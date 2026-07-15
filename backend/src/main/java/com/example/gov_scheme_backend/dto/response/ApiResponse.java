@@ -1,14 +1,13 @@
-package com.example.gov_scheme_backend.dto.auth;
+package com.example.gov_scheme_backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
-public class LoginResponse {
+public class ApiResponse {
     private boolean status;
     private String message;
-    private String token;
 }
