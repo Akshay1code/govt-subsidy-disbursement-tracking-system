@@ -1,4 +1,4 @@
-package com.example.gov_scheme_backend.models;
+package com.example.gov_scheme_backend.entities;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

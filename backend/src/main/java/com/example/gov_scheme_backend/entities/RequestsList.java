@@ -1,6 +1,7 @@
-package com.example.gov_scheme_backend.models;
+package com.example.gov_scheme_backend.entities;
 
 import com.example.gov_scheme_backend.enums.Role;
+import com.example.gov_scheme_backend.enums.Status;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,24 +11,34 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class Users {
+@AllArgsConstructor
+@Data
+public class RequestsList {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
     @Column
-    String fullName;
-    @Column(unique = true)
-    String username;
-    @Column(unique = false)
-    String password;
+    String officerId;
     @Column
-    @Enumerated(EnumType.STRING)
+    String fullName;
+    @Column
     Role role;
     @Column(length = 10)
     String mobileNo;
+    @Column
+    String region;
+    @Column
+    String district;
+    @Column
+    String state;
+    @Column(unique = true)
+    String username;
+    @Column
+    String password;
+    @Column
+    @Enumerated(EnumType.STRING)
+    Status status;
     @CreationTimestamp
     LocalDateTime createdAt;
     @CreationTimestamp
