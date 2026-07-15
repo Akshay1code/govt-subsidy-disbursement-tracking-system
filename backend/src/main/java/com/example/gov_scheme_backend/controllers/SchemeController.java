@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.ApiResponse;
-import com.example.gov_scheme_backend.dto.SchemesDto;
+import com.example.gov_scheme_backend.dto.response.ApiResponse;
+import com.example.gov_scheme_backend.dto.request.SchemesDto;
 import com.example.gov_scheme_backend.services.SchemeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
