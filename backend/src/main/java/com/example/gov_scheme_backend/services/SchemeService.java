@@ -1,8 +1,8 @@
 package com.example.gov_scheme_backend.services;
 
-import com.example.gov_scheme_backend.dto.ApiResponse;
-import com.example.gov_scheme_backend.dto.SchemesDto;
-import com.example.gov_scheme_backend.models.Schemes;
+import com.example.gov_scheme_backend.dto.response.ApiResponse;
+import com.example.gov_scheme_backend.dto.request.SchemesDto;
+import com.example.gov_scheme_backend.entities.Schemes;
 import com.example.gov_scheme_backend.repositories.SchemeRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

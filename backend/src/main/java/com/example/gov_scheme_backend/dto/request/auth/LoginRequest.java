@@ -1,4 +1,4 @@
-package com.example.gov_scheme_backend.dto.auth;
+package com.example.gov_scheme_backend.dto.request.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
