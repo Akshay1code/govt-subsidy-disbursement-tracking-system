@@ -1,0 +1,34 @@
+package com.example.gov_scheme_backend.enums;
+
+public enum DocumentType {
+
+    AADHAAR,
+
+    INCOME_CERTIFICATE,
+
+    CASTE_CERTIFICATE,
+
+    RESIDENCE_CERTIFICATE,
+
+    LAND_RECORD,
+
+    LAND_SURVEY_DOCUMENT,
+
+    BANK_PASSBOOK,
+
+    BONAFIDE_CERTIFICATE,
+
+    MARKS_MEMO,
+
+    FEE_RECEIPT,
+
+    BUSINESS_REGISTRATION,
+
+    GST_CERTIFICATE,
+
+    FISHING_LICENSE,
+
+    BOAT_REGISTRATION,
+
+    PASSPORT_PHOTO
+}
