@@ -1,6 +1,6 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.ApiResponse;
+import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.services.BadRequestException;
 import com.example.gov_scheme_backend.services.DuplicateResourceException;
 import com.example.gov_scheme_backend.services.ResourceNotFoundException;
