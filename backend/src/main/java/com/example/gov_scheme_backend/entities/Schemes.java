@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -12,23 +13,38 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(name = "schemes")
 public class Schemes {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    int id;
-    @Column
-    String schemeCode;
-    @Column
-    String schemeName;
-    @Column
-    String description;
-    @Column
-    double allocatedFunds;
-    @Column
-    boolean isActive;
-    @CreationTimestamp
-    LocalDateTime createdAt;
-    @CreationTimestamp
-    LocalDateTime updated;
+    private Integer id;
 
+    @Column(nullable = false, unique = true)
+    private String schemeCode;
+
+    @Column(nullable = false)
+    private String schemeName;
+
+    @Column(length = 1000)
+    private String description;
+
+    @Column(nullable = false)
+    private Double allocatedFunds;
+
+    @Column(nullable = false)
+    private Double minimumEligibleScore;
+
+    @Column(nullable = false)
+    private Boolean active;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private SchemeCategory category;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updated;
 }
