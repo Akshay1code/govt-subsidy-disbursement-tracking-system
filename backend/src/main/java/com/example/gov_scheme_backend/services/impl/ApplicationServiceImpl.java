@@ -1,13 +1,17 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.ApplicationRequestDTO;
 import com.example.gov_scheme_backend.dto.response.ApplicationResponseDTO;
 import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.Schemes;
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
+import com.example.gov_scheme_backend.exceptions.BadRequestException;
+import com.example.gov_scheme_backend.exceptions.DuplicateResourceException;
+import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.ApplicationRepository;
 import com.example.gov_scheme_backend.repositories.BeneficiaryRepository;
 import com.example.gov_scheme_backend.repositories.SchemeRepo;
+import com.example.gov_scheme_backend.services.ApplicationService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
