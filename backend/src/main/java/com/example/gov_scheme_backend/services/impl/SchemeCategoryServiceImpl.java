@@ -1,9 +1,12 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.SchemeCategoryRequestDTO;
 import com.example.gov_scheme_backend.dto.response.SchemeCategoryResponseDTO;
 import com.example.gov_scheme_backend.entities.SchemeCategory;
+import com.example.gov_scheme_backend.exceptions.DuplicateResourceException;
+import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.SchemeCategoryRepository;
+import com.example.gov_scheme_backend.services.SchemeCategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

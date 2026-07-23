@@ -1,4 +1,4 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.ApplicationFieldValueRequestDTO;
 import com.example.gov_scheme_backend.dto.response.ApplicationFieldValueResponseDTO;
@@ -6,6 +6,7 @@ import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.ApplicationFieldValue;
 import com.example.gov_scheme_backend.repositories.ApplicationFieldValueRepository;
 import com.example.gov_scheme_backend.repositories.ApplicationRepository;
+import com.example.gov_scheme_backend.services.ApplicationFieldValueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

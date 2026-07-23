@@ -1,4 +1,4 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.SchemeRequiredFieldRequestDTO;
 import com.example.gov_scheme_backend.dto.response.SchemeRequiredFieldResponseDTO;
@@ -6,6 +6,7 @@ import com.example.gov_scheme_backend.entities.SchemeRequiredField;
 import com.example.gov_scheme_backend.entities.Schemes;
 import com.example.gov_scheme_backend.repositories.SchemeRequiredFieldRepository;
 import com.example.gov_scheme_backend.repositories.SchemeRepo;
+import com.example.gov_scheme_backend.services.SchemeRequiredFieldService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

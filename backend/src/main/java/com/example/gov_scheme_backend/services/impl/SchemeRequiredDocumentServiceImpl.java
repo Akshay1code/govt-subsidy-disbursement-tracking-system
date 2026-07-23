@@ -1,12 +1,14 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.SchemeRequiredDocumentRequestDTO;
 import com.example.gov_scheme_backend.dto.response.SchemeRequiredDocumentResponseDTO;
 import com.example.gov_scheme_backend.entities.SchemeRequiredDocument;
 import com.example.gov_scheme_backend.entities.Schemes;
+import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.SchemeRequiredDocumentRepository;
 import com.example.gov_scheme_backend.repositories.SchemeRepo;
 
+import com.example.gov_scheme_backend.services.SchemeRequiredDocumentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
