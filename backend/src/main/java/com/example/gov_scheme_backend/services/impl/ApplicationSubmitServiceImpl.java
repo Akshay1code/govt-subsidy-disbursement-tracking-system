@@ -1,10 +1,11 @@
-package com.example.gov_scheme_backend.services;
+package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.ApplicationSubmitRequestDTO;
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.entities.*;
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
 import com.example.gov_scheme_backend.repositories.*;
+import com.example.gov_scheme_backend.services.ApplicationSubmitService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

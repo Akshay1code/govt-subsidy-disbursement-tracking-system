@@ -1,4 +1,4 @@
-package com.example.gov_scheme_backend.models;
+package com.example.gov_scheme_backend.entities;
 
 import com.example.gov_scheme_backend.enums.BeneficiaryStatus;
 import com.example.gov_scheme_backend.enums.Category;

@@ -12,6 +12,7 @@ import org.apache.catalina.User;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RequestListResponseDto {
+    String uniqueId;
     String fullName;
     Role role;
     String mobileNo;
