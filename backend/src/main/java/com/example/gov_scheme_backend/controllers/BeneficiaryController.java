@@ -1,51 +1,36 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.BeneficiaryRequestDTO;
-import com.example.gov_scheme_backend.dto.BeneficiaryResponseDTO;
+import com.example.gov_scheme_backend.dto.request.beneficiary.BeneficiaryRequestDTO;
+import com.example.gov_scheme_backend.dto.response.beneficiary.BeneficiaryResponseDTO;
 import com.example.gov_scheme_backend.services.BeneficiaryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @CrossOrigin(origins = "*")
-@RequestMapping("/api/beneficiaries")
+@RequestMapping("/gov/beneficiary")
 @RequiredArgsConstructor
 public class BeneficiaryController {
     private final BeneficiaryService beneficiaryService;
 
-    /** Registers a new beneficiary. */
-    @PostMapping
+    /** Registers a beneficiary record (normally auto-triggered when an application clears final approval). */
+    @PostMapping("/add")
     public ResponseEntity<BeneficiaryResponseDTO> registerBeneficiary(@Valid @RequestBody BeneficiaryRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(beneficiaryService.registerBeneficiary(request));
     }
 
-    /** Returns all active beneficiaries. */
-    @GetMapping
+    /** Returns all beneficiaries. */
+    @GetMapping("/get")
     public ResponseEntity<List<BeneficiaryResponseDTO>> getAllBeneficiaries() {
         return ResponseEntity.ok(beneficiaryService.getAllBeneficiaries());
     }
 
-    /** Returns an active beneficiary by ID. */
-    @GetMapping("/{id}")
-    public ResponseEntity<BeneficiaryResponseDTO> getBeneficiary(@PathVariable Long id) {
-        return ResponseEntity.ok(beneficiaryService.getBeneficiary(id));
-    }
-
-    /** Updates an active beneficiary by ID. */
+    /** Updates editable beneficiary fields (amounts, dates, remarks). */
     @PutMapping("/{id}")
     public ResponseEntity<BeneficiaryResponseDTO> updateBeneficiary(
             @PathVariable Long id,
@@ -53,16 +38,24 @@ public class BeneficiaryController {
         return ResponseEntity.ok(beneficiaryService.updateBeneficiary(id, request));
     }
 
-    /** Soft deletes a beneficiary by ID. */
+    /** Flags a beneficiary for review with a mandatory reason. */
+    @PutMapping("/{id}/flag")
+    public ResponseEntity<BeneficiaryResponseDTO> flagBeneficiary(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        return ResponseEntity.ok(beneficiaryService.flagBeneficiary(id, reason));
+    }
+
+    /** Clears the flag on a beneficiary once reviewed. */
+    @PutMapping("/{id}/unflag")
+    public ResponseEntity<BeneficiaryResponseDTO> unflagBeneficiary(@PathVariable Long id) {
+        return ResponseEntity.ok(beneficiaryService.unflagBeneficiary(id));
+    }
+
+    /** Deletes a beneficiary record. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBeneficiary(@PathVariable Long id) {
         beneficiaryService.deleteBeneficiary(id);
         return ResponseEntity.ok().build();
-    }
-
-    /** Searches beneficiaries by Aadhaar number, mobile number, or full name. */
-    @GetMapping("/search")
-    public ResponseEntity<List<BeneficiaryResponseDTO>> searchBeneficiary(@RequestParam String keyword) {
-        return ResponseEntity.ok(beneficiaryService.searchBeneficiary(keyword));
     }
 }

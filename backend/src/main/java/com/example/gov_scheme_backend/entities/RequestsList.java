@@ -19,10 +19,11 @@ public class RequestsList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
     @Column
-    String officerId;
+    String uniqueID;
     @Column
     String fullName;
     @Column
+    @Enumerated(EnumType.STRING)
     Role role;
     @Column(length = 10)
     String mobileNo;

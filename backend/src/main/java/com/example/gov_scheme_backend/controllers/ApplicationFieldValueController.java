@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.request.ApplicationFieldValueRequestDTO;
-import com.example.gov_scheme_backend.dto.response.ApplicationFieldValueResponseDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationFieldValueRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationFieldValueResponseDTO;
 import com.example.gov_scheme_backend.services.ApplicationFieldValueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

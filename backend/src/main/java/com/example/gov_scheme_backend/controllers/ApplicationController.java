@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.request.ApplicationRequestDTO;
-import com.example.gov_scheme_backend.dto.response.ApplicationResponseDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationResponseDTO;
 import com.example.gov_scheme_backend.services.ApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
