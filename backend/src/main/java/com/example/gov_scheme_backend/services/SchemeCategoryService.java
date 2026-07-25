@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.services;
 
-import com.example.gov_scheme_backend.dto.request.SchemeCategoryRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeCategoryResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeCategoryRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeCategoryResponseDTO;
 
 import java.util.List;
 

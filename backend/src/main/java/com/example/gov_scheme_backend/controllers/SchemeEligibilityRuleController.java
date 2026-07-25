@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.request.SchemeEligibilityRuleRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeEligibilityRuleResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeEligibilityRuleRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeEligibilityRuleResponseDTO;
 import com.example.gov_scheme_backend.services.SchemeEligibilityRuleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

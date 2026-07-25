@@ -1,8 +1,8 @@
 package com.example.gov_scheme_backend.controllers;
 
 
-import com.example.gov_scheme_backend.dto.request.SchemeRequiredDocumentRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeRequiredDocumentResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeRequiredDocumentRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeRequiredDocumentResponseDTO;
 import com.example.gov_scheme_backend.services.SchemeRequiredDocumentService;
 
 import lombok.RequiredArgsConstructor;

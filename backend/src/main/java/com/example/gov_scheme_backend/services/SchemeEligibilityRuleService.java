@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.services;
 
-import com.example.gov_scheme_backend.dto.request.SchemeEligibilityRuleRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeEligibilityRuleResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeEligibilityRuleRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeEligibilityRuleResponseDTO;
 
 import java.util.List;
 

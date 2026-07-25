@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.services;
 
-import com.example.gov_scheme_backend.dto.request.SchemeRequiredFieldRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeRequiredFieldResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeRequiredFieldRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeRequiredFieldResponseDTO;
 
 import java.util.List;
 

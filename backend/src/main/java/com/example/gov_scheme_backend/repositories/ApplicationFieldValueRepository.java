@@ -8,7 +8,6 @@ import java.util.List;
 public interface ApplicationFieldValueRepository
         extends JpaRepository<ApplicationFieldValue, Long> {
 
-
     List<ApplicationFieldValue> findByApplicationId(Long applicationId);
 
 }
