@@ -3,7 +3,6 @@ package com.example.gov_scheme_backend.services;
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.dto.request.SchemesDto;
 import com.example.gov_scheme_backend.entities.Schemes;
-import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.SchemeRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -44,13 +43,16 @@ public class SchemeService {
         } else {
             scheme.setSchemeCode(req.getSchemeCode());
         }
+
         scheme.setSchemeName(req.getSchemeName());
         scheme.setDescription(req.getDescription());
         scheme.setAllocatedFunds(req.getAllocatedFunds());
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
         scheme.setCategory(category);
+
         schemeRepo.save(scheme);
+
         return new ApiResponse(true, "Scheme created successfully");
     }
 }

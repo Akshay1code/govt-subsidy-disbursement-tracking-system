@@ -1,9 +1,11 @@
 package com.example.gov_scheme_backend.entities;
 
-import com.example.gov_scheme_backend.enums.RuleField;
+import com.example.gov_scheme_backend.enums.RuleKey;
 import com.example.gov_scheme_backend.enums.RuleOperator;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "scheme_eligibility_rules")
@@ -22,15 +24,12 @@ public class SchemeEligibilityRule {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private RuleField fieldName;
+    private RuleKey ruleKey;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RuleOperator operator;
 
     @Column(nullable = false)
-    private String expectedValue;
-
-    @Column(nullable = false)
-    private Integer points;
+    private String ruleValue;
 }

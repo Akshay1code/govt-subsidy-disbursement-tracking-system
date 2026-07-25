@@ -7,7 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -20,11 +19,10 @@ public class RequestsList {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     int id;
     @Column
-    String uniqueID;
+    String officerId;
     @Column
     String fullName;
     @Column
-    @Enumerated(EnumType.STRING)
     Role role;
     @Column(length = 10)
     String mobileNo;
@@ -43,6 +41,6 @@ public class RequestsList {
     Status status;
     @CreationTimestamp
     LocalDateTime createdAt;
-    @UpdateTimestamp
+    @CreationTimestamp
     LocalDateTime updatedAt;
 }
