@@ -1,6 +1,6 @@
 package com.example.gov_scheme_backend.services.impl;
 
-import com.example.gov_scheme_backend.dto.request.ApplicationSubmitRequestDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationSubmitRequestDTO;
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.entities.*;
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
@@ -17,7 +17,7 @@ public class ApplicationSubmitServiceImpl implements ApplicationSubmitService {
 
 
     @Autowired
-    private ApplicationRepository applicationRepository;
+    private ApplicationRepo applicationRepository;
 
     @Autowired
     private SchemeRepo schemeRepo;

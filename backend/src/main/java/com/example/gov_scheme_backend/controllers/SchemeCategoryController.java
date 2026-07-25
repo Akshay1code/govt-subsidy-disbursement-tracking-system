@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.request.SchemeCategoryRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeCategoryResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeCategoryRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeCategoryResponseDTO;
 import com.example.gov_scheme_backend.services.SchemeCategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

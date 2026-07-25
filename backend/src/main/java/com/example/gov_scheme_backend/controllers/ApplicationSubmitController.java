@@ -1,6 +1,6 @@
 package com.example.gov_scheme_backend.controllers;
 
-import com.example.gov_scheme_backend.dto.request.ApplicationSubmitRequestDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationSubmitRequestDTO;
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.services.ApplicationSubmitService;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.services.impl;
 
-import com.example.gov_scheme_backend.dto.request.SchemeRequiredFieldRequestDTO;
-import com.example.gov_scheme_backend.dto.response.SchemeRequiredFieldResponseDTO;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemeRequiredFieldRequestDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeRequiredFieldResponseDTO;
 import com.example.gov_scheme_backend.entities.SchemeRequiredField;
 import com.example.gov_scheme_backend.entities.Schemes;
 import com.example.gov_scheme_backend.repositories.SchemeRequiredFieldRepository;
