@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class SignupRequest {
-    String officerId;
     String fullName;
     Role role;
     String mobileNo;
@@ -18,5 +17,4 @@ public class SignupRequest {
     String state;
     String username;
     String password;
-
 }

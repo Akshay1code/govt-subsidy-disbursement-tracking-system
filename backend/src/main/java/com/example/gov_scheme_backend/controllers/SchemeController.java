@@ -1,8 +1,8 @@
 package com.example.gov_scheme_backend.controllers;
 
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
-import com.example.gov_scheme_backend.dto.request.SchemesDto;
-import com.example.gov_scheme_backend.services.SchemeService;
+import com.example.gov_scheme_backend.dto.request.schemes.SchemesDto;
+import com.example.gov_scheme_backend.services.impl.SchemeServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/gov/schemes")
 public class SchemeController {
     @Autowired
-    SchemeService schemeService;
+    SchemeServiceImpl schemeService;
     @PostMapping("/add")
     public ResponseEntity<ApiResponse> addScheme(@RequestBody SchemesDto req){
         ApiResponse res = schemeService.addService(req);

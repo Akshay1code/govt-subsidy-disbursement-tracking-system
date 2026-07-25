@@ -1,184 +1,137 @@
 package com.example.gov_scheme_backend.services.impl;
 
-import com.example.gov_scheme_backend.dto.BeneficiaryRequestDTO;
-import com.example.gov_scheme_backend.dto.BeneficiaryResponseDTO;
-import com.example.gov_scheme_backend.enums.BeneficiaryStatus;
+import com.example.gov_scheme_backend.dto.request.beneficiary.BeneficiaryRequestDTO;
+import com.example.gov_scheme_backend.dto.response.beneficiary.BeneficiaryResponseDTO;
+import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.Beneficiary;
+import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.DuplicateResourceException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
-import com.example.gov_scheme_backend.repositories.BeneficiaryRepository;
+import com.example.gov_scheme_backend.repositories.ApplicationRepo;
+import com.example.gov_scheme_backend.repositories.BeneficiaryRepo;
+import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.services.BeneficiaryService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class BeneficiaryServiceImpl implements BeneficiaryService {
-    private static final String BENEFICIARY_ID_PREFIX = "BEN";
 
-    private final BeneficiaryRepository beneficiaryRepository;
+    private final BeneficiaryRepo beneficiaryRepo;
+    private final UserRepo usersRepo;
+    private final ApplicationRepo applicationRepo;
 
-    /** Registers a beneficiary and creates the public beneficiary ID in BEN000001 format. */
+    /** Creates a beneficiary record linked to a user and their approved application. */
     @Override
     @Transactional
     public BeneficiaryResponseDTO registerBeneficiary(BeneficiaryRequestDTO request) {
-        validateDuplicateAadhaar(request.getAadhaarNumber());
-        validateDuplicateMobile(request.getMobileNumber());
+        if (beneficiaryRepo.existsByApplication_Id(request.getApplicationId())) {
+            throw new DuplicateResourceException("Beneficiary already exists for this application");
+        }
+
+        Users user = usersRepo.findByuniqueID(request.getUniqueID())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getUniqueID()));
+
+        Application application = applicationRepo.findById(request.getApplicationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with id: " + request.getApplicationId()));
 
         Beneficiary beneficiary = new Beneficiary();
-        mapRequestToEntity(request, beneficiary);
-        beneficiary.setStatus(BeneficiaryStatus.ACTIVE);
+        beneficiary.setUser(user);
+        beneficiary.setApplication(application);
+        beneficiary.setSanctionedAmount(request.getSanctionedAmount());
+        beneficiary.setDisbursedAmount(request.getDisbursedAmount());
+        beneficiary.setApprovedDate(request.getApprovedDate());
+        beneficiary.setDisbursedDate(request.getDisbursedDate());
+        beneficiary.setRemarks(request.getRemarks());
+        beneficiary.setIsFlagged(false);
 
-        Beneficiary savedBeneficiary = beneficiaryRepository.save(beneficiary);
-        savedBeneficiary.setBeneficiaryId(generateBeneficiaryId(savedBeneficiary.getId()));
-
-        return mapToResponse(beneficiaryRepository.save(savedBeneficiary));
+        return mapToResponse(beneficiaryRepo.save(beneficiary));
     }
 
-    /** Returns a single active beneficiary. */
     @Override
     public BeneficiaryResponseDTO getBeneficiary(Long id) {
-        return mapToResponse(getActiveBeneficiary(id));
+        return mapToResponse(getExistingBeneficiary(id));
     }
 
-    /** Returns all beneficiaries that are not soft deleted. */
     @Override
     public List<BeneficiaryResponseDTO> getAllBeneficiaries() {
-        return beneficiaryRepository.findByStatus(BeneficiaryStatus.ACTIVE)
+        return beneficiaryRepo.findAll()
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    /** Updates beneficiary details while preserving duplicate Aadhaar and mobile constraints. */
-    @Override
+    /** Updates editable fields (amounts, dates, remarks). */
     @Transactional
     public BeneficiaryResponseDTO updateBeneficiary(Long id, BeneficiaryRequestDTO request) {
-        Beneficiary beneficiary = getActiveBeneficiary(id);
+        Beneficiary beneficiary = getExistingBeneficiary(id);
+        beneficiary.setSanctionedAmount(request.getSanctionedAmount());
+        beneficiary.setDisbursedAmount(request.getDisbursedAmount());
+        beneficiary.setApprovedDate(request.getApprovedDate());
+        beneficiary.setDisbursedDate(request.getDisbursedDate());
+        beneficiary.setRemarks(request.getRemarks());
 
-        if (beneficiaryRepository.existsByAadhaarNumberAndIdNot(request.getAadhaarNumber(), id)) {
-            throw new DuplicateResourceException("Aadhaar number already exists");
-        }
-        if (beneficiaryRepository.existsByMobileNumberAndIdNot(request.getMobileNumber(), id)) {
-            throw new DuplicateResourceException("Mobile number already exists");
-        }
-
-        mapRequestToEntity(request, beneficiary);
-        return mapToResponse(beneficiaryRepository.save(beneficiary));
+        return mapToResponse(beneficiaryRepo.save(beneficiary));
     }
 
-    /** Soft deletes a beneficiary by marking status as inactive. */
+    /** Marks a beneficiary as flagged with a mandatory reason (e.g. document mismatch, fraud suspicion). */
+    @Override
+    @Transactional
+    public BeneficiaryResponseDTO flagBeneficiary(Long id, String reason) {
+        if (!StringUtils.hasText(reason)) {
+            throw new BadRequestException("Flag reason is required");
+        }
+
+        Beneficiary beneficiary = getExistingBeneficiary(id);
+        beneficiary.setIsFlagged(true);
+        beneficiary.setFlagReason(reason);
+
+        return mapToResponse(beneficiaryRepo.save(beneficiary));
+    }
+
+    /** Clears the flag from a beneficiary once reviewed. */
+    @Override
+    @Transactional
+    public BeneficiaryResponseDTO unflagBeneficiary(Long id) {
+        Beneficiary beneficiary = getExistingBeneficiary(id);
+        beneficiary.setIsFlagged(false);
+        beneficiary.setFlagReason(null);
+
+        return mapToResponse(beneficiaryRepo.save(beneficiary));
+    }
+
+    /** Deletes a beneficiary record. */
     @Override
     @Transactional
     public void deleteBeneficiary(Long id) {
-        Beneficiary beneficiary = getActiveBeneficiary(id);
-        beneficiary.setStatus(BeneficiaryStatus.INACTIVE);
-        beneficiaryRepository.save(beneficiary);
+        Beneficiary beneficiary = getExistingBeneficiary(id);
+        beneficiaryRepo.delete(beneficiary);
     }
 
-    /** Searches by exact-ish numeric fragments and name fragments across active records. */
-    @Override
-    public List<BeneficiaryResponseDTO> searchBeneficiary(String keyword) {
-        if (!StringUtils.hasText(keyword)) {
-            throw new BadRequestException("Search keyword is required");
-        }
-
-        String searchText = keyword.trim();
-        Map<Long, Beneficiary> uniqueResults = new LinkedHashMap<>();
-        addResults(uniqueResults, beneficiaryRepository.findByAadhaarNumberContainingAndStatus(searchText, BeneficiaryStatus.ACTIVE));
-        addResults(uniqueResults, beneficiaryRepository.findByMobileNumberContainingAndStatus(searchText, BeneficiaryStatus.ACTIVE));
-        addResults(uniqueResults, beneficiaryRepository.findByFullNameContainingIgnoreCaseAndStatus(searchText, BeneficiaryStatus.ACTIVE));
-
-        return uniqueResults.values()
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-
-    private Beneficiary getActiveBeneficiary(Long id) {
-        return beneficiaryRepository.findByIdAndStatus(id, BeneficiaryStatus.ACTIVE)
+    private Beneficiary getExistingBeneficiary(Long id) {
+        return beneficiaryRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Beneficiary not found with id: " + id));
-    }
-
-    private void validateDuplicateAadhaar(String aadhaarNumber) {
-        if (beneficiaryRepository.existsByAadhaarNumber(aadhaarNumber)) {
-            throw new DuplicateResourceException("Aadhaar number already exists");
-        }
-    }
-
-    private void validateDuplicateMobile(String mobileNumber) {
-        if (beneficiaryRepository.existsByMobileNumber(mobileNumber)) {
-            throw new DuplicateResourceException("Mobile number already exists");
-        }
-    }
-
-    private String generateBeneficiaryId(Long id) {
-        return BENEFICIARY_ID_PREFIX + String.format("%06d", id);
-    }
-
-    private void mapRequestToEntity(BeneficiaryRequestDTO request, Beneficiary beneficiary) {
-        beneficiary.setFullName(request.getFullName());
-        beneficiary.setAadhaarNumber(request.getAadhaarNumber());
-        beneficiary.setDateOfBirth(request.getDateOfBirth());
-        beneficiary.setGender(request.getGender());
-        beneficiary.setMobileNumber(request.getMobileNumber());
-        beneficiary.setEmail(request.getEmail());
-        beneficiary.setFatherName(request.getFatherName());
-        beneficiary.setOccupation(request.getOccupation());
-        beneficiary.setAnnualIncome(request.getAnnualIncome());
-        beneficiary.setCategory(request.getCategory());
-        beneficiary.setAddress(request.getAddress());
-        beneficiary.setVillage(request.getVillage());
-        beneficiary.setMandal(request.getMandal());
-        beneficiary.setDistrict(request.getDistrict());
-        beneficiary.setState(request.getState());
-        beneficiary.setPincode(request.getPincode());
-        beneficiary.setBankAccountNumber(request.getBankAccountNumber());
-        beneficiary.setIfscCode(request.getIfscCode());
-        beneficiary.setBankName(request.getBankName());
-        beneficiary.setLandArea(request.getLandArea());
-        beneficiary.setLandSurveyNumber(request.getLandSurveyNumber());
     }
 
     private BeneficiaryResponseDTO mapToResponse(Beneficiary beneficiary) {
         return BeneficiaryResponseDTO.builder()
                 .id(beneficiary.getId())
-                .beneficiaryId(beneficiary.getBeneficiaryId())
-                .fullName(beneficiary.getFullName())
-                .aadhaarNumber(beneficiary.getAadhaarNumber())
-                .dateOfBirth(beneficiary.getDateOfBirth())
-                .gender(beneficiary.getGender())
-                .mobileNumber(beneficiary.getMobileNumber())
-                .email(beneficiary.getEmail())
-                .fatherName(beneficiary.getFatherName())
-                .occupation(beneficiary.getOccupation())
-                .annualIncome(beneficiary.getAnnualIncome())
-                .category(beneficiary.getCategory())
-                .address(beneficiary.getAddress())
-                .village(beneficiary.getVillage())
-                .mandal(beneficiary.getMandal())
-                .district(beneficiary.getDistrict())
-                .state(beneficiary.getState())
-                .pincode(beneficiary.getPincode())
-                .bankAccountNumber(beneficiary.getBankAccountNumber())
-                .ifscCode(beneficiary.getIfscCode())
-                .bankName(beneficiary.getBankName())
-                .landArea(beneficiary.getLandArea())
-                .landSurveyNumber(beneficiary.getLandSurveyNumber())
-                .status(beneficiary.getStatus())
-                .createdAt(beneficiary.getCreatedAt())
-                .updatedAt(beneficiary.getUpdatedAt())
+                .uniqueID(beneficiary.getUser().getUniqueID())
+                .applicationId(beneficiary.getApplication().getId())
+                .sanctionedAmount(beneficiary.getSanctionedAmount())
+                .disbursedAmount(beneficiary.getDisbursedAmount())
+                .currentStatus(beneficiary.getCurrentStatus())
+                .approvedDate(beneficiary.getApprovedDate())
+                .disbursedDate(beneficiary.getDisbursedDate())
+                .remarks(beneficiary.getRemarks())
+                .isFlagged(beneficiary.getIsFlagged())
+                .flagReason(beneficiary.getFlagReason())
                 .build();
-    }
-
-    private void addResults(Map<Long, Beneficiary> uniqueResults, List<Beneficiary> beneficiaries) {
-        beneficiaries.forEach(beneficiary -> uniqueResults.putIfAbsent(beneficiary.getId(), beneficiary));
     }
 }
