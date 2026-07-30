@@ -94,8 +94,6 @@ public class ApplicationServiceImpl implements ApplicationService {
     private Application mapRequestToEntity(ApplicationRequestDTO request) {
 
         Application application = new Application();
-
-        application.setBeneficiaryId(request.getBeneficiaryId());
         application.setSchemeId(request.getSchemeId());
         application.setRemarks(request.getRemarks());
 
@@ -112,7 +110,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         response.setApplicationId(application.getId());
         response.setApplicationCode(application.getApplicationCode());
-        response.setBeneficiaryId(application.getBeneficiaryId());
         response.setSchemeId(application.getSchemeId());
         response.setStatus(application.getStatus());
         response.setRemarks(application.getRemarks());
