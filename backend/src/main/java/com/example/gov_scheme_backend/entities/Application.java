@@ -1,21 +1,13 @@
 package com.example.gov_scheme_backend.entities;
 
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.CascadeType;
+
 import java.util.List;
 
 import java.time.LocalDateTime;
@@ -31,11 +23,12 @@ public class Application {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private Users user;
+
     @Column(name = "application_code", unique = true)
     private String applicationCode;
-
-    @Column(name = "beneficiary_id", nullable = false)
-    private Long beneficiaryId;
 
     @Column(name = "scheme_id", nullable = false)
     private Integer schemeId;
@@ -61,4 +54,12 @@ public class Application {
             orphanRemoval = true
     )
     private List<ApplicationFieldValue> fieldValues;
+
+    @OneToMany(
+            mappedBy = "application",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<ApplicationDocument> documents;
+
 }

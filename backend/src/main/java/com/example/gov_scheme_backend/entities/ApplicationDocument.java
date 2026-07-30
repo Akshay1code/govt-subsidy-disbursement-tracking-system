@@ -20,28 +20,22 @@ public class ApplicationDocument {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_id", nullable = false)
     private Application application;
-
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DocumentType documentType;
 
-
     @Column(nullable = false)
     private String fileName;
-
 
     @Column(nullable = false)
     private String filePath;
 
-
     @Column(nullable = false)
     private Boolean verified = false;
-
 
     @CreationTimestamp
     @Column(name = "uploaded_at", nullable = false, updatable = false)
