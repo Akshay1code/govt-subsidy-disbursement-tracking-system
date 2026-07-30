@@ -17,15 +17,12 @@ public class ApplicationFieldValue {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="application_id", nullable = false)
     private Application application;
 
-
     @Column(nullable = false)
     private String fieldName;
-
 
     @Column(nullable = false)
     private String fieldValue;
