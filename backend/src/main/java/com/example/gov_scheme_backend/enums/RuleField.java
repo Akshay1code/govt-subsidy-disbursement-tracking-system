@@ -1,24 +1,25 @@
 package com.example.gov_scheme_backend.enums;
-
 public enum RuleField {
 
-    ANNUAL_INCOME,
+    AGE(FieldType.NUMBER),
 
-    LAND_AREA,
+    INCOME(FieldType.NUMBER),
 
-    OCCUPATION,
+    CGPA(FieldType.NUMBER),
 
-    CATEGORY,
+    CASTE(FieldType.STRING),
 
-    GENDER,
+    STATE(FieldType.STRING),
 
-    AGE,
+    GENDER(FieldType.STRING),;
 
-    MARKS_PERCENTAGE,
+    private final FieldType type;
 
-    BUSINESS_TYPE,
+    RuleField(FieldType type) {
+        this.type = type;
+    }
 
-    INVESTMENT_AMOUNT,
-
-    FISHING_EXPERIENCE
+    public FieldType getType() {
+        return type;
+    }
 }

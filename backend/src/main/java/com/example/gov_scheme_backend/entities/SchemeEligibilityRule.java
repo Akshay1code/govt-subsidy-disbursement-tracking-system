@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Optional;
+
 @Entity
 @Table(name = "scheme_eligibility_rules")
 @Data
@@ -18,10 +20,10 @@ public class SchemeEligibilityRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "scheme_id", nullable = false)
+    @JoinColumn(name = "scheme_code", nullable = false)
     private Schemes scheme;
+    @Enumerated(EnumType.STRING)
     @Column
     RuleField fieldName;
     @Column
@@ -38,4 +40,11 @@ public class SchemeEligibilityRule {
 
     @Column(nullable = false)
     private String ruleValue;
+
+    @Column(nullable = false)
+    private Double tolerance;
+
+    @Column(nullable = false)
+    private Double partialPercentage;
+
 }
