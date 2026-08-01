@@ -8,6 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Data
@@ -18,7 +19,7 @@ public class Schemes {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @Column(nullable = false, unique = true)
     private String schemeCode;
@@ -47,4 +48,19 @@ public class Schemes {
 
     @UpdateTimestamp
     private LocalDateTime updated;
+
+    @OneToMany(
+            mappedBy = "scheme",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<SchemeEligibilityRule> eligibilityRules;
+
+    @OneToMany(
+            mappedBy = "scheme",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<SchemeRequiredDocument> requiredDocuments;
+
 }

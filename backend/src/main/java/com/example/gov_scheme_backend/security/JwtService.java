@@ -4,6 +4,8 @@ import com.example.gov_scheme_backend.entities.Users;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ public class JwtService {
     public String generateToken(Users user) {
         Map<String,Object> claims = new HashMap<>();
         claims.put("role",user.getRole());
+        claims.put("userId",user.getId());
         return Jwts.builder()
                 .claims(claims)
                 .subject(user.getUsername())
@@ -38,13 +41,30 @@ public class JwtService {
         return extractAllClaims(token).getSubject();
     }
 
-    private Claims extractAllClaims(String token) {
+    public Claims extractAllClaims(String token) {
 
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+    public String extractTokenFromCookie(HttpServletRequest request) {
+
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+
+            if ("token".equals(cookie.getName())) {   // Replace "jwt" with your cookie name
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

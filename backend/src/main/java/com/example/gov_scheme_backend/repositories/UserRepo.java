@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface UserRepo extends JpaRepository<Users,Integer> {
+public interface UserRepo extends JpaRepository<Users,Long> {
     public boolean existsByUsername(String username);
     public Users save(Users user);
     List<Users> findByRole(Role role);

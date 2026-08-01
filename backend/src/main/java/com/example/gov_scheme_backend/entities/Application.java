@@ -30,8 +30,9 @@ public class Application {
     @Column(name = "application_code", unique = true)
     private String applicationCode;
 
-    @Column(name = "scheme_id", nullable = false)
-    private Integer schemeId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scheme_code" ,referencedColumnName = "schemeCode", nullable = false)
+    private Schemes scheme;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -61,5 +62,4 @@ public class Application {
             orphanRemoval = true
     )
     private List<ApplicationDocument> documents;
-
 }
