@@ -20,4 +20,11 @@ public interface BeneficiaryService {
     BeneficiaryResponseDTO unflagBeneficiary(Long id);
 
     void deleteBeneficiary(Long id);
+
+    /**
+     * Finance officer marks the beneficiary as disbursed. This updates beneficiary record,
+     * links the disbursement to the underlying application (sets Application.status = DISBURSED)
+     * and writes an audit log entry.
+     */
+    BeneficiaryResponseDTO disburseBeneficiary(Long id, com.example.gov_scheme_backend.dto.request.schemes.DisbursementRequestDTO request);
 }

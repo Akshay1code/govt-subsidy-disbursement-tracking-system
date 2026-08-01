@@ -38,6 +38,14 @@ public class BeneficiaryController {
         return ResponseEntity.ok(beneficiaryService.updateBeneficiary(id, request));
     }
 
+    /** Finance officer endpoint: mark beneficiary as disbursed. */
+    @PostMapping("/{id}/disburse")
+    public ResponseEntity<BeneficiaryResponseDTO> disburseBeneficiary(
+            @PathVariable Long id,
+            @Valid @RequestBody com.example.gov_scheme_backend.dto.request.schemes.DisbursementRequestDTO request) {
+        return ResponseEntity.ok(beneficiaryService.disburseBeneficiary(id, request));
+    }
+
     /** Flags a beneficiary for review with a mandatory reason. */
     @PutMapping("/{id}/flag")
     public ResponseEntity<BeneficiaryResponseDTO> flagBeneficiary(
