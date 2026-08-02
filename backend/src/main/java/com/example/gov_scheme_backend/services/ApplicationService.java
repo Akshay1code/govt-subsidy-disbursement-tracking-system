@@ -1,10 +1,13 @@
 package com.example.gov_scheme_backend.services;
 
-import com.example.gov_scheme_backend.dto.request.application.ApplicationRequestDTO;
-import com.example.gov_scheme_backend.dto.response.application.ApplicationResponseDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationFieldValueRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.EligibilityEngineScoreDTO;
 
 public interface ApplicationService {
 
-    ApplicationResponseDTO submitApplication(ApplicationRequestDTO request);
+    EligibilityEngineScoreDTO saveFields(
+            Long userId,
+            ApplicationFieldValueRequestDTO requests
+    );
 
 }

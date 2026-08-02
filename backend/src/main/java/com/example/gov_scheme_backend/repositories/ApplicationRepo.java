@@ -10,12 +10,5 @@ import java.util.Optional;
 
 @Repository
 public interface ApplicationRepo extends JpaRepository<Application, Long> {
-
     Optional<Application> findByApplicationCode(String applicationCode);
-
-    List<Application> findByBeneficiaryId(Long beneficiaryId);
-
-    List<Application> findByStatus(ApplicationStatus status);
-
-    boolean existsByBeneficiaryIdAndSchemeId(Long beneficiaryId, Integer schemeId);
 }
