@@ -26,6 +26,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final BeneficiaryRepo beneficiaryRepo;
     private final UserRepo usersRepo;
     private final ApplicationRepo applicationRepo;
+    private final com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
 
     /** Creates a beneficiary record linked to a user and their approved application. */
     @Override
@@ -112,6 +113,51 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     public void deleteBeneficiary(Long id) {
         Beneficiary beneficiary = getExistingBeneficiary(id);
         beneficiaryRepo.delete(beneficiary);
+    }
+
+    @Override
+    @Transactional
+    public BeneficiaryResponseDTO disburseBeneficiary(Long id, com.example.gov_scheme_backend.dto.request.schemes.DisbursementRequestDTO request) {
+        Beneficiary beneficiary = getExistingBeneficiary(id);
+
+        if (Boolean.TRUE.equals(beneficiary.getIsFlagged())) {
+            throw new BadRequestException("Beneficiary is flagged for review and cannot be disbursed");
+        }
+
+        // set disbursement details
+        beneficiary.setDisbursedAmount(request.getDisbursedAmount());
+        beneficiary.setDisbursedDate(request.getDisbursedDate() != null ? request.getDisbursedDate() : java.time.LocalDate.now());
+        if (request.getRemarks() != null) {
+            beneficiary.setRemarks(request.getRemarks());
+        }
+        // mark beneficiary active (business choice)
+        beneficiary.setCurrentStatus(com.example.gov_scheme_backend.enums.BeneficiaryStatus.ACTIVE);
+
+        beneficiary = beneficiaryRepo.save(beneficiary);
+
+        // Update application status to DISBURSED
+        Application application = beneficiary.getApplication();
+        application.setStatus(com.example.gov_scheme_backend.enums.ApplicationStatus.DISBURSED);
+        applicationRepo.save(application);
+
+        // Write audit log
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.DISBURSE)
+                .description("Disbursed amount " + request.getDisbursedAmount() + " to beneficiary id " + id + (performer != null ? " by " + performer.getUsername() : ""))
+                .build();
+
+        auditLogRepo.save(audit);
+
+        return mapToResponse(beneficiary);
     }
 
     private Beneficiary getExistingBeneficiary(Long id) {
