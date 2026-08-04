@@ -63,4 +63,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+
+        return path.equals("/gov/auth/signin")
+                || path.equals("/gov/auth/signup")
+                || path.equals("/gov/auth/officer/get-request");
+    }
 }

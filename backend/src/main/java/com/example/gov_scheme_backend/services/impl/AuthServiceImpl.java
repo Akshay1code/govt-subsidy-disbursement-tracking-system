@@ -8,7 +8,6 @@ import com.example.gov_scheme_backend.entities.RequestsList;
 import com.example.gov_scheme_backend.enums.Role;
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.enums.Status;
-import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.RequestRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
@@ -61,9 +60,9 @@ public class AuthServiceImpl {
             return new ApiResponse(false, "Password doesn't meet the standard guidelines");
         }
         String hashedPassword = passwordEncoder.encode(req.getPassword());
-        if(req.getRole() == null){
+        if(req.getRole().equals(Role.BENEFICIARY)){
             Users user = new Users();
-            user.setUniqueID("FAR-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            user.setUniqueID("BENEF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
             user.setFullName(req.getFullName());
             user.setUsername(req.getUsername());
             user.setPassword(hashedPassword);
@@ -71,12 +70,11 @@ public class AuthServiceImpl {
             user.setRegion(req.getRegion());
             user.setDistrict(req.getDistrict());
             user.setState(req.getState());
-            user.setRole(Role.FARMER);
+            user.setRole(Role.BENEFICIARY);
             userRepo.save(user);
 
             return new ApiResponse(true, "Signup Successfull");
         }
-
         RequestsList user = new RequestsList();
         user.setUniqueID("OFFI-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         user.setFullName(req.getFullName());
@@ -91,7 +89,6 @@ public class AuthServiceImpl {
         requestRepo.save(user);
 
         return new ApiResponse(true, "Request Sent Successfully to Admin");
-
     }
 
     public List<Users> profileService(Role role){
@@ -99,7 +96,28 @@ public class AuthServiceImpl {
     }
     
     public ApiResponse deleteProfile() {
-        return null;
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        Users dbUser = userRepo.findByUsername(username).orElse(null);
+        if (dbUser == null) {
+            return new ApiResponse(false, "User not found");
+        }
+        userRepo.delete(dbUser);
+        return new ApiResponse(true, "Profile deleted successfully");
+    }
+
+    public ApiResponse updateProfile(Users req) {
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        Users dbUser = userRepo.findByUsername(username).orElse(null);
+        if (dbUser == null) {
+            return new ApiResponse(false, "User not found");
+        }
+        if (req.getFullName() != null) dbUser.setFullName(req.getFullName());
+        if (req.getMobileNo() != null) dbUser.setMobileNo(req.getMobileNo());
+        if (req.getRegion() != null) dbUser.setRegion(req.getRegion());
+        if (req.getDistrict() != null) dbUser.setDistrict(req.getDistrict());
+        if (req.getState() != null) dbUser.setState(req.getState());
+        userRepo.save(dbUser);
+        return new ApiResponse(true, "Profile updated successfully!");
     }
 
     public List <RequestListResponseDto> getRequests() {

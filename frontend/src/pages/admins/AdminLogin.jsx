@@ -1,6 +1,8 @@
+import '../../styles/Login.css';
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import logo from '../../assets/icons/logo.png'
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -45,7 +47,7 @@ export default function AdminLogin() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <Link to="/" className="login-page__brand" style={{ margin: 0 }}>
-            <img src="/logo.png" alt="GS Portal Logo" className="login-page__logo" />
+            <img src={logo} alt="GS Portal Logo" className="login-page__logo" />
             <span>GS Admin Center</span>
           </Link>
         </div>
@@ -91,9 +93,8 @@ export default function AdminLogin() {
             </motion.button>
           </form>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2.5rem', fontSize: '0.86rem' }}>
-            <Link to="/officer/login">Officer Portal</Link>
-            <Link to="/login">Beneficiary Portal</Link>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', fontSize: '0.86rem' }}>
+            <Link to="/login">Go to Main Portal Login</Link>
           </div>
         </div>
       </motion.div>

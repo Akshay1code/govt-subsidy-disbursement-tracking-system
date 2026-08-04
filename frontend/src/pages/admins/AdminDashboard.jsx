@@ -1,8 +1,11 @@
+import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getSchemes, saveSchemes } from '../data/schemes'
-import ThemeToggle from '../components/ThemeToggle'
+import { getSchemes, saveSchemes } from '../../data/schemes'
+import ThemeToggle from '../../components/ThemeToggle'
+import { updateApprovalStatus, getOfficerRequests } from '../../services/adminService'
+import logo from '../../assets/icons/logo.png'
 
 // Seed applications used by default if none in localStorage
 const INITIAL_APPLICATIONS = [
@@ -180,7 +183,7 @@ export default function AdminDashboard() {
   const [actionLogs, setActionLogs] = useState([])
   const [showSchemeModal, setShowSchemeModal] = useState(false)
   const [editingScheme, setEditingScheme] = useState(null)
-  
+
   // Scheme Form State
   const [schemeForm, setSchemeForm] = useState({
     id: '',
@@ -213,7 +216,7 @@ export default function AdminDashboard() {
   const [officers, setOfficers] = useState(() => {
     const stored = window.localStorage.getItem('gov-subsidy-officers')
     const registered = stored ? JSON.parse(stored) : []
-    
+
     // Combine defaults and registered uniquely by officerId
     const combined = [...DEFAULT_OFFICERS]
     registered.forEach(reg => {
@@ -375,8 +378,8 @@ export default function AdminDashboard() {
   // Action Logs Filters
   const filteredLogs = actionLogs.filter(log => {
     const matchesSearch = log.details.toLowerCase().includes(logSearch.toLowerCase()) ||
-                          log.id.toLowerCase().includes(logSearch.toLowerCase()) ||
-                          log.targetId.toLowerCase().includes(logSearch.toLowerCase())
+      log.id.toLowerCase().includes(logSearch.toLowerCase()) ||
+      log.targetId.toLowerCase().includes(logSearch.toLowerCase())
     const matchesAction = logActionFilter === 'All' || log.action === logActionFilter
     const matchesOfficer = logOfficerFilter === 'All' || log.officerId === logOfficerFilter
     return matchesSearch && matchesAction && matchesOfficer
@@ -438,7 +441,8 @@ export default function AdminDashboard() {
   }
 
   // Admin Quick Action: Approve / Reject application override
-  function handleAdminStatusChange(appId, newStatus) {
+  async function handleAdminStatusChange(appId, newStatus) {
+    // ── 1. Optimistic local update ──────────────────────────────────────
     const updatedApps = applications.map(app => {
       if (app.id === appId) {
         return {
@@ -452,9 +456,18 @@ export default function AdminDashboard() {
 
     setApplications(updatedApps)
     window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(updatedApps))
-    showToast(`Application ${appId} marked as ${newStatus}`)
+
     if (selectedApp && selectedApp.id === appId) {
       setSelectedApp(prev => ({ ...prev, status: newStatus, remarks: `[Admin Override]: Status changed to ${newStatus}` }))
+    }
+
+    // ── 2. Sync to backend ──────────────────────────────────────────────
+    try {
+      await updateApprovalStatus(appId, newStatus.toUpperCase())
+      showToast(`Application ${appId} marked as ${newStatus}`)
+    } catch (err) {
+      console.warn('Backend sync failed, local update preserved:', err.message)
+      showToast(`Application ${appId} marked as ${newStatus} (offline mode)`)
     }
   }
 
@@ -489,7 +502,7 @@ export default function AdminDashboard() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <img src="/logo.png" alt="GS Portal" style={{ height: '36px' }} />
+            <img src={logo} alt="GS Portal" style={{ height: '36px' }} />
             <div>
               <strong style={{ fontSize: '1.1rem', color: 'var(--text)', display: 'block' }}>GS Admin Command Center</strong>
               <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>National Subsidy Tracking & Oversight</span>
@@ -572,7 +585,7 @@ export default function AdminDashboard() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             {/* High Level Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-              
+
               {/* Card 1: Total Applications */}
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
@@ -629,12 +642,12 @@ export default function AdminDashboard() {
 
             {/* Visual Analytics & Number Representations */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-              
+
               {/* Application Status Distribution */}
               <div className="admin-card" style={{ padding: '1.5rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '1.2rem', color: 'var(--text)' }}>Application Status Breakdown</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
                     <span style={{ fontWeight: 600, color: '#22c55e', fontSize: '0.95rem' }}>Approved</span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
@@ -669,7 +682,7 @@ export default function AdminDashboard() {
         {/* ── TAB 2: APPLICATION HISTORY & AUDIT ── */}
         {activeTab === 'history' && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            
+
             {/* Filters Row */}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
               <input
@@ -1089,7 +1102,7 @@ export default function AdminDashboard() {
                       if (log.action.includes('Reject')) actionColor = '#ef4444'
                       if (log.action.includes('Verify')) actionColor = '#22c55e'
                       if (log.action.includes('Unverify')) actionColor = '#f59e0b'
-                      
+
                       return (
                         <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
                           <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--muted)' }}>{log.id}</td>
