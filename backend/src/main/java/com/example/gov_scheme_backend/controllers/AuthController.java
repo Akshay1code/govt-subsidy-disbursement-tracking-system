@@ -35,7 +35,7 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
         cookie.setPath("/");
-        cookie.setMaxAge(60 * 60 * 1000);
+        cookie.setMaxAge(60 * 60 * 24 * 7);
         response.addCookie(cookie);
         return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse(true, "Login Successfull"));
     }
@@ -76,5 +76,35 @@ public class AuthController {
         return ResponseEntity.ok(
                 authService.updateApprovalStatus(uniqueId, status)
         );
+    }
+
+    @GetMapping("/profile/get")
+    public ResponseEntity<?> getMe() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() instanceof String) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse(false, "Not authenticated"));
+        }
+        Users user = (Users) auth.getPrincipal();
+        return ResponseEntity.ok(user);
+    }
+
+    @PostMapping("/signout")
+    public ResponseEntity<?> signout(HttpServletResponse response) {
+        Cookie cookie = new Cookie("token", null);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
+        return ResponseEntity.ok(new ApiResponse(true, "Signed out successfully"));
+    }
+
+    @PutMapping("/profile/update")
+    public ResponseEntity<ApiResponse> updateProfile(@RequestBody Users user) {
+        ApiResponse res = authService.updateProfile(user);
+        if(!res.isStatus()){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(res);
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(res);
     }
 }

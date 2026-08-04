@@ -1,16 +1,13 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { ThemeProvider } from './context/ThemeContext'
-import Landing from './pages/Landing'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import SchemeDetail from './pages/SchemeDetail'
-import OfficerLogin from './pages/OfficerLogin'
-import OfficerRegister from './pages/OfficerRegister'
-import OfficerDashboard from './pages/OfficerDashboard'
-import AdminLogin from './pages/AdminLogin'
-import AdminDashboard from './pages/AdminDashboard'
-import './App.css'
+import { ThemeProvider } from './src/context/ThemeContext'
+import Landing from './src/pages/Landing'
+import Login from './src/pages/auth/Login'
+import Register from './src/pages/auth/Register'
+import Dashboard from './src/pages/beneficiary/Dashboard'
+import SchemeDetail from './src/pages/SchemeDetail'
+import OfficerDashboard from './src/pages/officers/OfficerDashboard'
+import AdminLogin from './src/pages/admins/AdminLogin'
+import AdminDashboard from './src/pages/admins/AdminDashboard'
 
 function App() {
   return (
@@ -22,8 +19,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/scheme/:id" element={<SchemeDetail />} />
-          <Route path="/officer/login" element={<OfficerLogin />} />
-          <Route path="/officer/register" element={<OfficerRegister />} />
+          <Route path="/officer/login" element={<Login />} />
+          <Route path="/officer/register" element={<Register />} />
           <Route path="/officer/dashboard" element={<OfficerDashboard />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />

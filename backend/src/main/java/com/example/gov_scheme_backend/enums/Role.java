@@ -1,7 +1,7 @@
 package com.example.gov_scheme_backend.enums;
 
 public enum Role {
-    FARMER,
+    BENEFICIARY,
     FIELD_OFFICER,
     DISTRICT_OFFICER,
     REGIONAL_OFFICER,
