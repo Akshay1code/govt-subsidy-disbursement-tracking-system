@@ -1,6 +1,9 @@
+import '../../styles/Login.css';
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { registerOfficer } from '../../services/authService'
+import logo from '../../assets/icons/logo.png'
 
 function EyeIcon({ open }) {
   return open ? (
@@ -47,7 +50,7 @@ export default function OfficerRegister() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
     if (!form.fullName.trim()) { setError('Please enter your full name.'); return }
@@ -66,42 +69,28 @@ export default function OfficerRegister() {
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return }
 
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const payload = {
+        ...form,
+        employeeCode: form.employeeCode.trim() || 'EMP-' + Math.floor(100000 + Math.random() * 900000)
+      }
+
+      const result = await registerOfficer(payload)
+
+      if (result.status) {
+        showToast('Officer registration successful! Redirecting to login...', 'success')
+        setTimeout(() => {
+          navigate('/officer/login', { state: { registeredId: form.officerId.trim().toUpperCase() } })
+        }, 1400)
+      } else {
+        setError(result.message || 'Registration failed. Please try again.')
+      }
+    } catch (err) {
+      console.error('Officer registration error:', err)
+      setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.')
+    } finally {
       setLoading(false)
-
-      const storedOfficers = window.localStorage.getItem('gov-subsidy-officers')
-      const officersList = storedOfficers ? JSON.parse(storedOfficers) : []
-
-      // Check if Officer ID already exists
-      const idExists = officersList.some(
-        off => off.officerId.toUpperCase() === form.officerId.trim().toUpperCase()
-      ) || form.officerId.trim().toUpperCase() === 'OFF001'
-
-      if (idExists) {
-        setError('Officer ID already registered. Please choose or generate a unique ID.')
-        return
-      }
-
-      const newOfficer = {
-        fullName: form.fullName.trim(),
-        officerId: form.officerId.trim().toUpperCase(),
-        designation: form.designation,
-        department: form.department,
-        district: form.district.trim(),
-        email: form.email.trim(),
-        employeeCode: form.employeeCode.trim() || 'EMP-' + Math.floor(100000 + Math.random() * 900000),
-        password: form.password,
-        registeredAt: new Date().toISOString()
-      }
-
-      officersList.push(newOfficer)
-      window.localStorage.setItem('gov-subsidy-officers', JSON.stringify(officersList))
-
-      showToast('Officer registration successful! Redirecting to login...', 'success')
-      setTimeout(() => {
-        navigate('/officer/login', { state: { registeredId: newOfficer.officerId } })
-      }, 1400)
-    }, 800)
+    }
   }
 
   return (
@@ -131,7 +120,7 @@ export default function OfficerRegister() {
         {/* Brand & Theme Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <Link to="/" className="login-page__brand" style={{ margin: 0 }}>
-            <img src="/logo.png" alt="GS Portal Logo" className="login-page__logo" />
+            <img src={logo} alt="GS Portal Logo" className="login-page__logo" />
             <span>GS Officer Portal</span>
           </Link>
         </div>

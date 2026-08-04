@@ -1,6 +1,8 @@
+import '../styles/Landing.css';
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import logo from '../assets/icons/logo.png'
 
 const STORAGE_KEY = 'gov-subsidy-language'
 
@@ -558,7 +560,7 @@ function Landing() {
 
       <header className="topbar">
         <div className="topbar__brand">
-          <img src="/logo.png" alt="GS Gov Subsidy Logo" className="brand-logo" />
+          <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
           <div>
             <strong>GS Gov Subsidy</strong>
             <span>Scheme Portal</span>
