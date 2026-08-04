@@ -2,6 +2,7 @@ package com.example.gov_scheme_backend.entities;
 import com.example.gov_scheme_backend.enums.BeneficiaryStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 import jakarta.persistence.Id;
 
@@ -28,7 +29,9 @@ public class Beneficiary {
     private Double disbursedAmount;
     @Enumerated(EnumType.STRING)
     private BeneficiaryStatus currentStatus;
+    @CreationTimestamp
     private LocalDate approvedDate;
+    @CreationTimestamp
     private LocalDate disbursedDate;
     private String remarks;
     @Column(nullable = false)

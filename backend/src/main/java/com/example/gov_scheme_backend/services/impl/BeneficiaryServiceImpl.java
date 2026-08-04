@@ -126,8 +126,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // set disbursement details
         beneficiary.setDisbursedAmount(request.getDisbursedAmount());
-        beneficiary.setDisbursedDate(request.getDisbursedDate() != null ? request.getDisbursedDate() : java.time.LocalDate.now());
-        if (request.getRemarks() != null) {
+               if (request.getRemarks() != null) {
             beneficiary.setRemarks(request.getRemarks());
         }
         // mark beneficiary active (business choice)
