@@ -275,18 +275,7 @@ export default function SchemeDetail() {
     navigate('/dashboard')
   }
 
-  // Simulate field officer processing application (DBT)
-  const handleSimulateOfficerDisbursement = () => {
-    const updatedApps = {
-      ...applications,
-      [scheme.id]: {
-        ...appDetails,
-        status: 'Disbursed'
-      }
-    }
-    window.localStorage.setItem('gov-subsidy-applications', JSON.stringify(updatedApps))
-    setApplications(updatedApps)
-  }
+
 
   return (
     <div className="scheme-detail-layout">
@@ -383,15 +372,7 @@ export default function SchemeDetail() {
                       </span>
                     </div>
                     
-                    {appDetails.status === 'Applied' && (
-                      <button 
-                        onClick={handleSimulateOfficerDisbursement}
-                        className="button button--secondary btn-apply"
-                        style={{ width: '100%', marginTop: '1.2rem' }}
-                      >
-                        Simulate Officer Inspection & Disbursement
-                      </button>
-                    )}
+
 
                     <Link to="/dashboard" className="button button--ghost" style={{ width: '100%', marginTop: '0.8rem', textAlign: 'center' }}>
                       Go to Tracking Dashboard

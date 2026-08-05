@@ -127,6 +127,7 @@ public class AuthServiceImpl {
 
             RequestListResponseDto dto = new RequestListResponseDto();
 
+            dto.setUniqueID(request.getUniqueID());
             dto.setFullName(request.getFullName());
             dto.setRole(request.getRole());
             dto.setMobileNo(request.getMobileNo());
@@ -151,22 +152,22 @@ public class AuthServiceImpl {
         }
         if(status.equals("APPROVED")){
             requestStatus = Status.APPROVED;
+            Users user = new Users();
+            user.setFullName(request.getFullName());
+            user.setMobileNo(request.getMobileNo());
+            user.setRole(request.getRole());
+            user.setUniqueID(request.getUniqueID());
+            user.setUsername(request.getUsername());
+            user.setPassword(request.getPassword());
+            user.setRegion(request.getRegion());
+            user.setDistrict(request.getDistrict());
+            user.setState(request.getState());
+            userRepo.save(user);
         }
         if(status.equals("REJECTED")){
             requestStatus = Status.REJECTED;
         }
 
-        Users user = new Users();
-        user.setFullName(request.getFullName());
-        user.setMobileNo(request.getMobileNo());
-        user.setRole(request.getRole());
-        user.setUniqueID(request.getUniqueID());
-        user.setUsername(request.getUsername());
-        user.setPassword(request.getPassword());
-        user.setRegion(request.getRegion());
-        user.setDistrict(request.getDistrict());
-        user.setState(request.getState());
-        userRepo.save(user);
         request.setStatus(requestStatus);
         requestRepo.save(request);
 
