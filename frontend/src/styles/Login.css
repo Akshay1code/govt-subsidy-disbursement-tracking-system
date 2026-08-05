@@ -1,0 +1,534 @@
+/* ==========================================================================
+   LOGIN PAGE
+   ========================================================================== */
+
+.login-page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Left panel */
+.login-page__left {
+  --bg: #f5f8f3;
+  --text: #0f1c12;
+  --text-soft: #3a473d;
+  --muted: #657569;
+  --accent-strong: #c98804;
+  --border-light: rgba(22, 60, 30, 0.08);
+  --bg-input: rgba(255, 255, 255, 0.7);
+
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2.5rem;
+  background: linear-gradient(160deg, #eaf3ea 0%, #fdf5d6 100%);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.login-page__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+
+.login-page__logo {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.login-page__form-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.login-page__copy {
+  margin-bottom: 1.5rem;
+}
+
+.login-page__copy h1 {
+  margin: 0 0 0.25rem;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.login-page__copy p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+/* Form fields */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.form-group-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.login-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  height: 100%;
+}
+
+.login-form__field > label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.login-form__input-wrap {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.login-form__input-wrap:focus-within {
+  border-color: #f5c842;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.15);
+}
+
+.login-form__icon {
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: color 180ms ease;
+}
+
+.login-form__input-wrap:focus-within .login-form__icon {
+  color: var(--accent-strong);
+}
+
+.login-form__input-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.96rem;
+}
+
+.login-form__input-wrap input::placeholder {
+  color: #a39b8c;
+}
+
+/* Remove browser default autofill background color */
+.login-form__input-wrap input:-webkit-autofill,
+.login-form__input-wrap input:-webkit-autofill:hover, 
+.login-form__input-wrap input:-webkit-autofill:focus, 
+.login-form__input-wrap input:-webkit-autofill:active {
+  transition: background-color 5000s ease-in-out 0s;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
+.login-form__pw-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: color 150ms ease;
+}
+
+.login-form__pw-toggle:hover {
+  color: var(--text);
+}
+
+/* Role chips */
+.login-form__role-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.role-chip {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.role-chip:hover {
+  border-color: #f5c842;
+  color: var(--text);
+}
+
+.role-chip.active {
+  border-color: #f5c842;
+  background: #fdf5d3;
+  color: #9c6c00;
+  font-weight: 700;
+}
+
+/* Meta row */
+.login-form__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: -0.25rem;
+}
+
+.login-form__remember {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.login-form__forgot {
+  font-size: 0.88rem;
+  color: var(--accent-strong);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-form__forgot:hover {
+  text-decoration: underline;
+}
+
+/* Error */
+.login-form__error {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: rgba(220, 80, 60, 0.15);
+  border: 1px solid rgba(220, 80, 60, 0.3);
+  color: #f87171;
+  font-size: 0.88rem;
+}
+
+/* Submit button */
+.login-form__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #e6a020, #c47d10);
+  color: #0d1a0e;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: opacity 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 8px 28px rgba(200, 130, 20, 0.35);
+}
+
+.login-form__submit:hover {
+  box-shadow: 0 12px 36px rgba(200, 130, 20, 0.5);
+}
+
+.login-form__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-form__spinner {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #0d1a0e;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Register link */
+.login-page__register {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.login-page__register a {
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.login-page__register a:hover {
+  text-decoration: underline;
+}
+
+/* Right panel */
+.login-page__right {
+  position: relative;
+  background: url('../assets/images/farmers-group.png') center center / cover no-repeat;
+  overflow: hidden;
+}
+
+.login-page__right-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(4, 14, 10, 0.35) 0%, rgba(4, 14, 10, 0.15) 100%);
+}
+
+/* ── Control buttons (X and edit) ── */
+.rp-controls {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.rp-ctrl-btn {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #222;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 150ms ease;
+}
+
+.rp-ctrl-btn--accent {
+  background: #f5c842;
+  color: #1a1200;
+}
+
+.rp-ctrl-btn:hover { background: rgba(255,255,255,1); }
+.rp-ctrl-btn--accent:hover { background: #e0b430; }
+
+/* ── Task card (yellow) ── */
+.rp-card {
+  position: absolute;
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  padding: 1rem 1.25rem;
+}
+
+.rp-card--task {
+  top: 1.4rem;
+  left: 1.4rem;
+  background: #f5c842;
+  color: #1a1200;
+  min-width: 210px;
+  box-shadow: 0 8px 28px rgba(200, 160, 0, 0.35);
+}
+
+.rp-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.rp-card__header strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rp-card--task small {
+  font-size: 0.78rem;
+  opacity: 0.7;
+  display: block;
+}
+
+.rp-card__sub {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+.rp-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rp-card__dot--dark { background: #1a1200; }
+.rp-card__dot--yellow { background: #f5c842; }
+
+/* ── Avatar cluster ── */
+.rp-avatars {
+  position: absolute;
+  top: 38%;
+  right: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.rp-avatar {
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.7);
+  background: rgba(10, 28, 18, 0.7);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+}
+
+/* ── Calendar strip ── */
+.rp-calendar {
+  position: absolute;
+  bottom: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.2rem;
+  background: rgba(5, 14, 10, 0.45);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 0.75rem 1.1rem;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.rp-cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 10px;
+  cursor: default;
+  transition: background 150ms ease;
+}
+
+.rp-cal-day span {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.rp-cal-day strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+}
+
+.rp-cal-day.active {
+  background: rgba(255,255,255,0.14);
+}
+
+.rp-cal-day.active strong {
+  color: #fff;
+}
+
+/* ── Meeting card (white) ── */
+.rp-card--meeting {
+  bottom: 1.5rem;
+  left: 1.4rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1200;
+  min-width: 200px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+}
+
+.rp-card--meeting .rp-card__header strong {
+  font-size: 0.95rem;
+  color: #111;
+}
+
+.rp-card--meeting small {
+  font-size: 0.78rem;
+  color: #555;
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.rp-meeting-avatars {
+  display: flex;
+  gap: -0.3rem;
+  margin-top: 0.75rem;
+}
+
+.rp-mini-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #e8e0d0;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  margin-left: -0.4rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.rp-mini-avatar:first-child {
+  margin-left: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-page__right {
+    display: none;
+  }
+
+  .login-page__left {
+    padding: 2rem 1.5rem;
+  }
+}
+
+/* ========================================================================== */
