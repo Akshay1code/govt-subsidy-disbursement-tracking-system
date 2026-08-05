@@ -16,6 +16,7 @@ import com.example.gov_scheme_backend.exceptions.DuplicateResourceException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.ApplicationRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
+import com.example.gov_scheme_backend.repositories.SchemeRepo;
 import com.example.gov_scheme_backend.services.ApplicationService;
 import com.example.gov_scheme_backend.services.EligibilityEngineService;
 import jakarta.transaction.Transactional;
@@ -36,6 +37,8 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Autowired
     UserRepo userRepo;
     @Autowired
+    SchemeRepo schemeRepo;
+    @Autowired
     EligibilityEngineService check;
 
     @Override
@@ -47,12 +50,17 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found"));
 
+        Schemes scheme = schemeRepo.findBySchemeCode(req.getSchemeCode())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Scheme not found with code: " + req.getSchemeCode()));
+
         Application app = new Application();
 
         app.setApplicationCode("APP-" +
                 UUID.randomUUID().toString().substring(0, 8).toUpperCase());
 
         app.setUser(user);
+        app.setScheme(scheme);
         app.setStatus(ApplicationStatus.PENDING);
 
         List<ApplicationFieldValue> fieldValues = new ArrayList<>();
