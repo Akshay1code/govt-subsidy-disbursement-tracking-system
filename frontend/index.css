@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Source+Serif+4:wght@600;700;800&display=swap');
+
+:root {
+  --bg: #07130f;
+  --bg-elevated: #102018;
+  --panel: rgba(7, 19, 15, 0.72);
+  --panel-strong: rgba(8, 26, 18, 0.9);
+  --text: #fff7e8;
+  --text-soft: rgba(255, 247, 232, 0.84);
+  --muted: rgba(255, 247, 232, 0.66);
+  --accent: #d9822b;
+  --accent-strong: #ffc76a;
+  --secondary: #5f8f4a;
+  --solar: #82aeca;
+  --border: rgba(255, 255, 255, 0.12);
+  --shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
+  font-family: 'Noto Sans', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* LIGHT MODE STYLING OVERRIDES ([data-theme="light"])
+   ------------------------------------------------------------- */
+[data-theme="light"] {
+  --bg: #f4f7f5;
+  --bg-elevated: #ffffff;
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel-strong: #ffffff;
+  --text: #0f172a;
+  --text-soft: #334155;
+  --muted: #64748b;
+  --accent: #d97706;
+  --accent-strong: #b45309;
+  --secondary: #16a34a;
+  --solar: #0284c7;
+  --border: rgba(15, 23, 42, 0.12);
+  --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  color-scheme: light;
+}
+
+[data-theme="light"] body {
+  background: #f4f7f5;
+  color: #0f172a;
+}
+
+[data-theme="light"] .landing-shell {
+  background: #f4f7f5;
+}
+
+[data-theme="light"] .landing-backdrop {
+  background:
+    linear-gradient(180deg, rgba(244, 247, 245, 0.88) 0%, rgba(244, 247, 245, 0.8) 45%, rgba(244, 247, 245, 0.95) 100%),
+    linear-gradient(90deg, rgba(244, 247, 245, 0.9) 0%, rgba(244, 247, 245, 0.75) 38%, rgba(244, 247, 245, 0.5) 100%),
+    url('./src/assets/images/farm-hero.png') center center / cover no-repeat;
+  filter: none;
+}
+
+[data-theme="light"] .landing-nav {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .landing-nav__link {
+  color: #334155;
+}
+
+[data-theme="light"] .landing-nav__link:hover {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+[data-theme="light"] .landing-card,
+[data-theme="light"] .dashboard-card,
+[data-theme="light"] .officer-card,
+[data-theme="light"] .login-page__left,
+[data-theme="light"] .modal-content,
+[data-theme="light"] .stat-card,
+[data-theme="light"] .table-card,
+[data-theme="light"] .admin-card,
+[data-theme="light"] .officer-progress-card,
+[data-theme="light"] .scheme-info-panel,
+[data-theme="light"] .gate-card,
+[data-theme="light"] .tracking-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .login-page__left {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .data-table th {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+[data-theme="light"] .data-table td {
+  border-bottom-color: rgba(15, 23, 42, 0.06) !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .data-table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.03) !important;
+}
+
+[data-theme="light"] .theme-toggle {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: #f1f5f9;
+  border-color: var(--accent);
+}
+
+[data-theme="light"] .beneficiary-meta-card {
+  background: linear-gradient(135deg, rgba(95, 143, 74, 0.12) 0%, rgba(142, 214, 106, 0.06) 100%) !important;
+}
+
+[data-theme="light"] .doc-verify-row {
+  background: var(--bg) !important;
+}
+
+[data-theme="light"] .doc-verify-btn {
+  background: var(--bg) !important;
+}
+
+[data-theme="light"] .doc-verify-btn:hover {
+  background: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Custom sizes for action buttons in dashboards */
+.btn-apply,
+.btn-approve,
+.btn-reject {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.82rem !important;
+  min-height: unset !important;
+  height: auto !important;
+  width: auto !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em !important;
+}
+
+

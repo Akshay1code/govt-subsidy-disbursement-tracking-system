@@ -1,0 +1,20 @@
+package com.example.gov_scheme_backend.enums;
+
+public enum DocumentType {
+
+    AADHAAR,
+    PAN,
+    RATION_CARD,
+    INCOME_CERTIFICATE,
+    CASTE_CERTIFICATE,
+    DOMICILE_CERTIFICATE,
+    LAND_RECORD,
+    BANK_PASSBOOK,
+    PASSPORT,
+    VOTER_ID,
+    DRIVING_LICENSE,
+    DISABILITY_CERTIFICATE,
+    BIRTH_CERTIFICATE,
+    EDUCATION_CERTIFICATE,
+    PASSPORT_PHOTO
+}
