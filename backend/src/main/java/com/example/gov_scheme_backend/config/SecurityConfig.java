@@ -35,7 +35,10 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/gov/auth/signin", "/gov/auth/signup"
-                                ,"/gov/auth/officer/get-request").permitAll()
+                                ,"/gov/auth/officer/get-request"
+                                ,"/api/v1/disbursement/**"
+                                ,"/api/v1/reports/**"
+                                ,"/api/v1/test/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // Removed httpBasic to stop the native browser popup

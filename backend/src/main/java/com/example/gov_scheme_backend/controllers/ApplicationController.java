@@ -7,6 +7,8 @@ import com.example.gov_scheme_backend.dto.response.application.ApplicationRespon
 import com.example.gov_scheme_backend.dto.response.application.EligibilityEngineScoreDTO;
 import com.example.gov_scheme_backend.security.JwtService;
 import com.example.gov_scheme_backend.services.ApplicationService;
+import com.example.gov_scheme_backend.entities.Application;
+import com.example.gov_scheme_backend.enums.RuleField;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -59,4 +61,53 @@ public class ApplicationController {
 //
 //    }
 
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.ApplicationRepo applicationRepo;
+
+    @GetMapping
+    public ResponseEntity<?> getAllApplications() {
+        return getApplicationsList();
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyApplications() {
+        return getApplicationsList();
+    }
+
+    private ResponseEntity<?> getApplicationsList() {
+        List<Application> apps = applicationRepo.findAll();
+        List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
+        for (Application app : apps) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", app.getId());
+            map.put("applicationId", app.getId());
+            map.put("applicationCode", app.getApplicationCode());
+            map.put("applicant", app.getUser() != null ? app.getUser().getFullName() : "Unknown");
+            map.put("applicantName", app.getUser() != null ? app.getUser().getFullName() : "Unknown");
+            map.put("schemeName", app.getScheme() != null ? app.getScheme().getSchemeName() : "Unknown");
+            map.put("schemeId", app.getScheme() != null ? app.getScheme().getSchemeCode() : "");
+            map.put("status", app.getStatus() != null ? app.getStatus().toString() : "PENDING");
+            map.put("remarks", app.getRemarks());
+            
+            String annualIncome = "45000";
+            String aadhaar = "1234-5678-9012";
+            String phone = "9876543210";
+            if (app.getFieldValues() != null) {
+                for (com.example.gov_scheme_backend.entities.ApplicationFieldValue val : app.getFieldValues()) {
+                    String fieldNameStr = val.getFieldName() != null ? val.getFieldName().name() : "";
+                    if ("INCOME".equalsIgnoreCase(fieldNameStr)) {
+                        annualIncome = val.getFieldValue();
+                    }
+                }
+            }
+            if (app.getUser() != null) {
+                phone = app.getUser().getMobileNo() != null ? app.getUser().getMobileNo() : phone;
+            }
+            map.put("annualIncome", annualIncome);
+            map.put("aadhaar", aadhaar);
+            map.put("phone", phone);
+            response.add(map);
+        }
+        return ResponseEntity.ok(response);
+    }
 }

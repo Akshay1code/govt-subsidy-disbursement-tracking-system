@@ -51,6 +51,7 @@ public class SchemeServiceImpl {
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
         scheme.setCategory(category);
+        scheme.setBudgetUsed(0.0);
 
         schemeRepo.save(scheme);
 
