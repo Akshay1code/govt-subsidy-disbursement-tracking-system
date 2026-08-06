@@ -33,6 +33,13 @@ public class Schemes {
     @Column(nullable = false)
     private Double allocatedFunds;
 
+    @Column(name = "budget_used", nullable = false)
+    private Double budgetUsed = 0.0;
+
+    public Double getBudgetUsed() {
+        return budgetUsed != null ? budgetUsed : 0.0;
+    }
+
     @Column(nullable = false)
     private Double minimumEligibleScore;
 

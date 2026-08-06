@@ -38,7 +38,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
         }
         for (SchemeEligibilityRule rule : rules) {
 
-            String userValue = userFields.get(rule.getFieldName());
+            String userValue = userFields.get(rule.getFieldName().name());
             if (userValue == null) {
                 throw new BadRequestException(
                         "Missing value for field: " + rule.getFieldName()

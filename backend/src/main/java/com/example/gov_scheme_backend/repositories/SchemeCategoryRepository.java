@@ -8,5 +8,6 @@ import org.springframework.stereotype.Repository;
 public interface SchemeCategoryRepository extends JpaRepository<SchemeCategory, Integer> {
 
     boolean existsByCategoryNameIgnoreCase(String categoryName);
+    java.util.Optional<SchemeCategory> findByCategoryName(String categoryName);
 
 }

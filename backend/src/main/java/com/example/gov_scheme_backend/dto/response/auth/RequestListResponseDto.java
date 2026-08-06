@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RequestListResponseDto {
-    String uniqueID;
     String fullName;
     Role role;
     String mobileNo;
