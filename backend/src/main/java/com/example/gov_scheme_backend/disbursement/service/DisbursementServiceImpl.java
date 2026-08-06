@@ -1,14 +1,14 @@
-package com.example.disbursement.service;
+package com.example.gov_scheme_backend.disbursement.service;
 
-import com.example.disbursement.dto.ConfigurePlanRequest;
-import com.example.disbursement.model.AuditLog;
-import com.example.disbursement.model.DisbursementMilestone;
-import com.example.disbursement.model.DisbursementPlan;
-import com.example.disbursement.model.Scheme;
-import com.example.disbursement.repository.AuditLogRepository;
-import com.example.disbursement.repository.DisbursementMilestoneRepository;
-import com.example.disbursement.repository.DisbursementPlanRepository;
-import com.example.disbursement.repository.SchemeRepository;
+import com.example.gov_scheme_backend.disbursement.dto.ConfigurePlanRequest;
+import com.example.gov_scheme_backend.disbursement.model.AuditLog;
+import com.example.gov_scheme_backend.disbursement.model.DisbursementMilestone;
+import com.example.gov_scheme_backend.disbursement.model.DisbursementPlan;
+import com.example.gov_scheme_backend.disbursement.model.Scheme;
+import com.example.gov_scheme_backend.disbursement.repository.AuditLogRepository;
+import com.example.gov_scheme_backend.disbursement.repository.DisbursementMilestoneRepository;
+import com.example.gov_scheme_backend.disbursement.repository.DisbursementPlanRepository;
+import com.example.gov_scheme_backend.disbursement.repository.SchemeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

@@ -1,7 +1,7 @@
-package com.example.disbursement.service;
+package com.example.gov_scheme_backend.disbursement.service;
 
-import com.example.disbursement.dto.ConfigurePlanRequest;
-import com.example.disbursement.model.DisbursementMilestone;
+import com.example.gov_scheme_backend.disbursement.dto.ConfigurePlanRequest;
+import com.example.gov_scheme_backend.disbursement.model.DisbursementMilestone;
 
 import java.util.List;
 

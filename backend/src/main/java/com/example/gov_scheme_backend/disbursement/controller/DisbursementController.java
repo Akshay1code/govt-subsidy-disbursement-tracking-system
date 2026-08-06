@@ -1,8 +1,8 @@
-package com.example.disbursement.controller;
+package com.example.gov_scheme_backend.disbursement.controller;
 
-import com.example.disbursement.dto.ConfigurePlanRequest;
-import com.example.disbursement.model.DisbursementMilestone;
-import com.example.disbursement.service.DisbursementService;
+import com.example.gov_scheme_backend.disbursement.dto.ConfigurePlanRequest;
+import com.example.gov_scheme_backend.disbursement.model.DisbursementMilestone;
+import com.example.gov_scheme_backend.disbursement.service.DisbursementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
