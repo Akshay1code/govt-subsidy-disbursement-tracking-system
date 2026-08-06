@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const DEFAULT_OFFICERS = [
   {
     officerId: 'OFF001',
-    password: 'admin123',
+    password: null,
     fullName: 'Anil Verma',
     designation: 'District Officer',
     email: 'anil.verma@gov.in',
@@ -15,7 +15,7 @@ const DEFAULT_OFFICERS = [
   },
   {
     officerId: 'OFF002',
-    password: 'officer123',
+    password: null,
     fullName: 'Dr. Sunita Sharma',
     designation: 'Financial Officer',
     email: 'sunita.sharma@gov.in',
@@ -24,7 +24,7 @@ const DEFAULT_OFFICERS = [
   },
   {
     officerId: 'OFF003',
-    password: 'officer123',
+    password: null,
     fullName: 'Rajesh Gupta',
     designation: 'Field Officer',
     email: 'rajesh.gupta@gov.in',
@@ -54,7 +54,7 @@ export default function OfficerLogin() {
   const location = useLocation()
   const prefilledId = location.state?.registeredId || ''
 
-  const [form, setForm] = useState({ officerId: prefilledId || '', password: '' })
+  const [form, setForm] = useState({ officerId: prefilledId || '', password: null })
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -411,4 +411,5 @@ export default function OfficerLogin() {
     </div>
   )
 }
+
 
