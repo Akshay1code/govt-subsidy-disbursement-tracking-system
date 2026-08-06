@@ -1,4 +1,4 @@
-package com.example.disbursement.model;
+package com.example.gov_scheme_backend.disbursement.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;

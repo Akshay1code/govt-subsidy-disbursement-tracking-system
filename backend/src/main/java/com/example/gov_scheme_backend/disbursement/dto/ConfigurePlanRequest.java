@@ -1,4 +1,4 @@
-package com.example.disbursement.dto;
+package com.example.gov_scheme_backend.disbursement.dto;
 
 import java.time.LocalDate;
 import java.util.List;
