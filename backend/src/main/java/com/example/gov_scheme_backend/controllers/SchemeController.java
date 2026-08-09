@@ -4,6 +4,7 @@ import com.example.gov_scheme_backend.dto.request.schemes.SchemeCategoryRequestD
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.dto.request.schemes.SchemesDto;
 import com.example.gov_scheme_backend.dto.response.schemes.SchemeCategoryResponseDTO;
+import com.example.gov_scheme_backend.dto.response.schemes.SchemeResponseDTO;
 import com.example.gov_scheme_backend.services.impl.SchemeServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,27 @@ public class SchemeController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
         }
         return ResponseEntity.status(HttpStatus.OK).body(res);
+    }
+
+    @PatchMapping("/{schemeCode}")
+    public ResponseEntity<ApiResponse> updateScheme(
+            @PathVariable String schemeCode,
+            @RequestBody SchemesDto req) {
+        ApiResponse res = schemeService.updateService(schemeCode, req);
+        if (!res.isStatus()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
+        }
+        return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/get")
+    public ResponseEntity<List<SchemeResponseDTO>> getAllSchemes() {
+        return ResponseEntity.ok(schemeService.getAllSchemes());
+    }
+
+    @GetMapping("/get-{categoryName}")
+    public ResponseEntity<List<SchemeResponseDTO>> getSchemesByCategory(@PathVariable String categoryName) {
+        return ResponseEntity.ok(schemeService.getSchemesByCategory(categoryName));
     }
 
 //    @PostMapping

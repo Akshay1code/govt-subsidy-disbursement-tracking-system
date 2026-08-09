@@ -1,4 +1,4 @@
-import '../../styles/Dashboard.css';
+﻿import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -7,6 +7,29 @@ import { getApplications } from '../../services/applicationService'
 import ThemeToggle from '../../components/ThemeToggle'
 import logo from '../../assets/icons/logo.png'
 import api from '../../services/api'
+
+function getApplicationStatus(app) {
+  return String(app?.applicationStatus || app?.status || '').toUpperCase()
+}
+
+function isDraftStatus(status) {
+  return status === 'DRAFT' || status === 'PENDING'
+}
+
+function formatApplicationDate(value) {
+  if (!value) return '—'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '—'
+  }
+
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -21,6 +44,7 @@ export default function Dashboard() {
   const [editForm, setEditForm] = useState({})
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+  const [selectedApplication, setSelectedApplication] = useState(null)
   const [toast, setToast] = useState(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [loadingSchemes, setLoadingSchemes] = useState(true)
@@ -52,11 +76,12 @@ export default function Dashboard() {
     init()
   }, [navigate])
 
-  // Fetch schemes from backend
+  // Fetch schemes from backend, using the selected category endpoint
   useEffect(() => {
     async function loadSchemes() {
       try {
-        const data = await fetchSchemesFromAPI()
+        setLoadingSchemes(true)
+        const data = await fetchSchemesFromAPI(selectedCategory)
         setSchemes(Array.isArray(data) ? data : data?.data || [])
       } catch (err) {
         console.error('Failed to load schemes:', err.message)
@@ -66,7 +91,7 @@ export default function Dashboard() {
       }
     }
     loadSchemes()
-  }, [])
+  }, [selectedCategory])
 
   // Fetch applications from backend
   useEffect(() => {
@@ -86,7 +111,6 @@ export default function Dashboard() {
     try {
       await api.post('/gov/auth/signout')
     } catch { /* silently ignore */ }
-    sessionStorage.removeItem('gov-subsidy-auth')
     navigate('/')
   }
 
@@ -114,7 +138,6 @@ export default function Dashboard() {
     try {
       const res = await api.delete('/gov/auth/delete')
       if (res.data.status) {
-        sessionStorage.removeItem('gov-subsidy-auth')
         navigate('/')
       } else {
         showToast(res.data.message || 'Failed to delete account.', 'error')
@@ -142,6 +165,55 @@ export default function Dashboard() {
   })
 
   const hasApplications = applications.length > 0
+  const statusSteps = ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED']
+
+  const getStatusLabel = (status) => {
+    switch (String(status || '').toUpperCase()) {
+      case 'DRAFT':
+      case 'PENDING':
+        return 'Application started'
+      case 'SUBMITTED':
+        return 'Application submitted'
+      case 'UNDER_REVIEW':
+        return 'Under review'
+      case 'APPROVED':
+        return 'Approved'
+      case 'REJECTED':
+        return 'Rejected'
+      case 'DISBURSED':
+        return 'Disbursed'
+      default:
+        return 'Status unavailable'
+    }
+  }
+
+  const getStatusHint = (status) => {
+    switch (String(status || '').toUpperCase()) {
+      case 'DRAFT':
+      case 'PENDING':
+        return 'Your application is saved but not yet final submitted.'
+      case 'SUBMITTED':
+        return 'The application has been finalized and sent for review.'
+      case 'UNDER_REVIEW':
+        return 'The officer team is checking your submission.'
+      case 'APPROVED':
+        return 'The application has cleared review.'
+      case 'REJECTED':
+        return 'The application was rejected after review.'
+      case 'DISBURSED':
+        return 'Funds have been released for this application.'
+      default:
+        return 'Please open the details panel for more information.'
+    }
+  }
+
+  const openTrackingDetails = (app) => {
+    setSelectedApplication(app)
+  }
+
+  const closeTrackingDetails = () => {
+    setSelectedApplication(null)
+  }
 
   return (
     <div className="dashboard-layout">
@@ -269,11 +341,11 @@ export default function Dashboard() {
                   {filteredSchemes.map(scheme => (
                     <motion.div
                       className="scheme-card"
-                      key={scheme.id}
+                      key={scheme.schemeCode}
                       whileHover={{ y: -4 }}
                     >
                       <div className="scheme-card__header">
-                        <span className={`scheme-card__category category--${scheme.category?.toLowerCase()}`}>
+                        <span className={`scheme-card__category category--${String(scheme.category || '').toLowerCase()}`}>
                           {scheme.category}
                         </span>
                       </div>
@@ -293,8 +365,22 @@ export default function Dashboard() {
                       </div>
 
                       <div className="scheme-card__actions">
-                        <Link to={`/scheme/${scheme.id}`} className="btn-card-view btn-apply">
-                          View Scheme Details →
+                        <Link to={`/scheme/${scheme.schemeCode}`} className="btn-card-view btn-apply">
+                          {(() => {
+                            const appForScheme = applications.find(app => {
+                              const appSchemeCode = app?.schemeCode || app?.schemeId || app?.scheme?.schemeCode
+                              return appSchemeCode === scheme.schemeCode
+                            })
+                            const appStatus = getApplicationStatus(appForScheme)
+
+                            if (!appForScheme) {
+                              return 'View Scheme Details →'
+                            }
+
+                            return isDraftStatus(appStatus)
+                              ? 'Continue Application'
+                              : 'Track Application'
+                          })()}
                         </Link>
                       </div>
                     </motion.div>
@@ -337,24 +423,54 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="tracking-list">
-                  {applications.map(app => (
-                    <div className="tracking-card" key={app.id || app.applicationId}>
+                  {applications.map(app => {
+                    const appStatus = getApplicationStatus(app)
+
+                    return (
+                    <div
+                      className="tracking-card tracking-card--clickable"
+                      key={app.id || app.applicationId}
+                      onClick={() => openTrackingDetails(app)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openTrackingDetails(app)
+                        }
+                      }}
+                    >
                       <div className="tracking-card__header">
                         <h4>{app.schemeName || app.schemeId}</h4>
-                        <span className={`tracking-badge tracking-badge--${app.status?.toLowerCase()}`}>
-                          {app.status}
+                        <span className={`tracking-badge tracking-badge--${String(getApplicationStatus(app)).toLowerCase()}`}>
+                          {getApplicationStatus(app) || 'DRAFT'}
                         </span>
                       </div>
-                      <p style={{ color: 'var(--muted)', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>
-                        Submitted: {app.submittedDate || app.createdAt || '—'}
+                      <p className="tracking-card__summary">
+                        {getStatusLabel(appStatus)}
                       </p>
+                      <div className="tracking-card__meta">
+                        <div>
+                          <span className="meta-label">Submitted</span>
+                          <span className="meta-value">{formatApplicationDate(app.submittedDate || app.createdAt)}</span>
+                        </div>
+                        <div>
+                          <span className="meta-label">Application Code</span>
+                          <span className="meta-value">{app.applicationCode || app.applicationId || '—'}</span>
+                        </div>
+                      </div>
+                      <div className="tracking-card__footer">
+                        <span>{getStatusHint(appStatus)}</span>
+                        <span className="tracking-card__cta">View tracking status</span>
+                      </div>
                       {app.remarks && (
-                        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.65rem' }}>
                           Remarks: {app.remarks}
                         </p>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </motion.div>
@@ -428,6 +544,15 @@ export default function Dashboard() {
                       </div>
 
                       <div className="form-group">
+                        <label>Unique Code</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={editForm.uniqueID || editForm.uniqueId || ''}
+                        />
+                      </div>
+
+                      <div className="form-group">
                         <label>Mobile Number</label>
                         <input
                           type="text"
@@ -493,6 +618,116 @@ export default function Dashboard() {
         </div>
       </main>
 
+      <AnimatePresence>
+        {selectedApplication && (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tracking-details-title" onClick={closeTrackingDetails}>
+            <motion.div
+              className="modal-panel tracking-modal"
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="tracking-modal__header">
+                <div>
+                  <p className="console-eyebrow">Application tracking</p>
+                  <h3 id="tracking-details-title">{selectedApplication.schemeName || selectedApplication.schemeId}</h3>
+                </div>
+                <button type="button" className="modal-close-btn" onClick={closeTrackingDetails} aria-label="Close tracking details">
+                  ×
+                </button>
+              </div>
+
+              <div className="tracking-modal__status">
+                <span className={`tracking-badge tracking-badge--${String(getApplicationStatus(selectedApplication)).toLowerCase()}`}>
+                  {getApplicationStatus(selectedApplication) || 'DRAFT'}
+                </span>
+                <p>{getStatusHint(getApplicationStatus(selectedApplication))}</p>
+              </div>
+
+              <div className="tracking-modal__grid">
+                <div>
+                  <span className="meta-label">Application Code</span>
+                  <div className="meta-value">{selectedApplication.applicationCode || selectedApplication.applicationId || '—'}</div>
+                </div>
+                <div>
+                  <span className="meta-label">Applicant</span>
+                  <div className="meta-value">{selectedApplication.applicantName || selectedApplication.applicant || profile?.fullName || 'Beneficiary'}</div>
+                </div>
+                <div>
+                  <span className="meta-label">Submitted On</span>
+                  <div className="meta-value">{formatApplicationDate(selectedApplication.submittedDate || selectedApplication.createdAt)}</div>
+                </div>
+                <div>
+                  <span className="meta-label">Phone</span>
+                  <div className="meta-value">{selectedApplication.phone || profile?.mobileNo || '—'}</div>
+                </div>
+                <div>
+                  <span className="meta-label">Aadhaar</span>
+                  <div className="meta-value">{selectedApplication.aadhaar || '—'}</div>
+                </div>
+                <div>
+                  <span className="meta-label">Annual Income</span>
+                  <div className="meta-value">{selectedApplication.annualIncome || '—'}</div>
+                </div>
+              </div>
+
+              <div className="tracking-timeline">
+                {statusSteps.map((step) => {
+                  const current = String(getApplicationStatus(selectedApplication)).toUpperCase()
+                  const stepRank = statusSteps.indexOf(step)
+                  const currentRank = statusSteps.indexOf(current)
+                  const isCurrentOrPassed = currentRank >= stepRank
+                  return (
+                    <div className={`tracking-timeline__step ${isCurrentOrPassed ? 'is-active' : ''}`} key={step}>
+                      <span className="tracking-timeline__dot" />
+                      <div>
+                        <strong>{step}</strong>
+                        <p>
+                          {step === 'DRAFT' && 'Saved application'}
+                          {step === 'SUBMITTED' && 'Final submit completed'}
+                          {step === 'UNDER_REVIEW' && 'Officer review'}
+                          {step === 'APPROVED' && 'Approved for disbursement'}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+                {String(getApplicationStatus(selectedApplication)).toUpperCase() === 'REJECTED' && (
+                  <div className="tracking-timeline__rejected">
+                    <strong>REJECTED</strong>
+                    <p>This application was rejected during review.</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedApplication.remarks && (
+                <div className="tracking-modal__remarks">
+                  <span className="meta-label">Officer remarks</span>
+                  <p>{selectedApplication.remarks}</p>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="button button--ghost" onClick={closeTrackingDetails}>
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="button button--primary"
+                  onClick={() => {
+                    closeTrackingDetails()
+                    setActiveTab('schemes')
+                  }}
+                >
+                  Browse Schemes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Account Deletion Confirmation Modal */}
       <AnimatePresence>
         {showDeleteModal && (
@@ -503,7 +738,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
             >
-              <h3>⚠️ Permanently Delete Account?</h3>
+              <h3>âš ï¸ Permanently Delete Account?</h3>
               <p className="danger-text">
                 This action is irreversible. Your account and all associated data will be permanently deleted from the system.
               </p>
@@ -542,3 +777,4 @@ export default function Dashboard() {
     </div>
   )
 }
+

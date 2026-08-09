@@ -127,6 +127,8 @@ public class AuthServiceImpl {
 
             RequestListResponseDto dto = new RequestListResponseDto();
 
+            dto.setId(request.getId());
+            dto.setUniqueId(request.getUniqueID());
             dto.setFullName(request.getFullName());
             dto.setRole(request.getRole());
             dto.setMobileNo(request.getMobileNo());
@@ -143,8 +145,17 @@ public class AuthServiceImpl {
 
 
     public  ApiResponse updateApprovalStatus(String uniqueId, String status) {
-        RequestsList request =  requestRepo.findByUniqueID(uniqueId)
-                .orElseThrow(() -> new ResourceNotFoundException("Officer not found"));
+        RequestsList request = requestRepo.findByUniqueID(uniqueId).orElseGet(() -> {
+            try {
+                Integer requestId = Integer.valueOf(uniqueId);
+                return requestRepo.findById(requestId).orElse(null);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        });
+        if (request == null) {
+            throw new ResourceNotFoundException("Officer not found");
+        }
         Status requestStatus = Status.PENDING;
         if(request.getStatus() == Status.APPROVED){
             return new ApiResponse(false,"Officer is already Approved");
@@ -156,17 +167,19 @@ public class AuthServiceImpl {
             requestStatus = Status.REJECTED;
         }
 
-        Users user = new Users();
-        user.setFullName(request.getFullName());
-        user.setMobileNo(request.getMobileNo());
-        user.setRole(request.getRole());
-        user.setUniqueID(request.getUniqueID());
-        user.setUsername(request.getUsername());
-        user.setPassword(request.getPassword());
-        user.setRegion(request.getRegion());
-        user.setDistrict(request.getDistrict());
-        user.setState(request.getState());
-        userRepo.save(user);
+        if (requestStatus == Status.APPROVED) {
+            Users user = new Users();
+            user.setFullName(request.getFullName());
+            user.setMobileNo(request.getMobileNo());
+            user.setRole(request.getRole());
+            user.setUniqueID(request.getUniqueID());
+            user.setUsername(request.getUsername());
+            user.setPassword(request.getPassword());
+            user.setRegion(request.getRegion());
+            user.setDistrict(request.getDistrict());
+            user.setState(request.getState());
+            userRepo.save(user);
+        }
         request.setStatus(requestStatus);
         requestRepo.save(request);
 

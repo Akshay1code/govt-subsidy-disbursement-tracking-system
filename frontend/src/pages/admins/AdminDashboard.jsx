@@ -1,94 +1,169 @@
 import '../../styles/Dashboard.css';
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getSchemes, saveSchemes } from '../../data/schemes'
+import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
 import ThemeToggle from '../../components/ThemeToggle'
 import { updateApprovalStatus, getOfficerRequests } from '../../services/adminService'
+import { getApplications } from '../../services/applicationService'
+import { getProfilesByRole } from '../../services/adminService'
+import api from '../../services/api'
 import logo from '../../assets/icons/logo.png'
-
-// Seed applications used by default if none in localStorage
-const INITIAL_APPLICATIONS = []
-
-
-const DEFAULT_OFFICERS = []
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const contentRef = useRef(null)
 
-  // Auth guard: redirect to admin login if not authenticated
+  // Auth guard: backend cookie + profile role check
   useEffect(() => {
-    if (!window.localStorage.getItem('gov-subsidy-admin-auth')) {
-      navigate('/admin/login')
+    async function verifyAdmin() {
+      try {
+        const res = await api.get('/gov/auth/profile/get')
+        const user = res.data?.data || res.data
+        if (!user || String(user.role || '').toUpperCase() !== 'ADMIN') {
+          navigate('/login')
+        }
+      } catch {
+        navigate('/login')
+      }
     }
+    verifyAdmin()
   }, [navigate])
 
   const handleLogout = () => {
-    window.localStorage.removeItem('gov-subsidy-admin-auth')
-    window.localStorage.removeItem('gov-subsidy-admin-profile')
-    navigate('/admin/login')
+    api.post('/gov/auth/signout').catch(() => {})
+    navigate('/login')
   }
 
   // Load schemes state
-  const [schemes, setSchemes] = useState(() => getSchemes())
+  const [schemes, setSchemes] = useState([])
   const [actionLogs, setActionLogs] = useState([])
   const [showSchemeModal, setShowSchemeModal] = useState(false)
   const [editingScheme, setEditingScheme] = useState(null)
+  
+  useEffect(() => {
+    async function fetchSchemes() {
+      const data = await getSchemes()
+      setSchemes(data || [])
+    }
+    fetchSchemes()
+  }, [])
 
-  // Scheme Form State
+  useEffect(() => {
+    async function fetchApplications() {
+      try {
+        const data = await getApplications()
+        setApplications(Array.isArray(data) ? data : data?.data || [])
+      } catch {
+        setApplications([])
+      }
+    }
+    fetchApplications()
+  }, [])
+
+  useEffect(() => {
+    async function fetchOfficers() {
+      try {
+        const data = await getProfilesByRole('FIELD_OFFICER')
+        setOfficers(Array.isArray(data) ? data : data?.data || [])
+      } catch {
+        setOfficers([])
+      }
+    }
+    fetchOfficers()
+  }, [])
+
+  // Scheme Form State (Maps to SchemesDto + Rules/Docs)
   const [schemeForm, setSchemeForm] = useState({
-    id: '',
-    name: '',
-    category: 'Agriculture',
-    amount: '',
+    schemeCode: '',
+    schemeName: '',
     description: '',
-    eligibilityText: '',
-    maxIncome: 300000,
-    allowedOccupations: 'Farmer',
-    maxLandHolding: 5,
-    processingTime: '15-20 Days',
-    requiredDocs: 'Land Ownership Deed (7/12 Extract), Aadhaar Card, Bank Passbook Photo'
+    allocatedFunds: '',
+    minimumEligibleScore: 50,
+    active: true,
+    categoryId: 1,
+    rules: [],
+    documents: [],
+    fields: []
   })
+
+  const getCategoryNameById = (id) => {
+    switch (Number(id)) {
+      case 1:
+        return 'Agriculture'
+      case 2:
+        return 'Housing'
+      case 3:
+        return 'Education'
+      case 4:
+        return 'Healthcare'
+      default:
+        return 'General'
+    }
+  }
 
   // Log filter State
   const [logSearch, setLogSearch] = useState('')
   const [logActionFilter, setLogActionFilter] = useState('All')
   const [logOfficerFilter, setLogOfficerFilter] = useState('All')
 
-  // Load applications from localStorage or seed
-  const [applications, setApplications] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-officer-applications')
-    if (stored) return JSON.parse(stored)
-    window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(INITIAL_APPLICATIONS))
-    return INITIAL_APPLICATIONS
-  })
+  // Load backend-backed data with empty-state fallbacks
+  const [applications, setApplications] = useState([])
+  const [officers, setOfficers] = useState([])
+  const [queries, setQueries] = useState([])
 
-  // Load registered officers + defaults
-  const [officers, setOfficers] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-officers')
-    const registered = stored ? JSON.parse(stored) : []
-
-    // Combine defaults and registered uniquely by officerId
-    const combined = [...DEFAULT_OFFICERS]
-    registered.forEach(reg => {
-      if (!combined.some(o => o.officerId.toUpperCase() === reg.officerId.toUpperCase())) {
-        combined.push(reg)
-      }
-    })
-    return combined
-  })
-
-  // Load Queries from landing page submission
-  const [queries, setQueries] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-queries')
-    if (stored) return JSON.parse(stored)
-    const seedQueries = []
-    window.localStorage.setItem('gov-subsidy-queries', JSON.stringify(seedQueries))
-    return seedQueries
-  })
-
-  // View state
+  // View state (declared early so useEffects below can reference it)
   const [activeTab, setActiveTab] = useState('analytics') // 'analytics' | 'history' | 'officers' | 'queries'
+
+  // Officer Requests from backend (GET /gov/auth/officer/get-request)
+  const [officerRequests, setOfficerRequests] = useState([])
+  const [requestsLoading, setRequestsLoading] = useState(false)
+  const [requestsFilter, setRequestsFilter] = useState('All')
+
+  async function fetchOfficerRequests() {
+    setRequestsLoading(true)
+    try {
+      const data = await getOfficerRequests()
+      setOfficerRequests(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Failed to fetch officer requests:', err)
+    } finally {
+      setRequestsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'officer-requests') fetchOfficerRequests()
+  }, [activeTab])
+
+  async function handleRequestAction(request, status) {
+    const uniqueId = request.uniqueId || request.uniqueID || request.id
+    if (!uniqueId) {
+      showToast('Cannot act: request identifier missing from backend response.', 'error')
+      return
+    }
+    try {
+      const res = await updateApprovalStatus(uniqueId, status)
+      if (res.status) {
+        showToast(`Request ${status === 'APPROVED' ? 'Approved' : 'Rejected'} successfully!`)
+        setOfficerRequests(prev =>
+          prev.map(item =>
+            (item.uniqueId || item.uniqueID || item.id) === uniqueId
+              ? { ...item, status }
+              : item
+          )
+        )
+        await fetchOfficerRequests()
+      } else {
+        showToast(res.message || 'Action failed', 'error')
+      }
+    } catch (err) {
+      console.error('Request action failed:', err)
+      showToast(err.message || 'Error updating request status', 'error')
+    }
+  }
+
+  // View state (activeTab declared above near line 97 to avoid temporal dead zone)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [officerFilter, setOfficerFilter] = useState('All')
@@ -105,11 +180,17 @@ export default function AdminDashboard() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey)
+    window.setTimeout(() => {
+      contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 40)
+  }
+
   // Load Action Logs when needed
   useEffect(() => {
     if (activeTab === 'action-logs') {
-      const storedLogs = window.localStorage.getItem('gov-subsidy-officer-actions')
-      setActionLogs(storedLogs ? JSON.parse(storedLogs) : [])
+      setActionLogs([])
     }
   }, [activeTab])
 
@@ -117,17 +198,16 @@ export default function AdminDashboard() {
   function openCreateScheme() {
     setEditingScheme(null)
     setSchemeForm({
-      id: '',
-      name: '',
-      category: 'Agriculture',
-      amount: '',
+      schemeCode: '',
+      schemeName: '',
       description: '',
-      eligibilityText: '',
-      maxIncome: 300000,
-      allowedOccupations: 'Farmer',
-      maxLandHolding: 5,
-      processingTime: '15-20 Days',
-      requiredDocs: 'Land Ownership Deed (7/12 Extract), Aadhaar Card, Bank Passbook Photo'
+      allocatedFunds: '',
+      minimumEligibleScore: 50,
+      active: true,
+      categoryId: 1,
+      rules: [],
+      documents: [],
+      fields: []
     })
     setShowSchemeModal(true)
   }
@@ -135,72 +215,76 @@ export default function AdminDashboard() {
   function openEditScheme(scheme) {
     setEditingScheme(scheme)
     setSchemeForm({
-      id: scheme.id,
-      name: scheme.name,
-      category: scheme.category,
-      amount: scheme.amount,
-      description: scheme.description,
-      eligibilityText: scheme.eligibilityText,
-      maxIncome: scheme.maxIncome || 300000,
-      allowedOccupations: Array.isArray(scheme.allowedOccupations) ? scheme.allowedOccupations.join(', ') : scheme.allowedOccupations,
-      maxLandHolding: scheme.maxLandHolding || 5,
-      processingTime: scheme.processingTime || '15-20 Days',
-      requiredDocs: Array.isArray(scheme.requiredDocs) ? scheme.requiredDocs.join(', ') : scheme.requiredDocs
+      schemeCode: scheme.schemeCode || '',
+      schemeName: scheme.schemeName || scheme.name || '',
+      description: scheme.description || '',
+      allocatedFunds: scheme.allocatedFunds || 0,
+      minimumEligibleScore: scheme.minimumEligibleScore || 50,
+      active: scheme.active ?? true,
+      categoryId: scheme.categoryId || scheme.category?.id || 1,
+      rules: scheme.rules || [],
+      documents: scheme.documents || [],
+      fields: scheme.fields || []
     })
     setShowSchemeModal(true)
   }
 
-  function handleSaveScheme(e) {
+  const addRule = () => setSchemeForm(p => ({ ...p, rules: [...p.rules, { fieldName: 'AGE', operator: 'GREATER_THAN_EQUAL', expectedValue: '', points: 0 }] }))
+  const removeRule = (i) => setSchemeForm(p => ({ ...p, rules: p.rules.filter((_, idx) => idx !== i) }))
+  const updateRule = (i, k, v) => setSchemeForm(p => { const r = [...p.rules]; r[i][k] = v; return { ...p, rules: r } })
+
+  const addDocument = () => setSchemeForm(p => ({ ...p, documents: [...p.documents, { documentType: 'AADHAAR', mandatory: true }] }))
+  const removeDocument = (i) => setSchemeForm(p => ({ ...p, documents: p.documents.filter((_, idx) => idx !== i) }))
+  const updateDocument = (i, k, v) => setSchemeForm(p => { const d = [...p.documents]; d[i][k] = v; return { ...p, documents: d } })
+
+  const addField = () => setSchemeForm(p => ({ ...p, fields: [...p.fields, { fieldName: 'ANNUAL_INCOME', mandatory: true }] }))
+  const removeField = (i) => setSchemeForm(p => ({ ...p, fields: p.fields.filter((_, idx) => idx !== i) }))
+  const updateField = (i, k, v) => setSchemeForm(p => { const f = [...p.fields]; f[i][k] = v; return { ...p, fields: f } })
+
+  async function handleSaveScheme(e) {
     e.preventDefault()
-    if (!schemeForm.id || !schemeForm.name || !schemeForm.amount) {
-      showToast('Please fill out Scheme ID, Name, and Amount', 'error')
+    if (!schemeForm.schemeName || !schemeForm.allocatedFunds) {
+      showToast('Please fill out Scheme Name and Allocated Funds', 'error')
       return
     }
 
     const processedScheme = {
-      id: schemeForm.id.toLowerCase().replace(/\s+/g, '-'),
-      name: schemeForm.name,
-      category: schemeForm.category,
-      amount: schemeForm.amount,
+      schemeCode: schemeForm.schemeCode,
+      schemeName: schemeForm.schemeName,
       description: schemeForm.description,
-      eligibilityText: schemeForm.eligibilityText,
-      maxIncome: Number(schemeForm.maxIncome),
-      allowedOccupations: schemeForm.allowedOccupations.split(',').map(s => s.trim()).filter(Boolean),
-      maxLandHolding: Number(schemeForm.maxLandHolding),
-      processingTime: schemeForm.processingTime,
-      requiredDocs: schemeForm.requiredDocs.split(',').map(s => s.trim()).filter(Boolean),
-      natureDetails: [
-        { label: 'Category Nodal Division', value: `${schemeForm.category} Department` },
-        { label: 'SLA Duration', value: schemeForm.processingTime }
-      ],
-      natureInputs: [
-        { name: 'detailsNotes', label: 'Additional Declaration Notes', type: 'text', placeholder: 'Any extra details', required: false }
-      ]
+      allocatedFunds: Number(schemeForm.allocatedFunds),
+      minimumEligibleScore: Number(schemeForm.minimumEligibleScore),
+      active: schemeForm.active,
+      categoryId: Number(schemeForm.categoryId),
+      categoryName: getCategoryNameById(schemeForm.categoryId),
+      rules: schemeForm.rules,
+      documents: schemeForm.documents,
+      fields: schemeForm.fields
     }
 
-    let nextSchemes
-    if (editingScheme) {
-      nextSchemes = schemes.map(s => s.id === editingScheme.id ? processedScheme : s)
-      showToast(`Scheme "${processedScheme.name}" updated successfully!`)
-    } else {
-      if (schemes.some(s => s.id === processedScheme.id)) {
-        showToast(`Scheme ID "${processedScheme.id}" already exists!`, 'error')
-        return
+    try {
+      const res = editingScheme
+        ? await updateScheme(editingScheme.schemeCode || editingScheme.id, processedScheme)
+        : await addScheme(processedScheme)
+      if (res.status) {
+        showToast(`Scheme "${processedScheme.schemeName}" ${editingScheme ? 'updated' : 'saved'} successfully!`)
+
+        setShowSchemeModal(false)
+        setEditingScheme(null)
+        const updatedSchemes = await getSchemes()
+        setSchemes(updatedSchemes)
+      } else {
+        showToast(res.message || 'Failed to save scheme', 'error')
       }
-      nextSchemes = [...schemes, processedScheme]
-      showToast(`Scheme "${processedScheme.name}" created successfully!`)
+    } catch (error) {
+      showToast('Error saving scheme to backend', 'error')
     }
-
-    setSchemes(nextSchemes)
-    saveSchemes(nextSchemes)
-    setShowSchemeModal(false)
   }
 
   function handleDeleteScheme(schemeId) {
     if (window.confirm('Are you sure you want to delete this scheme? This will prevent citizens from applying.')) {
       const nextSchemes = schemes.filter(s => s.id !== schemeId)
       setSchemes(nextSchemes)
-      saveSchemes(nextSchemes)
       showToast('Scheme deleted successfully!')
     }
   }
@@ -265,7 +349,6 @@ export default function AdminDashboard() {
     })
 
     setApplications(updatedApps)
-    window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(updatedApps))
     showToast(`Application ${reassignApp.id} reassigned to ${newOfficerObj.fullName}`)
     setReassignApp(null)
   }
@@ -285,7 +368,6 @@ export default function AdminDashboard() {
     })
 
     setApplications(updatedApps)
-    window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(updatedApps))
 
     if (selectedApp && selectedApp.id === appId) {
       setSelectedApp(prev => ({ ...prev, status: newStatus, remarks: `[Admin Override]: Status changed to ${newStatus}` }))
@@ -362,57 +444,77 @@ export default function AdminDashboard() {
       </header>
 
       {/* ── Main Content Container ── */}
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <div ref={contentRef} style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', scrollMarginTop: '1rem' }}>
 
         {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <motion.div
+          initial={{ opacity: 0, y: -10, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}
+        >
           <button
             className={`button ${activeTab === 'analytics' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => handleTabChange('analytics')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             📊 Analytics & Insights
           </button>
           <button
             className={`button ${activeTab === 'history' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('history')}
+            onClick={() => handleTabChange('history')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             📜 Application History ({applications.length})
           </button>
           <button
             className={`button ${activeTab === 'officers' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('officers')}
+            onClick={() => handleTabChange('officers')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             👮 Officer Work Tracker ({officers.length})
           </button>
           <button
             className={`button ${activeTab === 'schemes' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('schemes')}
+            onClick={() => handleTabChange('schemes')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             🛠️ Manage Schemes ({schemes.length})
           </button>
           <button
             className={`button ${activeTab === 'action-logs' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('action-logs')}
+            onClick={() => handleTabChange('action-logs')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             👮 Officer Actions History
           </button>
           <button
+            className={`button ${activeTab === 'officer-requests' ? 'button--primary' : 'button--ghost'}`}
+            onClick={() => handleTabChange('officer-requests')}
+            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+          >
+            📋 Officer Requests ({officerRequests.length})
+          </button>
+          <button
             className={`button ${activeTab === 'queries' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => setActiveTab('queries')}
+            onClick={() => handleTabChange('queries')}
             style={{ fontSize: '0.9rem', borderRadius: '8px' }}
           >
             💬 Citizen Queries ({queries.length})
           </button>
-        </div>
+        </motion.div>
 
         {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
+        <AnimatePresence mode="wait">
         {activeTab === 'analytics' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="analytics"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
             {/* High Level Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
 
@@ -511,7 +613,14 @@ export default function AdminDashboard() {
 
         {/* ── TAB 2: APPLICATION HISTORY & AUDIT ── */}
         {activeTab === 'history' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="history"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
 
             {/* Filters Row */}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
@@ -585,8 +694,8 @@ export default function AdminDashboard() {
                             {app.submittedDate}
                           </td>
                           <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>
-                            <span style={{ fontWeight: 600 }}>{app.assignedOfficerName || 'Anil Verma'}</span>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {app.assignedOfficerId || 'OFF001'}</div>
+                            <span style={{ fontWeight: 600 }}>{app.assignedOfficerName || '—'}</span>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {app.assignedOfficerId || '—'}</div>
                           </td>
                           <td style={{ padding: '0.9rem 1.2rem' }}>
                             <span style={{ padding: '0.3rem 0.7rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}40` }}>
@@ -623,7 +732,14 @@ export default function AdminDashboard() {
 
         {/* ── TAB 3: OFFICER WORK PROGRESS TRACKER ── */}
         {activeTab === 'officers' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="officers"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Work Progress & Performance Tracker</h2>
@@ -638,7 +754,7 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
               {officers.map(officer => {
                 // Applications assigned to this officer
-                const officerApps = applications.filter(a => a.assignedOfficerId === officer.officerId || (!a.assignedOfficerId && officer.officerId === 'OFF001'))
+                const officerApps = applications.filter(a => a.assignedOfficerId === officer.officerId)
                 const assignedCount = officerApps.length
                 const pendingCount = officerApps.filter(a => a.status === 'Pending').length
                 const approvedCount = officerApps.filter(a => a.status === 'Approved').length
@@ -728,7 +844,14 @@ export default function AdminDashboard() {
 
         {/* ── TAB 4: CITIZEN SUPPORT QUERIES ── */}
         {activeTab === 'queries' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="queries"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
             <div style={{ marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Citizen Support Queries & Assistance Tickets</h2>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Review messages submitted through the portal support desk and send officer responses.</p>
@@ -791,9 +914,130 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
+        {/* ── TAB: OFFICER REGISTRATION REQUESTS ── */}
+        {activeTab === 'officer-requests' && (
+          <motion.div
+            key="officer-requests"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Registration Requests</h2>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>Review officer account requests. Approving creates a live system account.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <select
+                  value={requestsFilter}
+                  onChange={e => setRequestsFilter(e.target.value)}
+                  style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)', fontSize: '0.85rem' }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+                <button
+                  className="button button--ghost"
+                  style={{ fontSize: '0.82rem' }}
+                  onClick={fetchOfficerRequests}
+                  disabled={requestsLoading}
+                >
+                  {requestsLoading ? '⟳ Loading...' : '⟳ Refresh'}
+                </button>
+              </div>
+            </div>
+
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Full Name</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Role</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Mobile No</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Region / District</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>State</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestsLoading ? (
+                    <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading requests...</td></tr>
+                  ) : officerRequests.filter(r => requestsFilter === 'All' || r.status === requestsFilter).length === 0 ? (
+                    <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No requests found for this filter.</td></tr>
+                  ) : (
+                    officerRequests
+                      .filter(r => requestsFilter === 'All' || r.status === requestsFilter)
+                      .map((r, idx) => {
+                        const statusColor = r.status === 'APPROVED' ? '#22c55e' : r.status === 'REJECTED' ? '#ef4444' : '#f59e0b'
+                        const submittedDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{r.fullName}</td>
+                            <td style={{ padding: '0.9rem 1.2rem' }}>
+                              <span style={{ padding: '0.2rem 0.55rem', borderRadius: '4px', background: 'rgba(130, 174, 202, 0.15)', fontSize: '0.8rem', color: '#82aeca', fontWeight: 600 }}>{r.role}</span>
+                            </td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem', fontFamily: 'monospace' }}>{r.mobileNo}</td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>
+                              <div>{r.region}</div>
+                              <small style={{ color: 'var(--muted)' }}>{r.district}</small>
+                            </td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>{r.state}</td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{submittedDate}</td>
+                            <td style={{ padding: '0.9rem 1.2rem' }}>
+                              <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
+                              {r.status === 'PENDING' ? (
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    type="button"
+                                    className="button button--ghost"
+                                    style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' }}
+                                    onClick={() => handleRequestAction(r, 'APPROVED')}
+                                  >
+                                    ✓ Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="button button--ghost"
+                                    style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                                    onClick={() => handleRequestAction(r, 'REJECTED')}
+                                  >
+                                    ✕ Reject
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
         {/* ── TAB 5: MANAGE SCHEMES CRUD ── */}
         {activeTab === 'schemes' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="schemes"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Manage Government Subsidy Schemes</h2>
@@ -808,12 +1052,12 @@ export default function AdminDashboard() {
               <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Code</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Name</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Category</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Sanction Amount</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Max Income Limit</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Processing Time</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Category ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Allocated Funds</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Min Score</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
@@ -826,17 +1070,17 @@ export default function AdminDashboard() {
                     </tr>
                   ) : (
                     schemes.map(s => (
-                      <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#82aeca' }}>{s.id}</td>
-                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{s.name}</td>
+                      <tr key={s.id || s.schemeCode} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#82aeca' }}>{s.schemeCode}</td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{s.schemeName || s.name || 'Unnamed Scheme'}</td>
                         <td style={{ padding: '0.9rem 1.2rem' }}>
                           <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
-                            {s.category}
+                            {s.categoryId || s.category?.id || 'N/A'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, color: '#ffc76a' }}>{s.amount}</td>
-                        <td style={{ padding: '0.9rem 1.2rem' }}>₹{(s.maxIncome || 0).toLocaleString()}</td>
-                        <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>{s.processingTime || 'N/A'}</td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, color: '#ffc76a' }}>₹{(s.allocatedFunds || 0).toLocaleString()}</td>
+                        <td style={{ padding: '0.9rem 1.2rem' }}>{s.minimumEligibleScore} pts</td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', color: s.active ? '#22c55e' : 'var(--muted)' }}>{s.active ? 'Active' : 'Inactive'}</td>
                         <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                             <button
@@ -849,7 +1093,7 @@ export default function AdminDashboard() {
                             <button
                               className="button button--ghost"
                               style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
-                              onClick={() => handleDeleteScheme(s.id)}
+                              onClick={() => handleDeleteScheme(s.id || s.schemeCode)}
                             >
                               Delete
                             </button>
@@ -866,7 +1110,14 @@ export default function AdminDashboard() {
 
         {/* ── TAB 6: OFFICER ACTION HISTORY LOGS ── */}
         {activeTab === 'action-logs' && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            key="action-logs"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
             <div style={{ marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Action & Event History Log</h2>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Auditable trace of all verification activities, status decisions, and reassignments completed by regional officers.</p>
@@ -958,6 +1209,8 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
+        </AnimatePresence>
+
       </div>
 
       {/* ── MODAL 1: APPLICATION DETAILS & ADMIN OVERRIDE ── */}
@@ -982,7 +1235,7 @@ export default function AdminDashboard() {
                   <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Aadhaar Number</span><div style={{ fontWeight: 600 }}>{selectedApp.aadhaar}</div></div>
                   <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Email / Phone</span><div>{selectedApp.email} | {selectedApp.phone}</div></div>
                   <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Submitted On</span><div>{selectedApp.submittedDate}</div></div>
-                  <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Assigned Officer</span><div style={{ fontWeight: 600 }}>{selectedApp.assignedOfficerName || 'Anil Verma'}</div></div>
+                  <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Assigned Officer</span><div style={{ fontWeight: 600 }}>{selectedApp.assignedOfficerName || '—'}</div></div>
                   <div><span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Current Status</span><div style={{ fontWeight: 700, color: selectedApp.status === 'Approved' ? '#22c55e' : selectedApp.status === 'Rejected' ? '#ef4444' : '#f59e0b' }}>{selectedApp.status}</div></div>
                 </div>
 
@@ -1028,7 +1281,7 @@ export default function AdminDashboard() {
               style={{ background: 'var(--panel-strong)', borderRadius: '16px', border: '1px solid var(--border)', maxWidth: '460px', width: '100%', padding: '1.75rem' }}
             >
               <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text)' }}>Reassign Application {reassignApp.id}</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>Currently assigned to: <strong>{reassignApp.assignedOfficerName || 'Anil Verma'}</strong></p>
+               <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>Currently assigned to: <strong>{reassignApp.assignedOfficerName || '—'}</strong></p>
 
               <form onSubmit={handleReassignSubmit}>
                 <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Select New Target Officer</label>
@@ -1138,7 +1391,6 @@ export default function AdminDashboard() {
                   onClick={() => {
                     const updated = queries.map(q => q.id === selectedQuery.id ? { ...q, status: 'Resolved', reply: queryReplyText } : q)
                     setQueries(updated)
-                    localStorage.setItem('gov-subsidy-queries', JSON.stringify(updated))
                     showToast(`Query ${selectedQuery.id} marked as Resolved!`)
                     setSelectedQuery(null)
                   }}
@@ -1151,7 +1403,6 @@ export default function AdminDashboard() {
                   onClick={() => {
                     const updated = queries.map(q => q.id === selectedQuery.id ? { ...q, status: 'In Progress', reply: queryReplyText } : q)
                     setQueries(updated)
-                    localStorage.setItem('gov-subsidy-queries', JSON.stringify(updated))
                     showToast(`Query ${selectedQuery.id} marked as In Progress`)
                     setSelectedQuery(null)
                   }}
@@ -1185,29 +1436,27 @@ export default function AdminDashboard() {
               <form onSubmit={handleSaveScheme} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Scheme ID (Slug)</label>
+                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Scheme Code</label>
                     <input
                       type="text"
-                      placeholder="e.g. pm-kisan-smart"
-                      value={schemeForm.id}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, id: e.target.value }))}
+                      placeholder="e.g. SCH-1234 (Leave blank to auto-generate)"
+                      value={schemeForm.schemeCode}
+                      onChange={e => setSchemeForm(prev => ({ ...prev, schemeCode: e.target.value }))}
                       disabled={!!editingScheme}
-                      required
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Category</label>
+                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Category ID</label>
                     <select
-                      value={schemeForm.category}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, category: e.target.value }))}
+                      value={schemeForm.categoryId}
+                      onChange={e => setSchemeForm(prev => ({ ...prev, categoryId: e.target.value }))}
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
                     >
-                      <option value="Agriculture">Agriculture</option>
-                      <option value="Housing">Housing</option>
-                      <option value="Education">Education</option>
-                      <option value="Healthcare">Healthcare</option>
-                      <option value="SME Welfare">SME Welfare</option>
+                      <option value="1">1 - Agriculture</option>
+                      <option value="2">2 - Housing</option>
+                      <option value="3">3 - Education</option>
+                      <option value="4">4 - Healthcare</option>
                     </select>
                   </div>
                 </div>
@@ -1217,92 +1466,54 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     placeholder="e.g. PM Kisan Samman Nidhi"
-                    value={schemeForm.name}
-                    onChange={e => setSchemeForm(prev => ({ ...prev, name: e.target.value }))}
+                    value={schemeForm.schemeName}
+                    onChange={e => setSchemeForm(prev => ({ ...prev, schemeName: e.target.value }))}
                     required
                     style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Sanction Amount (display)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ₹6,000 / Year"
-                      value={schemeForm.amount}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, amount: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Processing Time SLA</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 15-20 Days"
-                      value={schemeForm.processingTime}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, processingTime: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Max Income Limit (₹ / year)</label>
+                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Allocated Funds</label>
                     <input
                       type="number"
-                      placeholder="e.g. 300000"
-                      value={schemeForm.maxIncome}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, maxIncome: e.target.value }))}
+                      placeholder="e.g. 10000000"
+                      value={schemeForm.allocatedFunds}
+                      onChange={e => setSchemeForm(prev => ({ ...prev, allocatedFunds: e.target.value }))}
                       required
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Max Land Limit (Acres)</label>
+                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Min Eligible Score</label>
                     <input
                       type="number"
-                      placeholder="e.g. 5"
-                      value={schemeForm.maxLandHolding}
-                      onChange={e => setSchemeForm(prev => ({ ...prev, maxLandHolding: e.target.value }))}
+                      placeholder="e.g. 50"
+                      value={schemeForm.minimumEligibleScore}
+                      onChange={e => setSchemeForm(prev => ({ ...prev, minimumEligibleScore: e.target.value }))}
                       required
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
                     />
                   </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Status</label>
+                    <select
+                      value={schemeForm.active}
+                      onChange={e => setSchemeForm(prev => ({ ...prev, active: e.target.value === 'true' }))}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Allowed Occupations (comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Farmer, Student, Unemployed, Salaried"
-                    value={schemeForm.allowedOccupations}
-                    onChange={e => setSchemeForm(prev => ({ ...prev, allowedOccupations: e.target.value }))}
-                    required
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Required Verification Documents (comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Aadhaar Card, Income Certificate, Bank Passbook"
-                    value={schemeForm.requiredDocs}
-                    onChange={e => setSchemeForm(prev => ({ ...prev, requiredDocs: e.target.value }))}
-                    required
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Scheme Overview Description</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Scheme Description</label>
                   <textarea
-                    rows="2"
-                    placeholder="Enter short details of the scheme..."
+                    rows="4"
+                    placeholder="Enter full details of the scheme..."
                     value={schemeForm.description}
                     onChange={e => setSchemeForm(prev => ({ ...prev, description: e.target.value }))}
                     required
@@ -1310,16 +1521,118 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Eligibility Description Copy</label>
-                  <textarea
-                    rows="2"
-                    placeholder="Describe eligibility conditions..."
-                    value={schemeForm.eligibilityText}
-                    onChange={e => setSchemeForm(prev => ({ ...prev, eligibilityText: e.target.value }))}
-                    required
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
-                  />
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <label style={{ fontSize: '0.88rem', color: 'var(--text)', fontWeight: 600 }}>Eligibility Rules</label>
+                    <button type="button" onClick={addRule} style={{ background: 'var(--panel-light)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.25rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>+ Add Rule</button>
+                  </div>
+                  {schemeForm.rules.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>No rules added.</p>}
+                  {schemeForm.rules.map((rule, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 80px 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <select value={rule.fieldName} onChange={e => updateRule(i, 'fieldName', e.target.value)} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
+                        <option value="AGE">Age</option>
+                        <option value="INCOME">Income</option>
+                        <option value="CGPA">CGPA</option>
+                        <option value="CASTE">Caste</option>
+                        <option value="STATE">State</option>
+                        <option value="GENDER">Gender</option>
+                      </select>
+                      <select value={rule.operator} onChange={e => updateRule(i, 'operator', e.target.value)} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
+                        <option value="LESS_THAN">Less Than (&lt;)</option>
+                        <option value="LESS_THAN_EQUAL">Less Than/Equal (&lt;=)</option>
+                        <option value="GREATER_THAN">Greater Than (&gt;)</option>
+                        <option value="GREATER_THAN_EQUAL">Greater/Equal (&gt;=)</option>
+                        <option value="EQUALS">Equals (==)</option>
+                        <option value="NOT_EQUALS">Not Equals (!=)</option>
+                      </select>
+                      <input type="text" placeholder="Expected Value" value={rule.expectedValue} onChange={e => updateRule(i, 'expectedValue', e.target.value)} required style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }} />
+                      <input type="number" placeholder="Pts" value={rule.points} onChange={e => updateRule(i, 'points', Number(e.target.value))} required style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }} />
+                      <button type="button" onClick={() => removeRule(i)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <label style={{ fontSize: '0.88rem', color: 'var(--text)', fontWeight: 600 }}>Required Documents</label>
+                    <button type="button" onClick={addDocument} style={{ background: 'var(--panel-light)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.25rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>+ Add Document</button>
+                  </div>
+                  {schemeForm.documents.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>No documents required.</p>}
+                  {schemeForm.documents.map((doc, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <select value={doc.documentType} onChange={e => updateDocument(i, 'documentType', e.target.value)} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
+                        <option value="AADHAAR">Aadhaar Card</option>
+                        <option value="PAN">PAN Card</option>
+                        <option value="RATION_CARD">Ration Card</option>
+                        <option value="INCOME_CERTIFICATE">Income Certificate</option>
+                        <option value="CASTE_CERTIFICATE">Caste Certificate</option>
+                        <option value="DOMICILE_CERTIFICATE">Domicile Certificate</option>
+                        <option value="LAND_RECORD">Land Record (7/12)</option>
+                        <option value="BANK_PASSBOOK">Bank Passbook</option>
+                      </select>
+                      <select value={doc.mandatory} onChange={e => updateDocument(i, 'mandatory', e.target.value === 'true')} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
+                        <option value="true">Mandatory</option>
+                        <option value="false">Optional</option>
+                      </select>
+                      <button type="button" onClick={() => removeDocument(i)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── REQUIRED APPLICATION FIELDS ── */}
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.88rem', color: 'var(--text)', fontWeight: 600 }}>Required Application Fields</label>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>Fields the applicant must fill in when applying</p>
+                    </div>
+                    <button type="button" onClick={addField} style={{ background: 'var(--panel-light)', border: '1px solid var(--border)', color: 'var(--text)', padding: '0.25rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add Field</button>
+                  </div>
+                  {schemeForm.fields.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>No additional fields required.</p>}
+                  {schemeForm.fields.map((field, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                      <select
+                        value={field.fieldName}
+                        onChange={e => updateField(i, 'fieldName', e.target.value)}
+                        style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}
+                      >
+                        <optgroup label="Common">
+                          <option value="ANNUAL_INCOME">Annual Income</option>
+                          <option value="OCCUPATION">Occupation</option>
+                          <option value="CATEGORY">Category (Caste)</option>
+                          <option value="GENDER">Gender</option>
+                          <option value="AGE">Age</option>
+                        </optgroup>
+                        <optgroup label="Agriculture">
+                          <option value="LAND_AREA">Land Area</option>
+                          <option value="LAND_SURVEY_NUMBER">Land Survey Number</option>
+                        </optgroup>
+                        <optgroup label="Education">
+                          <option value="COLLEGE_NAME">College Name</option>
+                          <option value="COURSE_NAME">Course Name</option>
+                          <option value="MARKS_PERCENTAGE">Marks / Percentage</option>
+                        </optgroup>
+                        <optgroup label="Fisheries">
+                          <option value="BOAT_REGISTRATION_NUMBER">Boat Registration Number</option>
+                          <option value="FISHING_EXPERIENCE">Fishing Experience</option>
+                        </optgroup>
+                        <optgroup label="Business">
+                          <option value="BUSINESS_TYPE">Business Type</option>
+                          <option value="INVESTMENT_AMOUNT">Investment Amount</option>
+                          <option value="GST_NUMBER">GST Number</option>
+                        </optgroup>
+                      </select>
+                      <select
+                        value={field.mandatory}
+                        onChange={e => updateField(i, 'mandatory', e.target.value === 'true')}
+                        style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}
+                      >
+                        <option value="true">Mandatory</option>
+                        <option value="false">Optional</option>
+                      </select>
+                      <button type="button" onClick={() => removeField(i)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+                    </div>
+                  ))}
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>

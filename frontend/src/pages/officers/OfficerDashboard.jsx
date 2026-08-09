@@ -12,12 +12,9 @@ import {
   configureDisbursementPlan, 
   completeMilestone, 
   releaseMilestone, 
-  seedDisbursementPlan,
   resolveMilestone,
   getOverdueMilestones,
   getNotifications,
-  triggerOverdueCheck,
-  triggerReminderCheck
 } from '../../services/officerService'
 
 const STATUS_BADGE = {
@@ -47,7 +44,6 @@ export default function OfficerDashboard() {
   const [disbursementPlan, setDisbursementPlan] = useState(null)
   const [showDisbursementManager, setShowDisbursementManager] = useState(false)
   const [planConfigStages, setPlanConfigStages] = useState([])
-  const [isSeeding, setIsSeeding] = useState(false)
 
   // Task 2 compliance states
   const [overdueReports, setOverdueReports] = useState([])
@@ -56,8 +52,6 @@ export default function OfficerDashboard() {
   const [resolvingMilestoneId, setResolvingMilestoneId] = useState(null)
   const [resolvedReasonInput, setResolvedReasonInput] = useState('')
   const [isResolving, setIsResolving] = useState(false)
-  const [isRunningScheduler, setIsRunningScheduler] = useState(false)
-
   // Auth guard + fetch officer profile on mount
   useEffect(() => {
     async function init() {
@@ -93,7 +87,6 @@ export default function OfficerDashboard() {
 
   const handleLogout = async () => {
     try { await api.post('/gov/auth/signout') } catch { /* ignore */ }
-    sessionStorage.removeItem('gov-subsidy-auth')
     navigate('/officer/login')
   }
 
@@ -103,6 +96,23 @@ export default function OfficerDashboard() {
   const approved = applications.filter(a => a.status === 'Approved' || a.status === 'APPROVED').length
   const rejected = applications.filter(a => a.status === 'Rejected' || a.status === 'REJECTED').length
   const approvalRate = total ? Math.round((approved / total) * 100) : 0
+
+  const officerProfileChecks = officer ? [
+    { label: 'Full Name', value: officer.fullName, required: true },
+    { label: 'Username', value: officer.username, required: true },
+    { label: 'Role', value: officer.role, required: true },
+    { label: 'Mobile Number', value: officer.mobileNo, required: true },
+    { label: 'Region', value: officer.region, required: true },
+    { label: 'District', value: officer.district, required: true },
+    { label: 'State', value: officer.state, required: true },
+    { label: 'Officer ID', value: officer.uniqueID || officer.uniqueId || officer.id, required: false },
+    { label: 'Created On', value: officer.createdAt, required: false },
+    { label: 'Updated On', value: officer.updatedAt, required: false },
+  ] : []
+  const profileFilledCount = officerProfileChecks.filter(item => Boolean(item.value)).length
+  const profileCompletion = officerProfileChecks.length
+    ? Math.round((profileFilledCount / officerProfileChecks.length) * 100)
+    : 0
 
   const filteredApps = applications.filter(app => {
     const term = searchTerm.toLowerCase()
@@ -174,7 +184,7 @@ export default function OfficerDashboard() {
       }
       setShowDisbursementManager(true)
     } catch (err) {
-      showToast(err.message || 'Disbursement plan not found. Please seed test data first.', 'error')
+      showToast(err.message || 'Disbursement plan not found.', 'error')
     }
   }
 
@@ -222,20 +232,6 @@ export default function OfficerDashboard() {
     }
   }
 
-  const handleSeedDisbursement = async () => {
-    setIsSeeding(true)
-    try {
-      await seedDisbursementPlan()
-      showToast('Test scheme, approved application, and plan seeded successfully!')
-      const data = await getMyApplications()
-      setApplications(Array.isArray(data) ? data : data?.data || [])
-    } catch (err) {
-      showToast(err.message || 'Seeding failed.', 'error')
-    } finally {
-      setIsSeeding(false)
-    }
-  }
-
   // Task 2 Handlers
   const fetchOverdueReports = async () => {
     try {
@@ -278,36 +274,6 @@ export default function OfficerDashboard() {
       showToast(err.message || 'Failed to resolve milestone.', 'error')
     } finally {
       setIsResolving(false)
-    }
-  }
-
-  const handleTriggerOverdueCheck = async () => {
-    setIsRunningScheduler(true)
-    try {
-      const res = await triggerOverdueCheck()
-      showToast(res || 'Overdue check completed.')
-      await fetchOverdueReports()
-      if (selectedApp) {
-        const plan = await getDisbursementPlan(selectedApp.id)
-        setDisbursementPlan(plan)
-      }
-    } catch (err) {
-      showToast(err.message || 'Trigger failed.', 'error')
-    } finally {
-      setIsRunningScheduler(false)
-    }
-  }
-
-  const handleTriggerReminderCheck = async () => {
-    setIsRunningScheduler(true)
-    try {
-      const res = await triggerReminderCheck()
-      showToast(res || 'Reminders check completed.')
-      await fetchNotifications()
-    } catch (err) {
-      showToast(err.message || 'Trigger failed.', 'error')
-    } finally {
-      setIsRunningScheduler(false)
     }
   }
 
@@ -430,6 +396,16 @@ export default function OfficerDashboard() {
             Alerts &amp; Reminders
             {notifications.length > 0 && <span className="tab-badge" style={{ background: '#a855f7' }}>{notifications.length}</span>}
           </button>
+          <button
+            className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21a8 8 0 1 0-16 0" />
+              <circle cx="12" cy="8" r="4" />
+            </svg>
+            Profile Check
+          </button>
         </div>
 
         <div className="tab-pane">
@@ -441,21 +417,6 @@ export default function OfficerDashboard() {
                   <h2>Officer Dashboard</h2>
                   <p>Monitor subsidy applications, verify documents, and approve or reject requests.</p>
                 </div>
-              </div>
-
-              <div className="dev-tools-panel" style={{ background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  🛠️ Dev Sandbox Tools:
-                </span>
-                <button className="button button--secondary" onClick={handleSeedDisbursement} disabled={isSeeding} style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-                  {isSeeding ? 'Seeding...' : 'Seed Test Plan'}
-                </button>
-                <button className="button button--secondary" onClick={handleTriggerOverdueCheck} disabled={isRunningScheduler} style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-                  Run Overdue Check
-                </button>
-                <button className="button button--secondary" onClick={handleTriggerReminderCheck} disabled={isRunningScheduler} style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-                  Run Reminder Check
-                </button>
               </div>
 
               <div className="officer-stats-grid">
@@ -735,6 +696,63 @@ export default function OfficerDashboard() {
                   ))}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* TAB 5: PROFILE CHECK */}
+          {activeTab === 'profile' && (
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+              <div className="pane-header">
+                <h2>Profile Check</h2>
+                <p>Review the officer account details that are already stored in the backend.</p>
+              </div>
+
+              <div className="profile-container">
+                <div className="profile-sidebar">
+                  <div className="profile-avatar-card">
+                    <div className="avatar-circle">
+                      {(officer.fullName || officer.username || 'O').charAt(0).toUpperCase()}
+                    </div>
+                    <h3>{officer.fullName || 'Officer'}</h3>
+                    <p>@{officer.username || 'unknown'}</p>
+                    <span className="profile-occup-badge">{officer.role || 'OFFICER'}</span>
+                  </div>
+
+                  <div className="profile-actions-panel">
+                    <div className="beneficiary-meta-card" style={{ width: '100%' }}>
+                      <div className="meta-card__item" style={{ width: '100%' }}>
+                        <span className="meta-card__label">Profile Completion</span>
+                        <span className="meta-card__val">{profileCompletion}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profile-form-card officer-profile-card">
+                  <div className="card-title-bar">
+                    <h3>Account Information</h3>
+                  </div>
+
+                  <div className="profile-form officer-profile-form">
+                    <div className="form-grid">
+                      {officerProfileChecks.map((item) => (
+                        <div className="form-group" key={item.label}>
+                          <label>
+                            {item.label} {item.required && <span style={{ color: '#ef4444' }}>*</span>}
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={item.value || 'Not provided'}
+                            className={`profile-field-input ${item.value ? 'profile-field-input--filled' : 'profile-field-input--missing'}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
             </motion.div>
           )}
         </div>

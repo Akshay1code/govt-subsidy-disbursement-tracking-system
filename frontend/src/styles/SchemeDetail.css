@@ -188,10 +188,621 @@
   box-shadow: var(--shadow);
 }
 
+.scheme-action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .gate-card h3 {
   margin: 0 0 0.8rem;
   font-family: 'Source Serif 4', Georgia, serif;
   font-size: 1.35rem;
+}
+
+.eligibility-console-card {
+  padding: 1.55rem;
+  border-radius: 24px;
+  border: 1px solid rgba(130, 174, 202, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(130, 174, 202, 0.16), transparent 42%),
+    radial-gradient(circle at left center, rgba(142, 214, 106, 0.12), transparent 35%),
+    rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  position: relative;
+}
+
+.eligibility-console-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: engine-scan 5.5s linear infinite;
+  pointer-events: none;
+}
+
+.eligibility-console-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.eligibility-console__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.console-eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.eligibility-console__header h3 {
+  margin: 0;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.3rem;
+}
+
+.console-endpoint {
+  flex-shrink: 0;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(130, 174, 202, 0.28);
+  background: rgba(130, 174, 202, 0.08);
+  color: #a4d3f5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.eligibility-console__copy {
+  margin: 0.65rem 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.eligibility-score-hero {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 42%),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(130, 174, 202, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.eligibility-score-ring {
+  --score-progress: 0%;
+  --score-accent: #8ed66a;
+  width: 152px;
+  height: 152px;
+  border-radius: 50%;
+  padding: 11px;
+  background: conic-gradient(
+    from 180deg,
+    var(--score-accent) 0 var(--score-progress),
+    rgba(255, 255, 255, 0.08) var(--score-progress) 100%
+  );
+  margin: 0 auto;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 16px 30px rgba(0, 0, 0, 0.22),
+    0 0 32px rgba(142, 214, 106, 0.18);
+  position: relative;
+  animation: ring-breathe 4s ease-in-out infinite;
+}
+
+[data-theme='light'] .eligibility-console-card {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 38%),
+    radial-gradient(circle at left center, rgba(22, 163, 74, 0.08), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .eligibility-console-card::before {
+  background: linear-gradient(120deg, transparent 0%, rgba(15, 23, 42, 0.04) 50%, transparent 100%);
+}
+
+[data-theme='light'] .console-endpoint {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.16);
+  color: #0369a1;
+}
+
+[data-theme='light'] .eligibility-console__copy {
+  color: #475569;
+}
+
+[data-theme='light'] .eligibility-score-hero {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.75), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-theme='light'] .eligibility-score-ring {
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.06),
+    0 14px 24px rgba(15, 23, 42, 0.12),
+    0 0 24px rgba(22, 163, 74, 0.12);
+}
+
+[data-theme='light'] .eligibility-score-ring::after {
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 0 18px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme='light'] .eligibility-score-ring__inner {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), transparent 46%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .eligibility-score-value {
+  color: #0f172a;
+}
+
+[data-theme='light'] .eligibility-score-label,
+[data-theme='light'] .eligibility-threshold,
+[data-theme='light'] .eligibility-gap,
+[data-theme='light'] .eligibility-rule-row {
+  color: #475569;
+}
+
+[data-theme='light'] .eligibility-state-badge.is-idle {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0369a1;
+}
+
+[data-theme='light'] .eligibility-state-badge.is-pass {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+[data-theme='light'] .eligibility-state-badge.is-fail {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+[data-theme='light'] .eligibility-result-banner {
+  border-color: rgba(15, 23, 42, 0.08);
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(255, 255, 255, 0.72)),
+    linear-gradient(135deg, rgba(22, 163, 74, 0.06), rgba(255, 255, 255, 0.6));
+}
+
+[data-theme='light'] .eligibility-result-banner strong {
+  color: #0f172a;
+}
+
+[data-theme='light'] .eligibility-result-banner span {
+  color: #64748b;
+}
+
+[data-theme='light'] .eligibility-field-stack {
+  gap: 0.7rem;
+}
+
+[data-theme='light'] .eligibility-rule-row {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .eligibility-rule-row strong {
+  color: #0f172a;
+}
+
+[data-theme='light'] .eligibility-error-box {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.18);
+  color: #b91c1c;
+}
+
+.eligibility-score-ring::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.eligibility-score-ring__inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 44%),
+    linear-gradient(180deg, rgba(7, 12, 10, 0.92), rgba(12, 18, 16, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.2);
+}
+
+.eligibility-score-value {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 2.4rem;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.eligibility-score-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.eligibility-score-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.eligibility-state-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.eligibility-state-badge.is-idle {
+  background: rgba(130, 174, 202, 0.12);
+  color: #a4d3f5;
+}
+
+.eligibility-state-badge.is-pass {
+  background: rgba(95, 143, 74, 0.16);
+  color: #8ed66a;
+}
+
+.eligibility-state-badge.is-fail {
+  background: rgba(220, 53, 69, 0.16);
+  color: #ff6b76;
+}
+
+.eligibility-threshold,
+.eligibility-gap {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.eligibility-result-banner {
+  margin-top: 0.9rem;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(130, 174, 202, 0.14);
+  background:
+    linear-gradient(135deg, rgba(130, 174, 202, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(95, 143, 74, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.eligibility-result-banner strong {
+  color: #e6f6d9;
+  font-size: 0.9rem;
+}
+
+.eligibility-result-banner span {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.eligibility-field-stack {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.eligibility-rule-card {
+  padding: 0.95rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.eligibility-rule-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.85rem;
+}
+
+.eligibility-rule-card__name {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.eligibility-rule-card__sub {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.eligibility-rule-card__tag {
+  flex-shrink: 0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(130, 174, 202, 0.08);
+  color: #a4d3f5;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.eligibility-input-label {
+  display: block;
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.45rem;
+}
+
+.eligibility-rule-card input,
+.eligibility-rule-card select {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0.75rem 0.85rem;
+  font-size: 0.92rem;
+  outline: none;
+}
+
+.eligibility-rule-card input:focus,
+.eligibility-rule-card select:focus {
+  border-color: rgba(130, 174, 202, 0.65);
+  box-shadow: 0 0 0 3px rgba(130, 174, 202, 0.12);
+}
+
+.eligibility-rule-list {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.eligibility-rule-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-soft);
+  font-size: 0.83rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.eligibility-rule-row strong {
+  color: #a4d3f5;
+  font-size: 0.78rem;
+}
+
+.eligibility-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.eligibility-actions .button {
+  flex: 1;
+}
+
+.eligibility-error-box {
+  margin-top: 0.85rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(220, 53, 69, 0.24);
+  background: rgba(220, 53, 69, 0.08);
+  color: #ff8e96;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+@keyframes engine-scan {
+  0% {
+    transform: translateX(-100%);
+  }
+  55% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ring-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eligibility-console-card::before,
+  .eligibility-score-ring {
+    animation: none;
+  }
+}
+
+.docs-submission-panel {
+  margin-top: 1.4rem;
+  padding: 1.55rem;
+  border-radius: 24px;
+  border: 1px solid rgba(130, 174, 202, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(255, 181, 71, 0.12), transparent 36%),
+    rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow);
+}
+
+.eligibility-result-card {
+  margin-top: 1rem;
+  padding: 1rem 1.05rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(130, 174, 202, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.eligibility-result-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.eligibility-result-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.95rem;
+}
+
+.eligibility-result-card__stats div {
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(130, 174, 202, 0.12);
+}
+
+.eligibility-result-card__stats span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  margin-bottom: 0.3rem;
+}
+
+.eligibility-result-card__stats strong {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.docs-submission-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.docs-submission-panel__header h3 {
+  margin: 0;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.28rem;
+}
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.doc-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(130, 174, 202, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.doc-upload-card__label {
+  font-size: 0.94rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.doc-upload-card__hint {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.doc-upload-card input[type='file'] {
+  margin-top: 0.35rem;
+  width: 100%;
+  color: var(--text-soft);
+}
+
+.doc-upload-card__file {
+  font-size: 0.78rem;
+  color: #f1c27a;
+  word-break: break-word;
+}
+
+.eligibility-json {
+  margin-top: 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.eligibility-json summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.eligibility-json summary::-webkit-details-marker {
+  display: none;
+}
+
+.eligibility-json pre {
+  margin: 0;
+  padding: 0 0.95rem 0.95rem;
+  color: #cfe6f8;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.eligibility-json--response {
+  border-color: rgba(95, 143, 74, 0.22);
 }
 
 .applied-gateway-info,
@@ -301,9 +912,18 @@
 
 .form-flex-columns {
   display: grid;
-  grid-template-columns: 1fr 440px;
-  gap: 2.5rem;
+  grid-template-columns: 1fr;
+  gap: 2rem;
   align-items: start;
+}
+
+.form-column-inputs {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.form-column-scanner {
+  margin-top: 0.5rem;
 }
 
 .form-column-inputs h3,
@@ -342,6 +962,22 @@
   align-items: center;
   border-top: 1px solid var(--border);
   padding-top: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+  .docs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .eligibility-result-card__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .eligibility-score-hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
 }
 
 /* Scanner styles */

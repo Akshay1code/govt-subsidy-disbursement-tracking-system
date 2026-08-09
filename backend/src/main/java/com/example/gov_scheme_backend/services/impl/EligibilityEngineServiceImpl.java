@@ -20,6 +20,24 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
     ApplicationRepo applicationRepo;
     @Autowired
     SchemeEligibilityRuleRepo schemeEligibilityRuleRepo;
+
+    private static boolean isNumericRuleField(RuleField field) {
+        return field == RuleField.AGE
+                || field == RuleField.INCOME
+                || field == RuleField.CGPA;
+    }
+
+    private static Double parseDoubleSafely(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     public double validateFields(Long applicationId){
 
         Application application = applicationRepo.findById(applicationId)
@@ -37,12 +55,13 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
             );
         }
         for (SchemeEligibilityRule rule : rules) {
+            if (rule == null || rule.getFieldName() == null) {
+                continue;
+            }
 
-            String userValue = userFields.get(rule.getFieldName().name());
+            String userValue = userFields.get(rule.getFieldName());
             if (userValue == null) {
-                throw new BadRequestException(
-                        "Missing value for field: " + rule.getFieldName()
-                );
+                continue;
             }
 
             boolean matched = false;
@@ -58,9 +77,14 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                     break;
 
                 case GREATER_THAN: {
-
-                    double user = Double.parseDouble(userValue);
-                    double expected = Double.parseDouble(rule.getRuleValue());
+                    if (!isNumericRuleField(rule.getFieldName())) {
+                        continue;
+                    }
+                    Double user = parseDoubleSafely(userValue);
+                    Double expected = parseDoubleSafely(rule.getRuleValue());
+                    if (user == null || expected == null) {
+                        continue;
+                    }
 
                     if (user > expected) {
                         score += rule.getPoints();
@@ -73,9 +97,14 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                 }
 
                 case GREATER_THAN_EQUAL: {
-
-                    double user = Double.parseDouble(userValue);
-                    double expected = Double.parseDouble(rule.getRuleValue());
+                    if (!isNumericRuleField(rule.getFieldName())) {
+                        continue;
+                    }
+                    Double user = parseDoubleSafely(userValue);
+                    Double expected = parseDoubleSafely(rule.getRuleValue());
+                    if (user == null || expected == null) {
+                        continue;
+                    }
 
                     if (user >= expected) {
                         score += rule.getPoints();
@@ -88,9 +117,14 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                 }
 
                 case LESS_THAN: {
-
-                    double user = Double.parseDouble(userValue);
-                    double expected = Double.parseDouble(rule.getRuleValue());
+                    if (!isNumericRuleField(rule.getFieldName())) {
+                        continue;
+                    }
+                    Double user = parseDoubleSafely(userValue);
+                    Double expected = parseDoubleSafely(rule.getRuleValue());
+                    if (user == null || expected == null) {
+                        continue;
+                    }
 
                     if (user < expected) {
                         score += rule.getPoints();
@@ -103,9 +137,14 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                 }
 
                 case LESS_THAN_EQUAL: {
-
-                    double user = Double.parseDouble(userValue);
-                    double expected = Double.parseDouble(rule.getRuleValue());
+                    if (!isNumericRuleField(rule.getFieldName())) {
+                        continue;
+                    }
+                    Double user = parseDoubleSafely(userValue);
+                    Double expected = parseDoubleSafely(rule.getRuleValue());
+                    if (user == null || expected == null) {
+                        continue;
+                    }
 
                     if (user <= expected) {
                         score += rule.getPoints();

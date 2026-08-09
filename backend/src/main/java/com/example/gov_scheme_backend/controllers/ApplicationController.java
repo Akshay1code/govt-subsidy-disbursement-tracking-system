@@ -45,6 +45,38 @@ public class ApplicationController {
         return ResponseEntity.status(HttpStatus.OK).body(res);
     }
 
+    @PostMapping("/submit/{schemeCode}")
+    public ResponseEntity<?> submitApplication(
+            @PathVariable String schemeCode,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+
+        Claims claims = jwtService.extractAllClaims(token);
+        Long userId = claims.get("userId", Long.class);
+        applicationService.submitApplication(userId, schemeCode);
+        return ResponseEntity.ok(new ApiResponse(true, "Application submitted successfully"));
+    }
+
+    @DeleteMapping("/{applicationId}")
+    public ResponseEntity<?> cancelApplication(
+            @PathVariable Long applicationId,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+
+        Claims claims = jwtService.extractAllClaims(token);
+        Long userId = claims.get("userId", Long.class);
+        applicationService.cancelApplication(userId, applicationId);
+        return ResponseEntity.ok(new ApiResponse(true, "Application process cancelled successfully"));
+    }
+
 //    @GetMapping("/beneficiary/{applicationId}/get-fields")
 //    public List<ApplicationFieldValueResponseDTO> getFields(
 //            @PathVariable Long applicationId) {
@@ -86,12 +118,21 @@ public class ApplicationController {
             map.put("applicantName", app.getUser() != null ? app.getUser().getFullName() : "Unknown");
             map.put("schemeName", app.getScheme() != null ? app.getScheme().getSchemeName() : "Unknown");
             map.put("schemeId", app.getScheme() != null ? app.getScheme().getSchemeCode() : "");
-            map.put("status", app.getStatus() != null ? app.getStatus().toString() : "PENDING");
+            String applicationStatus = app.getStatus() != null ? app.getStatus().toString() : "DRAFT";
+            map.put("status", applicationStatus);
+            map.put("applicationStatus", applicationStatus);
             map.put("remarks", app.getRemarks());
-            
-            String annualIncome = "45000";
-            String aadhaar = "1234-5678-9012";
-            String phone = "9876543210";
+            map.put("createdAt", app.getCreatedAt());
+            map.put("updatedAt", app.getUpdatedAt());
+            map.put(
+                    "submittedDate",
+                    "DRAFT".equalsIgnoreCase(applicationStatus) || "PENDING".equalsIgnoreCase(applicationStatus)
+                            ? app.getCreatedAt()
+                            : (app.getUpdatedAt() != null ? app.getUpdatedAt() : app.getCreatedAt()));
+
+            String annualIncome = null;
+            String aadhaar = null;
+            String phone = app.getUser() != null ? app.getUser().getMobileNo() : null;
             if (app.getFieldValues() != null) {
                 for (com.example.gov_scheme_backend.entities.ApplicationFieldValue val : app.getFieldValues()) {
                     String fieldNameStr = val.getFieldName() != null ? val.getFieldName().name() : "";
@@ -99,9 +140,6 @@ public class ApplicationController {
                         annualIncome = val.getFieldValue();
                     }
                 }
-            }
-            if (app.getUser() != null) {
-                phone = app.getUser().getMobileNo() != null ? app.getUser().getMobileNo() : phone;
             }
             map.put("annualIncome", annualIncome);
             map.put("aadhaar", aadhaar);

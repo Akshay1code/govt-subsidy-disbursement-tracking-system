@@ -1,4 +1,6 @@
 export const SCHEMES = []
+let currentSchemes = SCHEMES
+let officerActionLogs = []
 
 export function checkEligibility(scheme, userProfile) {
   if (!userProfile) return { eligible: false, reasons: ['Not logged in'] }
@@ -31,21 +33,15 @@ export function checkEligibility(scheme, userProfile) {
 }
 
 export function getSchemes() {
-  const stored = window.localStorage.getItem('gov-subsidy-schemes')
-  if (!stored) {
-    window.localStorage.setItem('gov-subsidy-schemes', JSON.stringify(SCHEMES))
-    return SCHEMES
-  }
-  return JSON.parse(stored)
+  return currentSchemes
 }
 
 export function saveSchemes(newSchemes) {
-  window.localStorage.setItem('gov-subsidy-schemes', JSON.stringify(newSchemes))
+  currentSchemes = Array.isArray(newSchemes) ? newSchemes : []
+  return currentSchemes
 }
 
 export function logOfficerAction(officerId, officerName, action, details, targetId) {
-  const storedLogs = window.localStorage.getItem('gov-subsidy-officer-actions')
-  const logs = storedLogs ? JSON.parse(storedLogs) : []
   const newLog = {
     id: 'ACT-' + Math.floor(100000 + Math.random() * 900000),
     timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -55,8 +51,7 @@ export function logOfficerAction(officerId, officerName, action, details, target
     details,
     targetId
   }
-  logs.unshift(newLog)
-  window.localStorage.setItem('gov-subsidy-officer-actions', JSON.stringify(logs))
+  officerActionLogs.unshift(newLog)
   return newLog
 }
 

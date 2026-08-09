@@ -34,13 +34,12 @@ export async function register(formData) {
 export async function registerOfficer(formData) {
   const payload = {
     fullName: formData.fullName,
-    role: 'OFFICER',
-    officerId: formData.officerId,
-    designation: formData.designation,
-    department: formData.department,
+    role: formData.role || 'FIELD_OFFICER',
+    mobileNo: formData.mobileNo,
+    region: formData.region,
     district: formData.district,
-    email: formData.email,
-    employeeCode: formData.employeeCode,
+    state: formData.state,
+    username: formData.username,
     password: formData.password,
   }
 

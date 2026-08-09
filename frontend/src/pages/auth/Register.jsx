@@ -1,6 +1,6 @@
 import '../../styles/Login.css'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { register as apiRegister, registerOfficer as apiRegisterOfficer } from '../../services/authService'
 import logo from '../../assets/icons/logo.png'
@@ -33,10 +33,10 @@ function validate(form, mode) {
   if (!form.username.trim())    return 'Please choose a username.'
   if (mode === 'officer' && !form.role) return 'Please select a role.'
 
-  const hasLetter = /[a-zA-Z]/.test(form.password)
-  const hasNumber = /[0-9]/.test(form.password)
-  if (form.password.length < 6 || !hasLetter || !hasNumber)
-    return 'Password must be ≥ 6 characters and contain letters & numbers.'
+  const backendPasswordPattern = /^[A-Z](?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&]).{7,}$/
+  if (!backendPasswordPattern.test(form.password)) {
+    return 'Password must start with an uppercase letter and include lowercase letters, a number, and a special character.'
+  }
 
   if (form.password !== form.confirmPassword) return 'Passwords do not match.'
   return null
@@ -191,8 +191,11 @@ function ErrorMsg({ message }) {
 /*  Main Register page                                             */
 /* ─────────────────────────────────────────────────────────────── */
 export default function Register() {
+  const location = useLocation()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('beneficiary') // 'beneficiary' | 'officer'
+  const [mode, setMode] = useState(() => (
+    location.pathname.startsWith('/officer') ? 'officer' : 'beneficiary'
+  )) // 'beneficiary' | 'officer'
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
