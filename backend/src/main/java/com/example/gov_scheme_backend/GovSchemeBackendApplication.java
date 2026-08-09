@@ -11,5 +11,4 @@ public class GovSchemeBackendApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(GovSchemeBackendApplication.class, args);
 	}
-
 }

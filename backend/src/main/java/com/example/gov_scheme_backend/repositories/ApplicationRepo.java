@@ -11,4 +11,5 @@ import java.util.Optional;
 @Repository
 public interface ApplicationRepo extends JpaRepository<Application, Long> {
     Optional<Application> findByApplicationCode(String applicationCode);
+    Optional<Application> findByUser_IdAndScheme_SchemeCode(Long userId, String schemeCode);
 }

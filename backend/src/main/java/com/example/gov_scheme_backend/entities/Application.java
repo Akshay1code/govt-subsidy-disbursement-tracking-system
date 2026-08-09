@@ -31,11 +31,11 @@ public class Application {
     private String applicationCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "scheme_code" ,referencedColumnName = "schemeCode", nullable = false)
+    @JoinColumn(name = "scheme_code", referencedColumnName = "scheme_code", nullable = false)
     private Schemes scheme;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 20)
     private ApplicationStatus status;
 
     @Column(length = 500)

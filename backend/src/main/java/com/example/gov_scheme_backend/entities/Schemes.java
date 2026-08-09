@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -21,7 +23,7 @@ public class Schemes {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "scheme_code", nullable = false, unique = true)
     private String schemeCode;
 
     @Column(nullable = false)
@@ -47,7 +49,12 @@ public class Schemes {
     private Boolean active;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(
+            name = "category_id",
+            nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)
+    )
+    @NotFound(action = NotFoundAction.IGNORE)
     private SchemeCategory category;
 
     @CreationTimestamp
@@ -69,5 +76,12 @@ public class Schemes {
             orphanRemoval = true
     )
     private List<SchemeRequiredDocument> requiredDocuments;
+
+    @OneToMany(
+            mappedBy = "scheme",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<SchemeRequiredField> requiredFields;
 
 }

@@ -4,8 +4,6 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } fr
 import { Link } from 'react-router-dom'
 import logo from '../assets/icons/logo.png'
 
-const STORAGE_KEY = 'gov-subsidy-language'
-
 const LANGUAGES = [
   { code: 'en', label: 'English', native: 'English' },
   { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
@@ -237,19 +235,11 @@ const itemVariants = {
 }
 
 function useStoredLanguage() {
-  const [language, setLanguage] = useState(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    return stored && COPY[stored] ? stored : 'en'
-  })
-
-  const [showLanguageModal, setShowLanguageModal] = useState(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    return !(stored && COPY[stored])
-  })
+  const [language, setLanguage] = useState('en')
+  const [showLanguageModal, setShowLanguageModal] = useState(true)
 
   const selectLanguage = (code) => {
     setLanguage(code)
-    window.localStorage.setItem(STORAGE_KEY, code)
     setShowLanguageModal(false)
   }
 
@@ -496,7 +486,6 @@ function Landing() {
 
   // Query Form State
   const [queryForm, setQueryForm] = useState({ name: '', phone: '', email: '', subject: '', message: '' })
-  const [queryToast, setQueryToast] = useState(null)
   const [submittedTicket, setSubmittedTicket] = useState(null)
 
   function handleQueryChange(e) {
@@ -522,10 +511,6 @@ function Landing() {
       status: 'Open',
       submittedAt: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
-
-    const existingQueries = JSON.parse(localStorage.getItem('gov-subsidy-queries') || '[]')
-    existingQueries.unshift(newQuery)
-    localStorage.setItem('gov-subsidy-queries', JSON.stringify(existingQueries))
 
     setSubmittedTicket(newQuery)
     setQueryForm({ name: '', phone: '', email: '', subject: '', message: '' })
