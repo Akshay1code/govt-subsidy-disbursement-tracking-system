@@ -16,14 +16,9 @@ export function ThemeProvider({ children }) {
   ].includes(path)
   const isThemeEnabled = !isExcluded
 
-  const [theme, setTheme] = useState(() => {
-    const saved = window.localStorage.getItem('gov-subsidy-theme')
-    if (saved) return saved
-    return 'dark' // default theme
-  })
+  const [theme, setTheme] = useState('dark')
 
   useEffect(() => {
-    window.localStorage.setItem('gov-subsidy-theme', theme)
     if (isThemeEnabled && theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light')
     } else {

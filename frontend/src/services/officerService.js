@@ -32,11 +32,6 @@ export async function releaseMilestone(milestoneId) {
   return response.data
 }
 
-export async function seedDisbursementPlan() {
-  const response = await api.post('/api/v1/disbursement/seed')
-  return response.data
-}
-
 export async function resolveMilestone(milestoneId, reason) {
   const response = await api.put(`/api/v1/disbursement/milestone/${milestoneId}/resolve`, { reason })
   return response.data

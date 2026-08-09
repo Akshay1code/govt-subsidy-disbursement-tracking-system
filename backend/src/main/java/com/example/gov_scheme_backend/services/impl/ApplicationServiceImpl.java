@@ -7,6 +7,7 @@ import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.dto.response.application.ApplicationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.EligibilityEngineScoreDTO;
 import com.example.gov_scheme_backend.entities.Application;
+import com.example.gov_scheme_backend.entities.ApplicationDocument;
 import com.example.gov_scheme_backend.entities.ApplicationFieldValue;
 import com.example.gov_scheme_backend.entities.Schemes;
 import com.example.gov_scheme_backend.entities.Users;
@@ -15,6 +16,7 @@ import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.DuplicateResourceException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.ApplicationRepo;
+import com.example.gov_scheme_backend.repositories.SchemeRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.services.ApplicationService;
 import com.example.gov_scheme_backend.services.EligibilityEngineService;
@@ -26,6 +28,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +40,8 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Autowired
     UserRepo userRepo;
     @Autowired
+    SchemeRepo schemeRepo;
+    @Autowired
     EligibilityEngineService check;
 
     @Override
@@ -43,21 +49,55 @@ public class ApplicationServiceImpl implements ApplicationService {
     public EligibilityEngineScoreDTO saveFields(Long userId,
                                   ApplicationFieldValueRequestDTO req) {
 
+        if (req == null || req.getSchemeCode() == null || req.getSchemeCode().trim().isEmpty()) {
+            throw new BadRequestException("Scheme code is required");
+        }
+
         Users user = userRepo.findById(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found"));
 
-        Application app = new Application();
+        Schemes scheme = schemeRepo.findBySchemeCode(req.getSchemeCode().trim())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Scheme not found with code: " + req.getSchemeCode()));
 
-        app.setApplicationCode("APP-" +
-                UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        Application app = applicationRepo.findByUser_IdAndScheme_SchemeCode(userId, scheme.getSchemeCode())
+                .map(existingApplication -> {
+                    if (existingApplication.getStatus() != null
+                            && existingApplication.getStatus() != ApplicationStatus.DRAFT
+                            && existingApplication.getStatus() != ApplicationStatus.PENDING) {
+                        throw new DuplicateResourceException(
+                                "An application already exists for this scheme. Please continue or cancel the existing application."
+                        );
+                    }
 
-        app.setUser(user);
-        app.setStatus(ApplicationStatus.PENDING);
+                    if (existingApplication.getFieldValues() != null) {
+                        existingApplication.getFieldValues().clear();
+                    }
+                    if (existingApplication.getDocuments() != null) {
+                        existingApplication.getDocuments().clear();
+                    }
 
+                    existingApplication.setStatus(ApplicationStatus.DRAFT);
+                    return existingApplication;
+                })
+                .orElseGet(() -> {
+                    Application newApplication = new Application();
+                    newApplication.setApplicationCode("APP-" +
+                            UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                    newApplication.setUser(user);
+                    newApplication.setScheme(scheme);
+                    newApplication.setStatus(ApplicationStatus.DRAFT);
+                    return newApplication;
+                });
+
+        List<FieldValueRequestDTO> submittedFields = req.getFields() == null ? List.of() : req.getFields();
         List<ApplicationFieldValue> fieldValues = new ArrayList<>();
 
-        for (FieldValueRequestDTO dto : req.getFields()) {
+        for (FieldValueRequestDTO dto : submittedFields) {
+            if (dto == null || dto.getFieldName() == null) {
+                continue;
+            }
 
             ApplicationFieldValue field = new ApplicationFieldValue();
             field.setFieldName(dto.getFieldName());
@@ -68,14 +108,82 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         app.setFieldValues(fieldValues);
-        applicationRepo.save(app);
-        double score = check.validateFields(app.getId());
+        Application saved = applicationRepo.save(app);
 
-        if(score < app.getScheme().getMinimumEligibleScore()){
+        String missingField = findMissingEligibilityField(scheme, submittedFields);
+        if (missingField != null) {
+            return new EligibilityEngineScoreDTO(false, 0.0, "Missing value for field: " + missingField);
+        }
+
+        double score = check.validateFields(saved.getId());
+
+        if(score < scheme.getMinimumEligibleScore()){
             return new EligibilityEngineScoreDTO(false,score,"You are not eligible");
         }
 
         return new EligibilityEngineScoreDTO(true,score,"You are eligible");
+    }
+
+    @Override
+    @Transactional
+    public void cancelApplication(Long userId, Long applicationId) {
+        if (applicationId == null) {
+            throw new BadRequestException("Application ID is required");
+        }
+
+        Application application = applicationRepo.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("No application found for this application ID"));
+
+        if (application.getUser() == null || application.getUser().getId() == null || !application.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not allowed to cancel this application");
+        }
+
+        if (application.getStatus() != ApplicationStatus.DRAFT && application.getStatus() != ApplicationStatus.PENDING) {
+            throw new BadRequestException("Only draft applications can be cancelled");
+        }
+
+        applicationRepo.delete(application);
+    }
+
+    @Override
+    @Transactional
+    public void submitApplication(Long userId, String schemeCode) {
+        if (schemeCode == null || schemeCode.trim().isEmpty()) {
+            throw new BadRequestException("Scheme code is required");
+        }
+
+        Application application = applicationRepo.findByUser_IdAndScheme_SchemeCode(userId, schemeCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("No application found for this scheme"));
+
+        if (application.getStatus() != ApplicationStatus.DRAFT && application.getStatus() != ApplicationStatus.PENDING) {
+            throw new BadRequestException("Application has already been submitted");
+        }
+
+        application.setStatus(ApplicationStatus.SUBMITTED);
+        applicationRepo.save(application);
+    }
+
+    private String findMissingEligibilityField(Schemes scheme, List<FieldValueRequestDTO> submittedFields) {
+        if (scheme == null || scheme.getEligibilityRules() == null || scheme.getEligibilityRules().isEmpty()) {
+            return null;
+        }
+
+        Set<String> providedFields = submittedFields.stream()
+                .filter(dto -> dto != null && dto.getFieldName() != null)
+                .map(dto -> dto.getFieldName().name())
+                .collect(Collectors.toSet());
+
+        for (var rule : scheme.getEligibilityRules()) {
+            if (rule == null || rule.getFieldName() == null) {
+                continue;
+            }
+
+            if (!providedFields.contains(rule.getFieldName().name())) {
+                return rule.getFieldName().name();
+            }
+        }
+
+        return null;
     }
 
 

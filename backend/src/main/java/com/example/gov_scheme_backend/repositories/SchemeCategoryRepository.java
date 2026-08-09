@@ -9,5 +9,6 @@ public interface SchemeCategoryRepository extends JpaRepository<SchemeCategory, 
 
     boolean existsByCategoryNameIgnoreCase(String categoryName);
     java.util.Optional<SchemeCategory> findByCategoryName(String categoryName);
+    java.util.Optional<SchemeCategory> findByCategoryNameIgnoreCase(String categoryName);
 
 }

@@ -32,8 +32,6 @@ export default function Login() {
 
   // Forgot Password State
   const [showForgotModal, setShowForgotModal] = useState(false)
-  const [forgotInput, setForgotInput] = useState('')
-
 
   function handleChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -42,7 +40,7 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.identifier.trim()) { setError('Please enter your Username or Officer ID.'); return }
+    if (!form.identifier.trim()) { setError('Please enter your Username.'); return }
     if (!form.password) { setError('Please enter your password.'); return }
 
     setLoading(true)
@@ -50,20 +48,32 @@ export default function Login() {
       const result = await apiLogin({ username: form.identifier.trim(), password: form.password })
 
       if (result.status) {
-        // Store a simple auth signal in sessionStorage (clears when tab closes)
-        // No user data stored locally — all profile data comes from the backend
-        sessionStorage.setItem('gov-subsidy-auth', 'true')
-        setLoading(false)
-        // Backend will know the role from the cookie/session; navigate to dashboard
-        // The dashboard itself will redirect to the correct role-based page
-        navigate('/dashboard')
+        // Fetch profile to determine role-based redirect
+        try {
+          const { default: api } = await import('../../services/api')
+          const profileRes = await api.get('/gov/auth/profile/get')
+          const user = profileRes.data?.data || profileRes.data
+
+          const role = user?.role?.toUpperCase()
+
+          if (role === 'ADMIN') {
+            navigate('/admin/dashboard')
+          } else if (role?.includes('OFFICER')) {
+            navigate('/officer/dashboard')
+          } else {
+            navigate('/dashboard')
+          }
+        } catch {
+          // Fallback: go to beneficiary dashboard if profile fetch fails
+          navigate('/dashboard')
+        }
       } else {
         setError(result.message || 'Invalid credentials. Please try again.')
-        setLoading(false)
       }
     } catch (err) {
       console.error('Login error:', err)
       setError(err.message || 'Invalid username or password.')
+    } finally {
       setLoading(false)
     }
   }
@@ -88,13 +98,31 @@ export default function Login() {
         <div className="login-page__form-area">
           <div className="login-page__copy">
             <h1>Portal Login</h1>
-            <p>Login as a citizen or official to access the government subsidy portal.</p>
+            <p>Login as a citizen, officer, or administrator to access the government subsidy portal.</p>
+          </div>
+
+          {/* Role Info Badges */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            {[
+              { label: 'Beneficiary', color: '#5f8f4a', icon: '👤' },
+              { label: 'Officer',     color: '#82aeca', icon: '👮' },
+              { label: 'Admin',       color: '#d9822b', icon: '🛡️' },
+            ].map(r => (
+              <span key={r.label} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem',
+                borderRadius: '99px', background: `${r.color}18`,
+                border: `1px solid ${r.color}40`, color: r.color
+              }}>
+                {r.icon} {r.label}
+              </span>
+            ))}
           </div>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             {/* Username/ID */}
             <div className="login-form__field">
-              <label htmlFor="identifier">Username / Officer ID</label>
+              <label htmlFor="identifier">Username / Admin ID</label>
               <div className="login-form__input-wrap">
                 <svg className="login-form__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
@@ -104,7 +132,7 @@ export default function Login() {
                   id="identifier"
                   name="identifier"
                   type="text"
-                  placeholder="Enter your username or ID"
+                  placeholder="Enter your username"
                   autoComplete="username"
                   value={form.identifier}
                   onChange={handleChange}
@@ -149,7 +177,7 @@ export default function Login() {
                 type="button"
                 className="login-form__forgot"
                 style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                onClick={() => { setShowForgotModal(true); setForgotStep(1); setForgotError(''); setForgotSuccess('') }}
+                onClick={() => setShowForgotModal(true)}
               >
                 Forgot password?
               </button>

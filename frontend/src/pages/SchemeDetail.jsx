@@ -1,291 +1,286 @@
 import '../styles/SchemeDetail.css';
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { getSchemes, checkEligibility } from '../data/schemes'
+import { motion } from 'framer-motion'
+import { getSchemes } from '../services/schemeService'
+import { getApplications, submitApplicationBySchemeCode, cancelApplicationById } from '../services/applicationService'
+import { runEligibilityEngine } from '../services/eligibilityService'
+import api from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 
-// Sample base64 mock documents to represent scanned images
-const MOCK_DOCS = {
-  clear: {
-    name: 'Aadhaar_Card_Clear.jpg',
-    url: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=60', // Representative doc image
-    diagnostics: {
-      resolution: { value: '3264 x 2448 px', status: 'pass', label: 'Resolution (300 DPI)' },
-      blur: { value: '0.04 variance (Excellent)', status: 'pass', label: 'Blur / Sharpness Check' },
-      contrast: { value: '88% Dynamic Range', status: 'pass', label: 'Lighting / Exposure' },
-      ocr: { value: '96% Match Confidence', status: 'pass', label: 'OCR Readability' },
-      bounds: { value: '98% Alignment', status: 'pass', label: 'Edge Detection' }
-    },
-    message: 'Document quality is optimal. Ready for instant digital processing.',
-    color: '#5f8f4a'
-  },
-  blurry: {
-    name: 'Aadhaar_Card_Blurry.jpg',
-    url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=60', // Blurry/dark tech image
-    diagnostics: {
-      resolution: { value: '640 x 480 px (Low)', status: 'warning', label: 'Resolution (300 DPI)' },
-      blur: { value: '0.64 variance (High Blur)', status: 'fail', label: 'Blur / Sharpness Check' },
-      contrast: { value: '42% Dynamic Range (Too Dark)', status: 'warning', label: 'Lighting / Exposure' },
-      ocr: { value: '31% Match (Unreadable)', status: 'fail', label: 'OCR Readability' },
-      bounds: { value: '61% Alignment', status: 'warning', label: 'Edge Detection' }
-    },
-    message: 'High blur & low resolution detected. Please re-upload a stable, well-lit scan to avoid officer rejection.',
-    color: '#d9822b'
-  },
-  contrast: {
-    name: 'Aadhaar_Card_Glare.jpg',
-    url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60', // Glare tech image
-    diagnostics: {
-      resolution: { value: '1920 x 1080 px', status: 'pass', label: 'Resolution (300 DPI)' },
-      blur: { value: '0.11 variance (Acceptable)', status: 'pass', label: 'Blur / Sharpness Check' },
-      contrast: { value: '95% Glare/Reflectance (Poor)', status: 'fail', label: 'Lighting / Exposure' },
-      ocr: { value: '72% Match (Aadhaar number obscured)', status: 'warning', label: 'OCR Readability' },
-      bounds: { value: '92% Alignment', status: 'pass', label: 'Edge Detection' }
-    },
-    message: 'Severe glare/contrast blowout detected. Please disable flash and scan from a top-down angle.',
-    color: '#d9822b'
+function normalizeRuleField(fieldName) {
+  return String(fieldName || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+}
+
+function getProfileSeedValue(profile, fieldName) {
+  switch (normalizeRuleField(fieldName)) {
+    case 'AGE':
+      return profile?.age ?? profile?.dobAge ?? profile?.yearsOld ?? ''
+    case 'INCOME':
+      return profile?.annualIncome ?? profile?.monthlyIncome ?? ''
+    case 'CGPA':
+      return profile?.cgpa ?? profile?.educationScore ?? profile?.marksPercentage ?? ''
+    case 'CASTE':
+      return profile?.caste || profile?.category || ''
+    case 'STATE':
+      return profile?.state || ''
+    case 'GENDER':
+      return profile?.gender || ''
+    default:
+      return profile?.[String(fieldName || '').toLowerCase()] || ''
   }
+}
+
+function getApplicationStatus(application) {
+  return String(application?.applicationStatus || application?.status || '').toUpperCase()
+}
+
+function isDraftStatus(status) {
+  return status === 'DRAFT' || status === 'PENDING'
 }
 
 export default function SchemeDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  
-  const SCHEMES = getSchemes()
-  // Scheme is derived directly from the route param
-  const scheme = SCHEMES.find(s => s.id === id)
 
-  const [profile] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-profile')
-    return stored ? JSON.parse(stored) : null
-  })
-  const [applications, setApplications] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-applications')
-    return stored ? JSON.parse(stored) : {}
-  })
+  const [schemes, setSchemes] = useState([])
+  const [loadingSchemes, setLoadingSchemes] = useState(true)
+  const scheme = schemes.find(s => s.schemeCode === id)
+  const [profile, setProfile] = useState(null)
+  const [applications, setApplications] = useState([])
+  const [loadingProfile, setLoadingProfile] = useState(true)
+  const [loadingApplications, setLoadingApplications] = useState(true)
   
-  // UI views: 'detail' | 'apply'
+  // UI views: 'detail' | 'apply' | 'docs'
   const [viewState, setViewState] = useState('detail')
   
   // Terms agreement state
   const [agreed, setAgreed] = useState(false)
   
   // Application Form Inputs
-  const [formInputs, setFormInputs] = useState(() => {
-    const initial = {}
-    const currentScheme = SCHEMES.find(s => s.id === id)
-    if (currentScheme) {
-      currentScheme.natureInputs.forEach(input => {
-        initial[input.name] = ''
-      })
-    }
-    return initial
-  })
+  const [formInputs, setFormInputs] = useState({})
+  const [eligibilityResult, setEligibilityResult] = useState(null)
+  const [eligibilityError, setEligibilityError] = useState('')
+  const [isCheckingScore, setIsCheckingScore] = useState(false)
+  const [docsError, setDocsError] = useState('')
+  const [isSubmittingDocs, setIsSubmittingDocs] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [docsFiles, setDocsFiles] = useState({})
 
-  // Eligibility inputs asked during application
-  const [eligibilityInputs, setEligibilityInputs] = useState(() => {
-    const stored = window.localStorage.getItem('gov-subsidy-profile')
-    const parsed = stored ? JSON.parse(stored) : {}
-    return {
-      aadhaar: parsed.aadhaar || '',
-      annualIncome: parsed.annualIncome || '',
-      bankName: parsed.bankName || '',
-      accountNumber: parsed.accountNumber || '',
-      ifsc: parsed.ifsc || ''
-    }
-  })
-  
-  // Scanner / Document Upload State
-  const [selectedDocType, setSelectedDocType] = useState('clear')
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanResult, setScanResult] = useState(null)
-  const [scannedImage, setScannedImage] = useState(null)
-  
-  // Loading submit
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitPhase, setSubmitPhase] = useState('')
-
-  // Redirect if not authenticated or the scheme id is invalid
   useEffect(() => {
-    if (!window.localStorage.getItem('gov-subsidy-auth')) {
-      navigate('/login')
-      return
+    async function loadSchemes() {
+      try {
+        setLoadingSchemes(true)
+        const data = await getSchemes()
+        setSchemes(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Failed to load schemes:', error.message)
+        setSchemes([])
+      } finally {
+        setLoadingSchemes(false)
+      }
     }
-    if (!SCHEMES.find(s => s.id === id)) {
-      navigate('/dashboard')
+    loadSchemes()
+  }, [])
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        setLoadingProfile(true)
+        const res = await api.get('/gov/auth/profile/get')
+        const profileData = res.data?.data || res.data || null
+        setProfile(profileData)
+      } catch (error) {
+        setProfile(null)
+      } finally {
+        setLoadingProfile(false)
+      }
     }
-  }, [id, navigate])
+    loadProfile()
+  }, [])
 
-  if (!scheme || !profile) return null
+  useEffect(() => {
+    async function loadApplications() {
+      try {
+        setLoadingApplications(true)
+        const data = await getApplications()
+        const list = Array.isArray(data) ? data : data?.data || []
+        setApplications(list)
+      } catch (error) {
+        setApplications([])
+      } finally {
+        setLoadingApplications(false)
+      }
+    }
+    loadApplications()
+  }, [])
 
-  const eligibility = checkEligibility(scheme, profile)
-  const isApplied = !!applications[scheme.id]
-  const appDetails = applications[scheme.id]
-
-  // Trigger simulated scanning animation
-  const handleSimulateScan = () => {
-    setIsScanning(true)
-    setScanResult(null)
-    setScannedImage(null)
-    
-    setTimeout(() => {
-      setIsScanning(false)
-      const data = MOCK_DOCS[selectedDocType]
-      setScanResult(data.diagnostics)
-      setScannedImage(data)
-    }, 1800)
+  const refreshApplications = async () => {
+    try {
+      setLoadingApplications(true)
+      const data = await getApplications()
+      const list = Array.isArray(data) ? data : data?.data || []
+      setApplications(list)
+      return list
+    } catch (error) {
+      setApplications([])
+      return []
+    } finally {
+      setLoadingApplications(false)
+    }
   }
+
+  useEffect(() => {
+    if (!scheme?.natureInputs?.length) return
+    const initial = {}
+    scheme.natureInputs.forEach(input => {
+      initial[input.name] = getProfileSeedValue(profile, input.name)
+    })
+    setFormInputs(initial)
+  }, [scheme?.schemeCode, profile])
+
+  useEffect(() => {
+    if (viewState !== 'success') return
+
+    const redirectTimer = setTimeout(() => {
+      navigate('/dashboard', { replace: true })
+    }, 1800)
+
+    return () => clearTimeout(redirectTimer)
+  }, [navigate, viewState])
+
+  if (loadingSchemes || loadingProfile) return null
+  if (!scheme) return null
+
+  const matchingApplication = applications.find(app => {
+    const appSchemeCode = app?.schemeCode || app?.schemeId || app?.scheme?.schemeCode
+    return appSchemeCode === scheme.schemeCode
+  })
+  const currentApplicationStatus = getApplicationStatus(matchingApplication)
+  const isDraftApplication = matchingApplication ? isDraftStatus(currentApplicationStatus) : false
+  const hasProfile = !!profile
+  const hasTrackedApplication = !!matchingApplication && !isDraftApplication
+  const appDetails = matchingApplication
+  const eligibilityPayload = {
+    schemeCode: scheme.schemeCode,
+    fields: Object.entries(formInputs)
+      .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+      .map(([fieldName, value]) => ({
+        fieldName: normalizeRuleField(fieldName),
+        value: String(value),
+      })),
+  }
+  const eligibilityScore = eligibilityResult?.score ?? 0
+  const eligibilityThreshold = Number(scheme.minimumEligibleScore || 0)
+  const eligibilityGap = eligibilityScore - eligibilityThreshold
+  const eligibilityState = !eligibilityResult
+    ? 'idle'
+    : eligibilityResult.status
+      ? 'pass'
+      : 'fail'
+  const scoreRingProgress = eligibilityThreshold > 0
+    ? Math.max(0, Math.min(100, Math.round((eligibilityScore / eligibilityThreshold) * 100)))
+    : 0
+  const canProceedToDocs = Boolean(
+    eligibilityResult &&
+    eligibilityResult.status &&
+    eligibilityScore >= eligibilityThreshold
+  )
+  const hasInitiatedScoring = Boolean(eligibilityResult || eligibilityError || isCheckingScore)
 
   // Handle Form Change
   const handleInputChange = (e) => {
     setFormInputs(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  const handleEligInputChange = (e) => {
-    const { name, value } = e.target
-    if (name === 'aadhaar') {
-      const cleaned = value.replace(/\D/g, '').slice(0, 12)
-      setEligibilityInputs(prev => ({ ...prev, [name]: cleaned }))
-    } else {
-      setEligibilityInputs(prev => ({ ...prev, [name]: value }))
+  const handleCheckScore = async () => {
+    if (!scheme?.rules?.length) {
+      setEligibilityError('No eligibility rules are configured for this scheme yet.')
+      setEligibilityResult(null)
+      return
+    }
+
+    setIsCheckingScore(true)
+    setEligibilityError('')
+    setViewState('apply')
+
+    try {
+      const response = await runEligibilityEngine(eligibilityPayload)
+      setEligibilityResult(response)
+      await refreshApplications()
+      if (response?.status === false) {
+        setEligibilityError(response?.message || 'Eligibility engine marked the application as not eligible.')
+      }
+    } catch (error) {
+      console.error('Failed to check score:', error.message)
+      setEligibilityError(error.message || 'Eligibility engine request failed.')
+    } finally {
+      setIsCheckingScore(false)
     }
   }
 
-  // Handle application submission
-  const handleSubmitApplication = async (e) => {
-    e.preventDefault()
-
-    // Check if dynamic fields are filled
-    for (let input of scheme.natureInputs) {
-      if (input.required && !formInputs[input.name]) {
-        alert(`Please fill out: ${input.label}`)
-        return
-      }
-    }
-
-    // Verify eligibility fields are filled
-    if (!eligibilityInputs.aadhaar || !eligibilityInputs.annualIncome || !eligibilityInputs.bankName || !eligibilityInputs.accountNumber || !eligibilityInputs.ifsc) {
-      alert('Please fill out all Aadhaar Identity and Direct Disbursement Bank credentials.')
-      return
-    }
-
-    // Aadhaar 12-digit validation
-    const cleanAadhaar = eligibilityInputs.aadhaar.replace(/\D/g, '')
-    if (cleanAadhaar.length !== 12) {
-      alert('Aadhaar UID must consist of exactly 12 digits.')
-      return
-    }
-
-    if (!scannedImage) {
-      alert('Please upload and scan your Aadhaar Identity Card photo first.')
-      return
-    }
-
-    if (selectedDocType !== 'clear') {
-      alert('Cannot submit application with failing document scanner quality check. Please re-upload a clear scan.')
-      return
-    }
-
-    setIsSubmitting(true)
-    
-    const phases = [
-      'Establishing connection to UIDAI Gateway...',
-      'Running anti-fraud cross-referencing...',
-      'Uploading scanned documents to DigiLocker servers...',
-      'Generating District Beneficiary Ledger node...',
-      'Submitting to local field officer queue...'
-    ]
-
-    for (let phase of phases) {
-      setSubmitPhase(phase)
-      await new Promise(r => setTimeout(r, 600))
-    }
-
-    // Update active profile in local storage with credentials filled during application
-    const updatedProfile = {
-      ...profile,
-      aadhaar: eligibilityInputs.aadhaar,
-      annualIncome: eligibilityInputs.annualIncome,
-      bankName: eligibilityInputs.bankName,
-      accountNumber: eligibilityInputs.accountNumber,
-      ifsc: eligibilityInputs.ifsc,
-      // If Kisan, update landHolding from dynamic inputs
-      landHolding: formInputs.landArea ? formInputs.landArea : profile.landHolding
-    }
-    window.localStorage.setItem('gov-subsidy-profile', JSON.stringify(updatedProfile))
-
-    // Update profile in users registry
-    const storedUsers = window.localStorage.getItem('gov-subsidy-users')
-    if (storedUsers) {
-      const usersList = JSON.parse(storedUsers)
-      const userIndex = usersList.findIndex(u => u.username === profile.username)
-      if (userIndex !== -1) {
-        usersList[userIndex] = updatedProfile
-        window.localStorage.setItem('gov-subsidy-users', JSON.stringify(usersList))
-      }
-    }
-
-    const updatedApps = {
-      ...applications,
-      [scheme.id]: {
-        status: 'Applied',
-        appliedDate: new Date().toLocaleDateString(),
-        details: formInputs,
-        documentChecked: scannedImage.name
-      }
-    }
-
-    // Generate unique APP ID for global officer queue
-    const appId = 'APP-' + Math.floor(1000 + Math.random() * 9000)
-    const officerApps = JSON.parse(window.localStorage.getItem('gov-subsidy-officer-applications') || '[]')
-    
-    // Parse scheme amount safely
-    let numericAmount = 5000
-    if (scheme.amount) {
-      const match = scheme.amount.replace(/[^0-9]/g, '')
-      if (match) numericAmount = parseInt(match)
-    }
-
-    const newOfficerApp = {
-      id: appId,
-      applicant: updatedProfile.fullName || 'Citizen',
-      email: updatedProfile.email || '',
-      phone: updatedProfile.phone || '',
-      aadhaar: eligibilityInputs.aadhaar,
-      schemeId: scheme.id,
-      amount: numericAmount,
-      annualIncome: eligibilityInputs.annualIncome,
-      submittedDate: new Date().toISOString().split('T')[0],
-      status: 'Pending',
-      assignedOfficerId: 'OFF001',
-      assignedOfficerName: 'Anil Verma',
-      remarks: '',
-      documents: scheme.requiredDocs.map(docName => ({
-        name: docName,
-        verified: docName.toLowerCase().includes('aadhaar') // auto-verify Aadhaar since scanned
-      })),
-      details: formInputs
-    }
-    
-    officerApps.unshift(newOfficerApp)
-    window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(officerApps))
-    window.localStorage.setItem('gov-subsidy-applications', JSON.stringify(updatedApps))
-    setIsSubmitting(false)
-    navigate('/dashboard')
+  const handleGoForDocsSubmission = () => {
+    if (!canProceedToDocs) return
+    setDocsError('')
+    setViewState('docs')
   }
 
-  // Simulate field officer processing application (DBT)
-  const handleSimulateOfficerDisbursement = () => {
-    const updatedApps = {
-      ...applications,
-      [scheme.id]: {
-        ...appDetails,
-        status: 'Disbursed'
+  const handleCancelApplicationProcess = async () => {
+    try {
+      const applicationId = matchingApplication?.id || matchingApplication?.applicationId
+      if (applicationId) {
+        await cancelApplicationById(applicationId)
       }
+      setDocsFiles({})
+      setEligibilityResult(null)
+      setEligibilityError('')
+      setDocsError('')
+      setAgreed(false)
+      setShowCancelConfirm(false)
+      setViewState('detail')
+      navigate('/dashboard', { replace: true })
+    } catch (error) {
+      setDocsError(error.message || 'Failed to cancel the application process.')
     }
-    window.localStorage.setItem('gov-subsidy-applications', JSON.stringify(updatedApps))
-    setApplications(updatedApps)
+  }
+
+  const handleDocFileChange = (e) => {
+    const { name, files } = e.target
+    setDocsFiles(prev => ({ ...prev, [name]: files?.[0] || null }))
+  }
+
+  const handleSubmitDocuments = async () => {
+    if (!canProceedToDocs) return
+
+    const missingDocs = [
+      'identityProof',
+      'incomeProof',
+      'supportingDocs',
+    ].filter(docName => !docsFiles[docName])
+
+    if (missingDocs.length > 0) {
+      setDocsError('Please upload all required documents before submitting.')
+      return
+    }
+
+    setDocsError('')
+    setIsSubmittingDocs(true)
+
+    try {
+      await submitApplicationBySchemeCode(scheme.schemeCode)
+      await refreshApplications()
+      setViewState('success')
+    } finally {
+      setIsSubmittingDocs(false)
+    }
+  }
+
+  const openCancelConfirmation = () => {
+    setShowCancelConfirm(true)
+    setDocsError('')
   }
 
   return (
@@ -323,7 +318,7 @@ export default function SchemeDetail() {
           >
             {/* Left side details */}
             <div className="scheme-info-panel">
-              <span className={`scheme-card__category category--${scheme.category.toLowerCase()}`}>
+              <span className={`scheme-card__category category--${String(scheme.category || '').toLowerCase()}`}>
                 {scheme.category}
               </span>
               
@@ -333,7 +328,7 @@ export default function SchemeDetail() {
               {/* Dynamic Nature-specific info details */}
               <h3 className="section-subtitle-detail">Scheme Specific Specifications</h3>
               <div className="nature-detail-grid">
-                {scheme.natureDetails.map((det, index) => (
+                {(scheme.natureDetails || []).map((det, index) => (
                   <div className="nature-detail-card" key={index}>
                     <span className="nature-detail-label">{det.label}</span>
                     <span className="nature-detail-val">{det.value}</span>
@@ -341,30 +336,22 @@ export default function SchemeDetail() {
                 ))}
               </div>
 
-              {/* Eligibility block */}
+              {/* Eligibility criteria block */}
               <div className="detail-section-block">
                 <h3>Eligibility Requirements</h3>
                 <p className="eligibility-desc">{scheme.eligibilityText}</p>
                 <div className="eligibility-status-large">
-                  <span className="elig-label">Your Evaluated Status:</span>
-                  {isApplied ? (
-                    <span className="badge-status-large status-applied">Applied / Active Tracker</span>
-                  ) : eligibility.eligible ? (
-                    <span className="badge-status-large status-eligible">✓ Eligible to Apply</span>
-                  ) : (
-                    <span className="badge-status-large status-ineligible">✕ Currently Ineligible</span>
-                  )}
+                  <span className="elig-label">Review Mode:</span>
+                  <span className="badge-status-large status-applied">Details only, no profile check on this page</span>
                 </div>
 
-                {!eligibility.eligible && !isApplied && (
-                  <div className="elig-reasons-box">
-                    <p className="box-title">Why you are currently ineligible:</p>
-                    <ul>
-                      {eligibility.reasons.map((r, idx) => <li key={idx}>{r}</li>)}
-                    </ul>
-                    <p className="box-tip">Tip: You can edit your parameters under the **Profile Management** tab in the dashboard if there was a typo in your income, land holdings, or occupation fields.</p>
-                  </div>
-                )}
+                <div className="elig-reasons-box">
+                  <p className="box-title">What happens next:</p>
+                  <ul>
+                    <li>You can read the scheme details and rules without any age or profile validation here.</li>
+                    <li>Application-specific checks, if any, happen only when you submit the form.</li>
+                  </ul>
+                </div>
               </div>
             </div>
 
@@ -373,37 +360,43 @@ export default function SchemeDetail() {
               <div className="gate-card">
                 <h3>Application Gateway</h3>
                 
-                {isApplied ? (
+                {loadingApplications ? (
+                  <div className="ineligible-gateway-info">
+                    <p>Checking application status...</p>
+                  </div>
+                ) : hasProfile && matchingApplication ? (
                   <div className="applied-gateway-info">
-                    <p>You have already submitted an application for this subsidy scheme.</p>
+                    <p>
+                      {isDraftApplication
+                        ? 'You have a saved draft application for this subsidy scheme.'
+                        : 'You have already submitted an application for this subsidy scheme.'}
+                    </p>
                     <div className="action-row">
                       <span className="label">Current Status:</span>
-                      <span className={`val badge-status--${appDetails.status.toLowerCase()}`}>
-                        {appDetails.status}
+                      <span className={`val badge-status--${String(currentApplicationStatus || 'draft').toLowerCase()}`}>
+                        {currentApplicationStatus || 'DRAFT'}
                       </span>
                     </div>
-                    
-                    {appDetails.status === 'Applied' && (
-                      <button 
-                        onClick={handleSimulateOfficerDisbursement}
-                        className="button button--secondary btn-apply"
-                        style={{ width: '100%', marginTop: '1.2rem' }}
-                      >
-                        Simulate Officer Inspection & Disbursement
-                      </button>
-                    )}
 
-                    <Link to="/dashboard" className="button button--ghost" style={{ width: '100%', marginTop: '0.8rem', textAlign: 'center' }}>
-                      Go to Tracking Dashboard
-                    </Link>
+                    {isDraftApplication ? (
+                      <button
+                        type="button"
+                        className="button button--primary btn-apply"
+                        onClick={() => setViewState('apply')}
+                        style={{ width: '100%', marginTop: '0.8rem' }}
+                      >
+                        Continue Application
+                      </button>
+                    ) : (
+                      <Link to="/dashboard" className="button button--ghost" style={{ width: '100%', marginTop: '0.8rem', textAlign: 'center' }}>
+                        Track Application
+                      </Link>
+                    )}
                   </div>
-                ) : !eligibility.eligible ? (
+                ) : !hasProfile ? (
                   <div className="ineligible-gateway-info">
-                    <p>This scheme is locked because you do not meet the minimum eligibility requirements listed on the left.</p>
-                    <p className="advice">Please update your demographic metrics in the Profile tab to align with the criteria if applicable.</p>
-                    <button disabled className="button button--primary btn-apply" style={{ width: '100%', opacity: 0.5, cursor: 'not-allowed' }}>
-                      Locked
-                    </button>
+                    <p>You can view the scheme details right now.</p>
+                    <p className="advice">Sign in to continue with the application flow.</p>
                   </div>
                 ) : (
                   <div className="terms-agreement-gate">
@@ -427,20 +420,23 @@ export default function SchemeDetail() {
                       <span>I agree to the terms, conditions, and DBT auditing regulations.</span>
                     </label>
 
-                    <button 
-                      onClick={() => setViewState('apply')}
-                      disabled={!agreed}
-                      className="button button--primary btn-apply"
-                      style={{ width: '100%', marginTop: '1rem' }}
-                    >
-                      Proceed towards Application Form
-                    </button>
+                    {hasProfile && (
+                      <button 
+                        onClick={() => setViewState('apply')}
+                        disabled={!agreed}
+                        className="button button--primary btn-apply"
+                        style={{ width: '100%', marginTop: '1rem' }}
+                      >
+                        Proceed towards Application Form
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
+
             </div>
           </motion.div>
-        ) : (
+        ) : hasProfile ? (
           /* ========================================= */
           /* VIEW 2: DETAILED QUALITY PHOTO FORM       */
           /* ========================================= */
@@ -454,268 +450,291 @@ export default function SchemeDetail() {
               <p>Scheme: {scheme.name}</p>
             </div>
 
-            <form onSubmit={handleSubmitApplication} className="application-form">
+            <form onSubmit={(e) => e.preventDefault()} className="application-form">
               <div className="form-flex-columns">
                 
-                {/* Left Form Column (Text Details) */}
+                {/* Admin-configured scheme fields */}
                 <div className="form-column-inputs">
-                  <h3>1. Verify Demographic Details</h3>
-                  <p className="helper-text">These fields are pre-filled from your profile credentials.</p>
-                  
-                   <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Applicant Name</label>
-                      <input type="text" disabled value={profile.fullName} />
-                    </div>
-                    <div className="form-group">
-                      <label>Aadhaar UID (12 Digits) <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        name="aadhaar"
-                        maxLength={12}
-                        placeholder="12-digit Aadhaar UID" 
-                        value={eligibilityInputs.aadhaar} 
-                        onChange={handleEligInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
+                  <h3>1. Scheme-Specific Information</h3>
+                  <p className="helper-text">
+                    Fill only the fields configured by the scheme administrator for this scheme.
+                  </p>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Annual Family Income (₹) <span className="req">*</span></label>
-                      <input 
-                        type="number" 
-                        name="annualIncome"
-                        placeholder="e.g. 240000" 
-                        value={eligibilityInputs.annualIncome} 
-                        onChange={handleEligInputChange}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Disbursement Bank Name <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        name="bankName"
-                        placeholder="e.g. State Bank of India" 
-                        value={eligibilityInputs.bankName} 
-                        onChange={handleEligInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Bank Account Number <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        name="accountNumber"
-                        placeholder="e.g. 38920192831" 
-                        value={eligibilityInputs.accountNumber} 
-                        onChange={handleEligInputChange}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>IFSC Code <span className="req">*</span></label>
-                      <input 
-                        type="text" 
-                        name="ifsc"
-                        placeholder="e.g. SBIN0004829" 
-                        value={eligibilityInputs.ifsc} 
-                        onChange={handleEligInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <h3 style={{ marginTop: '2rem' }}>2. Scheme-Specific Information</h3>
-                  <p className="helper-text">Please input exact specifications required for the {scheme.category} ministry database.</p>
-                  
                   <div className="scheme-dynamic-inputs">
-                    {scheme.natureInputs.map((input) => (
-                      <div className="form-group" key={input.name}>
-                        <label>{input.label} {input.required && <span className="req">*</span>}</label>
-                        {input.type === 'select' ? (
-                          <select 
-                            name={input.name}
-                            value={formInputs[input.name] || ''}
-                            onChange={handleInputChange}
-                            required={input.required}
-                          >
-                            <option value="">-- Select option --</option>
-                            {input.options.map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        ) : (
-                          <input 
-                            type={input.type}
-                            name={input.name}
-                            placeholder={input.placeholder}
-                            value={formInputs[input.name] || ''}
-                            onChange={handleInputChange}
-                            required={input.required}
-                          />
-                        )}
+                    {(scheme.natureInputs || []).length > 0 ? (
+                      (scheme.natureInputs || []).map((input) => (
+                        <div className="form-group" key={input.name}>
+                          <label>{input.label} {input.required && <span className="req">*</span>}</label>
+                          {input.type === 'select' ? (
+                            <select 
+                              name={input.name}
+                              value={formInputs[input.name] || ''}
+                              onChange={handleInputChange}
+                              required={input.required}
+                            >
+                              <option value="">-- Select option --</option>
+                              {input.options.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          ) : (
+                            <input 
+                              type={input.type}
+                              name={input.name}
+                              placeholder={input.placeholder}
+                              value={formInputs[input.name] || ''}
+                              onChange={handleInputChange}
+                              required={input.required}
+                            />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="elig-reasons-box" style={{ marginTop: 0 }}>
+                        <p className="box-title">No additional fields configured</p>
+                        <p className="box-tip">This scheme does not currently require any admin-defined input fields.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
 
-                  <div className="form-action-navs" style={{ marginTop: '2.5rem' }}>
+                </div>
+
+                <div className="form-column-actions">
+                  <div className="form-action-navs" style={{ marginTop: '1.6rem', flexWrap: 'wrap', gap: '0.9rem' }}>
                     <button 
                       type="button" 
                       className="button button--ghost"
-                      onClick={() => {
-                        setViewState('detail')
-                        setAgreed(false)
-                      }}
+                      onClick={openCancelConfirmation}
                     >
-                      Back to Terms
+                      Cancel Application Process
                     </button>
-                    
+
                     <button 
-                      type="submit" 
+                      type="button" 
                       className="button button--primary btn-apply"
-                      disabled={!scannedImage || selectedDocType !== 'clear'}
+                      onClick={handleCheckScore}
+                      disabled={isCheckingScore}
                     >
-                      Submit Subsidy Application
+                      {isCheckingScore ? 'Checking Score...' : 'Check Score'}
                     </button>
-                  </div>
-                </div>
 
-                {/* Right Form Column (Photo Quality Verification Scanner) */}
-                <div className="form-column-scanner">
-                  <h3>3. Identity Document Scan & Photo Quality Check</h3>
-                  <p className="helper-text">
-                    Government regulations require an automated high-fidelity quality check on the 
-                    Aadhaar card scan. Low-resolution or blurry uploads are flagged to prevent approval delays.
-                  </p>
-
-                  <div className="scanner-control-card">
-                    <div className="quality-simulation-selector">
-                      <label>Select Scan Template to Simulate:</label>
-                      <select 
-                        value={selectedDocType}
-                        onChange={(e) => {
-                          setSelectedDocType(e.target.value)
-                          setScanResult(null)
-                          setScannedImage(null)
-                        }}
-                      >
-                        <option value="clear">Aadhaar_Card_Clear.jpg (Passing Quality)</option>
-                        <option value="blurry">Aadhaar_Card_Blurry.jpg (Fails: High Blur)</option>
-                        <option value="contrast">Aadhaar_Card_Glare.jpg (Fails: High Glare)</option>
-                      </select>
-                    </div>
-
-                    <div className="scan-button-wrapper">
+                    {hasInitiatedScoring && canProceedToDocs && (
                       <button 
                         type="button" 
-                        onClick={handleSimulateScan}
-                        className="btn-trigger-scan"
-                        disabled={isScanning}
+                        className="button button--ghost btn-apply"
+                        onClick={handleGoForDocsSubmission}
                       >
-                        {isScanning ? 'Running Diagnostic Scan...' : 'Trigger Document Scanner Audit'}
+                        Go for Docs Submission
                       </button>
-                    </div>
-
-                    {/* Scanner Display Frame */}
-                    <div className="scanner-frame">
-                      {isScanning ? (
-                        <div className="scanner-screen scanning">
-                          <div className="scanner-laser-line"></div>
-                          <span className="scanner-status-text">Analyzing pixels...</span>
-                        </div>
-                      ) : scannedImage ? (
-                        <div className="scanner-screen preview">
-                          <img src={scannedImage.url} alt="Document preview" className="scanned-image" />
-                          
-                          {/* Simulated diagnostic overlays if clear scan */}
-                          {selectedDocType === 'clear' && (
-                            <div className="scanner-overlays">
-                              <div className="bounding-box-aadhaar" style={{ top: '15%', left: '15%', width: '70%', height: '10%' }}>
-                                <span className="box-tag">GOVERNMENT OF INDIA</span>
-                              </div>
-                              <div className="bounding-box-aadhaar" style={{ top: '40%', left: '55%', width: '35%', height: '45%' }}>
-                                <span className="box-tag">FACE DETECTED</span>
-                              </div>
-                              <div className="bounding-box-aadhaar" style={{ top: '65%', left: '15%', width: '38%', height: '20%' }}>
-                                <span className="box-tag font-mono">12-DIGIT UID PASSED</span>
-                              </div>
-                            </div>
-                          )}
-
-                          <span className="scanner-filename-tag">{scannedImage.name}</span>
-                        </div>
-                      ) : (
-                        <div className="scanner-screen empty">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <path d="M12 8v8M8 12h8" />
-                          </svg>
-                          <span>Scan pending. Click the button above to test.</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Diagnostic Metrics Display */}
-                    {scanResult && (
-                      <motion.div 
-                        className="diagnostic-results-panel"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                      >
-                        <h4>Quality Metric Diagnostics</h4>
-                        
-                        <div className="metrics-grid">
-                          {Object.keys(scanResult).map((key) => {
-                            const metric = scanResult[key]
-                            return (
-                              <div className={`metric-row metric--${metric.status}`} key={key}>
-                                <div className="metric-header">
-                                  <span className="metric-dot"></span>
-                                  <span className="metric-label">{metric.label}</span>
-                                </div>
-                                <span className="metric-value font-mono">{metric.value}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        <div className="diagnostic-summary-footer" style={{ borderLeftColor: scannedImage.color }}>
-                          <p>{scannedImage.message}</p>
-                          <span className={`status-badge-overall tag--${selectedDocType}`}>
-                            Overall Check: {selectedDocType === 'clear' ? 'PASSED' : 'REJECTED'}
-                          </span>
-                        </div>
-                      </motion.div>
                     )}
                   </div>
+
+                  {(eligibilityResult || eligibilityError) && (
+                    <motion.div
+                      className="eligibility-console-card"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28 }}
+                    >
+                      <div className="eligibility-console__header">
+                        <div>
+                          <p className="console-eyebrow">Eligibility Engine</p>
+                          <h3>Live scoring result</h3>
+                          <p className="eligibility-console__copy">
+                            The engine evaluates your submitted profile against the scheme rules and streams back a score.
+                          </p>
+                        </div>
+                        <span className="console-endpoint">ENGINE://RUNNING</span>
+                      </div>
+
+                      {eligibilityResult ? (
+                        <>
+                          <div className="eligibility-score-hero">
+                            <div
+                              className="eligibility-score-ring"
+                              style={{
+                                '--score-progress': `${scoreRingProgress}%`,
+                                '--score-accent': eligibilityResult.status ? '#8ed66a' : '#ff6b76',
+                              }}
+                              aria-label={`Eligibility score ${Number(eligibilityScore || 0).toFixed(1)}`}
+                            >
+                              <div className="eligibility-score-ring__inner">
+                                <div className="eligibility-score-value">
+                                  {Number(eligibilityScore || 0).toFixed(1)}
+                                </div>
+                                <div className="eligibility-score-label">Score</div>
+                              </div>
+                            </div>
+
+                            <div className="eligibility-score-meta">
+                              <span className={`eligibility-state-badge is-${eligibilityState}`}>
+                                {eligibilityState === 'idle'
+                                  ? 'Pending'
+                                  : eligibilityState === 'pass'
+                                    ? 'Eligible'
+                                    : 'Not eligible'}
+                              </span>
+                              <div className="eligibility-threshold">
+                                Threshold: <strong>{Number(eligibilityThreshold || 0).toFixed(1)}</strong>
+                              </div>
+                              <div className="eligibility-gap">
+                                Gap: <strong>{eligibilityGap >= 0 ? `+${eligibilityGap.toFixed(1)}` : eligibilityGap.toFixed(1)}</strong>
+                              </div>
+                              <div className="eligibility-result-banner">
+                                <strong>{eligibilityResult.message}</strong>
+                                <span>
+                                  {canProceedToDocs
+                                    ? 'Documents can now be submitted.'
+                                    : 'The engine did not clear the threshold.'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="eligibility-field-stack">
+                            <div className="eligibility-rule-row">
+                              <span className="eligibility-rule-card__name">Computed score</span>
+                              <strong>{Number(eligibilityScore || 0).toFixed(1)}</strong>
+                            </div>
+                            <div className="eligibility-rule-row">
+                              <span className="eligibility-rule-card__name">Minimum required</span>
+                              <strong>{eligibilityThreshold.toFixed ? eligibilityThreshold.toFixed(1) : eligibilityThreshold}</strong>
+                            </div>
+                            <div className="eligibility-rule-row">
+                              <span className="eligibility-rule-card__name">Decision</span>
+                              <strong>{eligibilityResult.status ? 'PASS' : 'FAIL'}</strong>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="eligibility-error-box">
+                          {eligibilityError}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
 
               </div>
             </form>
-          </motion.div>
-        )}
-      </main>
 
-      {/* Submitting Loading overlay */}
-      <AnimatePresence>
-        {isSubmitting && (
-          <div className="modal-overlay">
-            <motion.div 
-              className="modal-panel submit-loading"
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-            >
-              <div className="loading-spinner-circle"></div>
-              <h3>Submitting Digital Application</h3>
-              <p className="pulse-text">{submitPhase}</p>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            {viewState === 'docs' && (
+              <motion.div
+                className="docs-submission-panel"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="docs-submission-panel__header">
+                  <div>
+                    <p className="console-eyebrow">Document submission</p>
+                    <h3>2. Supporting Documents</h3>
+                  </div>
+                  <span className="console-endpoint">Unlocked after eligibility check</span>
+                </div>
+
+                <p className="eligibility-console__copy">
+                  Your score has cleared the threshold. Upload the supporting files required for this scheme.
+                </p>
+
+                <div className="docs-grid">
+                  {[
+                    { name: 'identityProof', label: 'Identity proof', hint: 'Aadhaar, voter ID, or equivalent' },
+                    { name: 'incomeProof', label: 'Income proof', hint: 'Certificate or salary slip' },
+                    { name: 'supportingDocs', label: 'Supporting document', hint: 'Land record, category proof, or scheme-specific file' },
+                  ].map((doc) => (
+                    <label className="doc-upload-card" key={doc.name}>
+                      <span className="doc-upload-card__label">{doc.label}</span>
+                      <span className="doc-upload-card__hint">{doc.hint}</span>
+                      <input
+                        type="file"
+                        name={doc.name}
+                        onChange={handleDocFileChange}
+                      />
+                      <span className="doc-upload-card__file">
+                        {docsFiles[doc.name]?.name || 'No file selected'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="form-action-navs" style={{ marginTop: '1.25rem', flexWrap: 'wrap', gap: '0.9rem' }}>
+                  <button 
+                    type="button" 
+                    className="button button--ghost"
+                    onClick={openCancelConfirmation}
+                  >
+                    Cancel Application Process
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="button button--primary btn-apply"
+                    onClick={handleSubmitDocuments}
+                    disabled={!canProceedToDocs || isSubmittingDocs}
+                  >
+                    {isSubmittingDocs ? 'Submitting...' : 'Submit Documents'}
+                  </button>
+                </div>
+
+                {docsError && (
+                  <div className="eligibility-error-box" style={{ marginTop: '1rem' }}>
+                    {docsError}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {viewState === 'success' && (
+              <motion.div
+                className="docs-submission-panel"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="docs-submission-panel__header">
+                  <div>
+                    <p className="console-eyebrow">Application submitted</p>
+                    <h3>Application submitted successfully</h3>
+                  </div>
+                  <span className="console-endpoint">Redirecting to dashboard</span>
+                </div>
+
+                <p className="eligibility-console__copy">
+                  Your supporting documents have been recorded. You will be returned to the Dashboard shortly.
+                </p>
+              </motion.div>
+            )}
+
+            {showCancelConfirm && (
+              <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancel-application-title">
+                <motion.div
+                  className="modal-panel modal-panel--danger"
+                  initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                >
+                  <h3 id="cancel-application-title">Cancel application process?</h3>
+                  <p className="danger-text">
+                    If you continue, we will delete the saved application record, generated application code, form fields, and uploaded documents from the database.
+                  </p>
+
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={() => setShowCancelConfirm(false)}
+                    >
+                      Keep Application
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-danger-confirm"
+                      onClick={handleCancelApplicationProcess}
+                    >
+                      Yes, Cancel and Delete
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </motion.div>
+        ) : null}
+      </main>
     </div>
   )
 }

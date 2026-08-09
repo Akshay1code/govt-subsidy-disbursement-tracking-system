@@ -18,7 +18,7 @@ public class SchemeRequiredDocument {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "scheme_id", nullable = false)
+    @JoinColumn(name = "scheme_code", referencedColumnName = "scheme_code", nullable = false)
     private Schemes scheme;
 
     @Enumerated(EnumType.STRING)

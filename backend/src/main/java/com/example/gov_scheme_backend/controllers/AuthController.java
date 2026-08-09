@@ -19,6 +19,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/gov/auth")
 public class AuthController {
+    private static final int JWT_COOKIE_MAX_AGE_SECONDS = 60 * 30;
+
     @Autowired
     AuthServiceImpl authService;
     @GetMapping("/hello")
@@ -35,7 +37,7 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
         cookie.setPath("/");
-        cookie.setMaxAge(60 * 60 * 24 * 7);
+        cookie.setMaxAge(JWT_COOKIE_MAX_AGE_SECONDS);
         response.addCookie(cookie);
         return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse(true, "Login Successfull"));
     }
@@ -54,19 +56,6 @@ public class AuthController {
         List<RequestListResponseDto> res = authService.getRequests();
         if(res.isEmpty()){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(false,"Couldn't Fetch Details"));
-        }
-        return ResponseEntity.status(HttpStatus.OK).body(res);
-    }
-
-    @GetMapping("/profile/{role}")
-    public List<Users> profile(@PathVariable Role role){
-        return authService.profileService(role);
-    }
-    @DeleteMapping("/delete")
-    public ResponseEntity<ApiResponse> deleteProfile(){
-        ApiResponse res = authService.deleteProfile();
-        if(!res.isStatus()){
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(res);
         }
         return ResponseEntity.status(HttpStatus.OK).body(res);
     }

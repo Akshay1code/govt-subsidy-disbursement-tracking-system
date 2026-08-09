@@ -10,4 +10,14 @@ public interface ApplicationService {
             ApplicationFieldValueRequestDTO requests
     );
 
+    void cancelApplication(
+            Long userId,
+            Long applicationId
+    );
+
+    void submitApplication(
+            Long userId,
+            String schemeCode
+    );
+
 }

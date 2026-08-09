@@ -11,3 +11,13 @@ export async function getApplications() {
   const response = await api.get('/gov/applications')
   return response.data
 }
+
+export async function submitApplicationBySchemeCode(schemeCode) {
+  const response = await api.post(`/gov/applications/submit/${schemeCode}`)
+  return response.data
+}
+
+export async function cancelApplicationById(applicationId) {
+  const response = await api.delete(`/gov/applications/${applicationId}`)
+  return response.data
+}
