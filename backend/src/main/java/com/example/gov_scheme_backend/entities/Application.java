@@ -1,6 +1,7 @@
 package com.example.gov_scheme_backend.entities;
 
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
+import com.example.gov_scheme_backend.enums.ReviewStage;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -40,6 +41,10 @@ public class Application {
 
     @Column(length = 500)
     private String remarks;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReviewStage stage;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
