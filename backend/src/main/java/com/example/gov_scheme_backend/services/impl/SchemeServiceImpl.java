@@ -166,10 +166,11 @@ public class SchemeServiceImpl {
 
         return switch (fieldName) {
             case AGE -> RuleKey.AGE;
-            case INCOME -> RuleKey.ANNUAL_INCOME;
-            case CGPA -> RuleKey.EDUCATION;
+            case ANNUAL_INCOME -> RuleKey.ANNUAL_INCOME;
+            case LAND_AREA -> RuleKey.LAND_AREA;
+            case OCCUPATION -> RuleKey.OCCUPATION;
             case CASTE -> RuleKey.CASTE;
-            case STATE -> RuleKey.MARITAL_STATUS;
+            case STATE -> RuleKey.STATE;
             case GENDER -> RuleKey.GENDER;
         };
     }
