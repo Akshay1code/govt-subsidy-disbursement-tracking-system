@@ -7,5 +7,8 @@ public enum AuditAction {
     LOGIN,
     LOGOUT,
     APPROVE,
+    REJECT,
+    ESCALATE,
+    RE_VERIFY,
     DISBURSE
 }

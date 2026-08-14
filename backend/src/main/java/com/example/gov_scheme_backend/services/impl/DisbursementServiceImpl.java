@@ -437,11 +437,15 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         // Seed Plan
         final Long appId = application.getId();
+
         DisbursementPlan plan = planRepo.findByApplicationId(appId).orElse(null);
+
         if (plan != null) {
             // Reset existing plan data for clean sandbox execution
-            List<DisbursementMilestone> milestones = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
-            milestoneRepo.deleteAll(milestones);
+            List<DisbursementMilestone> existingMilestones =
+                    milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+
+            milestoneRepo.deleteAll(existingMilestones);
             notificationRepo.deleteAll();
             auditLogRepo.deleteAll();
         } else {
@@ -450,10 +454,51 @@ public class DisbursementServiceImpl implements DisbursementService {
                     .totalAmount(50000.0)
                     .totalStages(3)
                     .build();
+
             plan = planRepo.save(plan);
         }
 
-        List<DisbursementMilestone> milestones = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+        // Seed milestones
+        List<DisbursementMilestone> seedMilestones = List.of(
+
+                DisbursementMilestone.builder()
+                        .plan(plan)
+                        .stageNumber(1)
+                        .milestoneName("Initial Release")
+                        .amountToRelease(20000.0)
+                        .dueDate(LocalDate.now())
+                        .completionStatus(MilestoneStatus.COMPLETED)
+                        .completedDate(LocalDate.now())
+                        .amountReleased(20000.0)
+                        .releaseDate(LocalDate.now())
+                        .build(),
+
+                DisbursementMilestone.builder()
+                        .plan(plan)
+                        .stageNumber(2)
+                        .milestoneName("Second Stage")
+                        .amountToRelease(15000.0)
+                        .dueDate(LocalDate.now().plusDays(30))
+                        .completionStatus(MilestoneStatus.PENDING)
+                        .amountReleased(0.0)
+                        .build(),
+
+                DisbursementMilestone.builder()
+                        .plan(plan)
+                        .stageNumber(3)
+                        .milestoneName("Final Release")
+                        .amountToRelease(15000.0)
+                        .dueDate(LocalDate.now().plusDays(60))
+                        .completionStatus(MilestoneStatus.PENDING)
+                        .amountReleased(0.0)
+                        .build()
+        );
+
+        milestoneRepo.saveAll(seedMilestones);
+
+        List<DisbursementMilestone> milestones =
+                milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+
         return mapToPlanResponse(plan, milestones);
     }
 

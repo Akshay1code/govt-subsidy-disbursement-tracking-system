@@ -9,6 +9,8 @@ import java.util.Optional;
 
 @Repository
 public interface SchemeRepo extends JpaRepository<Schemes, Long> {
+
     Optional<Schemes> findBySchemeCode(String schemeCode);
+
     List<Schemes> findByCategory_CategoryNameIgnoreCase(String categoryName);
 }
