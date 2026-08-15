@@ -47,6 +47,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Autowired
     EligibilityEngineService check;
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
 
     @Autowired
     WorkflowService workflowService;
@@ -239,6 +241,14 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         applicationRepo.delete(application);
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(application.getUser())
+                .action(com.example.gov_scheme_backend.enums.AuditAction.DELETE)
+                .description("Cancelled application ID: " + applicationId)
+                .build();
+        auditLogRepo.save(audit);
     }
 
     @Override
@@ -274,6 +284,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                 ApplicationStatus.SUBMITTED);
 
         applicationRepo.save(application);
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(application.getUser())
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description("Submitted application for scheme: " + schemeCode)
+                .build();
+        auditLogRepo.save(audit);
     }
 
     private String findMissingEligibilityField(

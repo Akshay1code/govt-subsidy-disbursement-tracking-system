@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import ThemeToggle from '../../components/ThemeToggle'
 import logo from '../../assets/icons/logo.png'
 import api from '../../services/api'
+import { getMyApplications } from '../../services/officerService'
+import DashboardTopbar from '../../components/DashboardTopbar'
 
 const SCHEME_NAMES = {
   'pm-kisan': 'PM-KISAN (Farmers Income Support)',
@@ -39,7 +41,8 @@ export default function FinanceDashboard() {
         const res = await api.get('/gov/auth/profile/get')
         if (res.data && res.data.status !== false) {
           const profileData = res.data.data || res.data
-          if (profileData.role !== 'FINANCE_OFFICER') {
+          const allowedRoles = ['FINANCE_OFFICER', 'ADMIN', 'FIELD_OFFICER']
+          if (!allowedRoles.includes(profileData.role?.toUpperCase())) {
             navigate('/login')
             return
           }
@@ -53,100 +56,13 @@ export default function FinanceDashboard() {
         return
       }
 
-      // Fetch applications from LocalStorage (or create defaults if empty)
-      const storedApps = window.localStorage.getItem('gov-subsidy-officer-applications')
-      let appsList = []
-      if (storedApps) {
-        appsList = JSON.parse(storedApps)
-      } else {
-        appsList = [
-          {
-            id: 'APP-1001',
-            applicant: 'Ravi Kumar',
-            email: 'ravi.kumar@example.in',
-            phone: '9876501234',
-            aadhaar: '4821-9930-1122',
-            schemeId: 'pm-kisan',
-            amount: 6000,
-            annualIncome: '180000',
-            submittedDate: '2025-01-12',
-            status: 'Approved',
-            assignedOfficerId: 'OFF001',
-            assignedOfficerName: 'Anil Verma',
-            remarks: 'Land records verified. Recommended for final payout.',
-          },
-          {
-            id: 'APP-1002',
-            applicant: 'Priya Nair',
-            email: 'priya.nair@example.in',
-            phone: '9812345678',
-            aadhaar: '7712-8890-4521',
-            schemeId: 'national-vidya',
-            amount: 50000,
-            annualIncome: '210000',
-            submittedDate: '2025-01-15',
-            status: 'Approved',
-            assignedOfficerId: 'OFF002',
-            assignedOfficerName: 'Dr. Sunita Sharma',
-            remarks: 'Marksheets match requirements. Finalizing DBT.',
-          },
-          {
-            id: 'APP-1004',
-            applicant: 'Meena Devi',
-            email: 'meena.devi@example.in',
-            phone: '9765432109',
-            aadhaar: '5561-2234-7788',
-            schemeId: 'pm-kisan',
-            amount: 6000,
-            annualIncome: '150000',
-            submittedDate: '2025-01-18',
-            status: 'Pending',
-            assignedOfficerId: 'OFF002',
-            assignedOfficerName: 'Dr. Sunita Sharma',
-            remarks: '',
-          },
-          {
-            id: 'APP-1005',
-            applicant: 'Arjun Reddy',
-            email: 'arjun.reddy@example.in',
-            phone: '9845098450',
-            aadhaar: '9081-4521-3300',
-            schemeId: 'pm-awas',
-            amount: 250000,
-            annualIncome: '320000',
-            submittedDate: '2025-01-20',
-            status: 'Approved',
-            assignedOfficerId: 'OFF001',
-            assignedOfficerName: 'Anil Verma',
-            remarks: 'Verification complete. Home subsidy approved.',
-          }
-        ]
-        window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(appsList))
+      try {
+        const data = await getMyApplications()
+        setApplications(Array.isArray(data) ? data : data?.data || [])
+      } catch (err) {
+        console.error('Failed to load applications:', err.message)
       }
-      setApplications(appsList)
-
-      // Fetch audit logs from LocalStorage
-      const storedLogs = window.localStorage.getItem('gov-subsidy-finance-audit-logs')
-      if (storedLogs) {
-        setAuditLogs(JSON.parse(storedLogs))
-      } else {
-        const defaultLogs = [
-          {
-            action: 'Disbursement Approved',
-            performedBy: 'FIN007 - Finance Lead',
-            description: 'Released ₹6,000 for APP-1001 (Ravi Kumar)',
-            timestamp: '2025-02-01 10:24:15',
-          },
-          {
-            action: 'Flagged Mismatch',
-            performedBy: 'FIN007 - Finance Lead',
-            description: 'Flagged APP-1003 due to name mismatch with Aadhaar records',
-            timestamp: '2025-01-28 14:15:30',
-          }
-        ]
-        window.localStorage.setItem('gov-subsidy-finance-audit-logs', JSON.stringify(defaultLogs))
-        setAuditLogs(defaultLogs)
-      }
+      setAuditLogs([])
       setLoading(false)
     }
     init()
@@ -277,32 +193,12 @@ export default function FinanceDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Topbar */}
-      <header className="topbar" style={{ background: 'var(--panel-strong)', borderBottom: '1px solid var(--border)' }}>
-        <div className="topbar__brand">
-          <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
-          <div>
-            <strong>GS Gov Subsidy</strong>
-            <span>Finance &amp; Disbursement Officer Portal</span>
-          </div>
-        </div>
-
-        <div className="topbar__user-info">
-          <span className="user-badge" style={{ border: '1px solid #bb8fce50' }}>
-            <span className="user-badge__dot" style={{ background: '#bb8fce' }}></span>
-            {officer?.fullName} ({officer?.role === 'FINANCE_OFFICER' ? 'Finance Officer' : officer?.role})
-          </span>
-          <ThemeToggle />
-          <button onClick={handleLogout} className="btn-logout">
-            Logout
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
-        </div>
-      </header>
+      <DashboardTopbar
+        portalName="Finance & Disbursement Officer Portal"
+        userName={officer?.fullName}
+        userRole={officer?.role === 'FINANCE_OFFICER' ? 'Finance Officer' : officer?.role}
+        onLogout={handleLogout}
+      />
 
       {/* Main Panel Content */}
       <main className="dashboard-main">
@@ -316,7 +212,7 @@ export default function FinanceDashboard() {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
             Pending Disbursement Queue
-            {pendingCount > 0 && <span className="tab-badge" style={{ background: '#bb8fce', color: '#111' }}>{pendingCount}</span>}
+            {pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'history' ? 'active' : ''}`}
@@ -332,30 +228,31 @@ export default function FinanceDashboard() {
 
         <div className="tab-pane">
           {/* STATS OVERVIEW CARDS */}
-          <div className="dashboard-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.2rem', marginBottom: '2rem' }}>
-            <div className="metric-card" style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.2rem' }}>
-              <span className="metric-card__label" style={{ color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending Queue Count</span>
-              <strong className="metric-card__val" style={{ display: 'block', fontSize: '2rem', marginTop: '0.4rem', color: '#f59e0b' }}>{pendingCount} Beneficiaries</strong>
+          <div className="officer-stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="officer-stat-card officer-stat-card--pending">
+              <span className="officer-stat-card__label">Pending Queue Count</span>
+              <span className="officer-stat-card__value">{pendingCount}</span>
             </div>
-            <div className="metric-card" style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.2rem' }}>
-              <span className="metric-card__label" style={{ color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Queue Disbursement Volume</span>
-              <strong className="metric-card__val" style={{ display: 'block', fontSize: '2rem', marginTop: '0.4rem', color: '#82aeca' }}>₹{totalApprovedAmount.toLocaleString()}</strong>
+            <div className="officer-stat-card officer-stat-card--approved">
+              <span className="officer-stat-card__label">Queue Disbursement Volume</span>
+              <span className="officer-stat-card__value">₹{totalApprovedAmount.toLocaleString()}</span>
             </div>
-            <div className="metric-card" style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.2rem' }}>
-              <span className="metric-card__label" style={{ color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Disbursed (All Time)</span>
-              <strong className="metric-card__val" style={{ display: 'block', fontSize: '2rem', marginTop: '0.4rem', color: '#bb8fce' }}>₹{totalDisbursedAmount.toLocaleString()}</strong>
+            <div className="officer-stat-card officer-stat-card--total">
+              <span className="officer-stat-card__label">Total Disbursed (All Time)</span>
+              <span className="officer-stat-card__value">₹{totalDisbursedAmount.toLocaleString()}</span>
             </div>
           </div>
 
           {/* TAB 1: PENDING QUEUE */}
           {activeTab === 'queue' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <div className="pane-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.3rem', margin: 0 }}>Approved Subsidy Payout Queue</h2>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Verify records and initiate Direct Benefit Transfers (DBT) for verified citizens.</p>
-                </div>
-                <div className="search-box" style={{ maxWidth: '300px' }}>
+              <div className="pane-header">
+                <h2>Approved Subsidy Payout Queue</h2>
+                <p>Verify records and initiate Direct Benefit Transfers (DBT) for verified citizens.</p>
+              </div>
+              
+              <div className="filter-bar">
+                <div className="search-box">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -370,39 +267,38 @@ export default function FinanceDashboard() {
               </div>
 
               {filteredQueue.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <p style={{ color: 'var(--muted)' }}>No pending approved applications found matching your criteria.</p>
+                <div className="empty-state">
+                  <p>No pending approved applications found matching your criteria.</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto', background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                <div className="dbt-ledger-wrap">
+                  <table className="dbt-ledger">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Beneficiary Name</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Scheme Name</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Approved Amount</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Application Status</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Assigned Officer</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Pending Date</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)', textAlign: 'center' }}>Action</th>
+                      <tr>
+                        <th>Beneficiary Name</th>
+                        <th>Scheme Name</th>
+                        <th>Approved Amount</th>
+                        <th>Application Status</th>
+                        <th>Assigned Officer</th>
+                        <th>Pending Date</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredQueue.map(app => (
-                        <tr key={app.id || app.applicationId} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '1.2rem', fontWeight: 600 }}>{app.applicant || app.applicantName}</td>
-                          <td style={{ padding: '1.2rem' }}>{app.schemeName || SCHEME_NAMES[app.schemeId] || app.schemeId}</td>
-                          <td style={{ padding: '1.2rem', fontFamily: 'monospace', fontWeight: 700 }}>₹{(app.amount || 0).toLocaleString()}</td>
-                          <td style={{ padding: '1.2rem' }}>
+                        <tr key={app.id || app.applicationId}>
+                          <td>{app.applicant || app.applicantName}</td>
+                          <td>{app.schemeName || SCHEME_NAMES[app.schemeId] || app.schemeId}</td>
+                          <td className="font-mono">₹{(app.amount || 0).toLocaleString()}</td>
+                          <td>
                             <span className="badge-status badge-status--eligible">Approved</span>
                           </td>
-                          <td style={{ padding: '1.2rem', color: 'var(--muted)', fontSize: '0.9rem' }}>{app.assignedOfficerName || 'Anil Verma'}</td>
-                          <td style={{ padding: '1.2rem', color: 'var(--muted)', fontSize: '0.9rem' }}>{app.submittedDate || '—'}</td>
-                          <td style={{ padding: '1.2rem', textAlign: 'center' }}>
+                          <td>{app.assignedOfficerName || 'Anil Verma'}</td>
+                          <td className="font-mono">{app.submittedDate || '—'}</td>
+                          <td>
                             <button
                               onClick={() => openDisburseModal(app)}
-                              className="button button--secondary btn-apply"
-                              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', background: '#bb8fce22', color: '#bb8fce', border: '1px solid #bb8fce60' }}
+                              className="officer-view-btn"
                             >
                               Disburse
                             </button>
@@ -419,35 +315,35 @@ export default function FinanceDashboard() {
           {/* TAB 2: AUDIT & HISTORY */}
           {activeTab === 'history' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <div className="pane-header" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.3rem', margin: 0 }}>Direct Disbursement Logs</h2>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Audit trails of all Direct Benefit Transfer payouts cleared by the Finance department.</p>
+              <div className="pane-header">
+                <h2>Direct Disbursement Logs</h2>
+                <p>Audit trails of all Direct Benefit Transfer payouts cleared by the Finance department.</p>
               </div>
 
               {auditLogs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <p style={{ color: 'var(--muted)' }}>No audit history records available yet.</p>
+                <div className="empty-state">
+                  <p>No audit history records available yet.</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto', background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                <div className="dbt-ledger-wrap">
+                  <table className="dbt-ledger">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Action</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Performed By</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Description</th>
-                        <th style={{ padding: '1rem 1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>Timestamp</th>
+                      <tr>
+                        <th>Action</th>
+                        <th>Performed By</th>
+                        <th>Description</th>
+                        <th>Timestamp</th>
                       </tr>
                     </thead>
                     <tbody>
                       {auditLogs.map((log, index) => (
-                        <tr key={index} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '1.2rem', fontWeight: 700, color: '#bb8fce' }}>
+                        <tr key={index}>
+                          <td style={{ fontWeight: 600, color: '#bb8fce' }}>
                             {log.action}
                           </td>
-                          <td style={{ padding: '1.2rem', fontSize: '0.9rem' }}>{log.performedBy}</td>
-                          <td style={{ padding: '1.2rem', color: 'var(--muted)', fontSize: '0.9rem' }}>{log.description}</td>
-                          <td style={{ padding: '1.2rem', color: 'var(--muted)', fontSize: '0.9rem', fontFamily: 'monospace' }}>{log.timestamp}</td>
+                          <td>{log.performedBy}</td>
+                          <td className="text-soft">{log.description}</td>
+                          <td className="font-mono text-soft">{log.timestamp}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { register as apiRegister, registerOfficer as apiRegisterOfficer } from '../../services/authService'
 import logo from '../../assets/icons/logo.png'
-
+import { FaUser, FaLandmark } from 'react-icons/fa'
 const OFFICER_ROLES = [
   { value: 'FIELD_OFFICER',    label: 'Field Officer' },
   { value: 'DISTRICT_OFFICER', label: 'District Officer' },
@@ -288,8 +288,8 @@ export default function Register() {
             gap: '4px',
           }}>
             {[
-              { key: 'beneficiary', label: '👤 Register as Beneficiary' },
-              { key: 'officer',     label: '🏛️ Register as Officer' },
+              { key: 'beneficiary', label: <span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FaUser /> Register as Beneficiary</span> },
+              { key: 'officer',     label: <span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FaLandmark /> Register as Officer</span> },
             ].map(tab => (
               <button
                 key={tab.key}

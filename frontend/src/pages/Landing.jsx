@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import logo from '../assets/icons/logo.png'
+import { FaCheck } from 'react-icons/fa'
 
 const LANGUAGES = [
   { code: 'en', label: 'English', native: 'English' },
@@ -776,8 +777,8 @@ function Landing() {
               exit={{ opacity: 0, scale: 0.9 }}
               style={{ background: 'var(--panel-strong)', borderRadius: '16px', border: '1px solid var(--border)', maxWidth: '480px', width: '100%', padding: '2rem', textAlign: 'center' }}
             >
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e', fontSize: '1.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                ✓
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e', fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                <FaCheck />
               </div>
               <h3 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem', color: 'var(--text)' }}>Query Submitted Successfully!</h3>
               <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
