@@ -5,11 +5,11 @@ import com.example.gov_scheme_backend.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -20,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
     @Autowired
     CustomUserDetailsService customUserDetailsService;
 
@@ -27,7 +28,8 @@ public class SecurityConfig {
     JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
@@ -35,50 +37,100 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+
+                        // CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Public scheme APIs
                         .requestMatchers(HttpMethod.GET, "/gov/schemes/**").permitAll()
-                        .requestMatchers(HttpMethod.PATCH, "/gov/auth/approval/**").permitAll()
-                        .requestMatchers("/gov/auth/signin", "/gov/auth/signup"
-                                ,"/gov/auth/officer/get-request"
-                                ,"/api/v1/disbursement/**"
-                                ,"/api/v1/reports/**"
-                                ,"/api/v1/test/**").permitAll()
+
+                        // Existing public authentication APIs
+                        .requestMatchers(
+                                "/gov/auth/hello",
+                                "/gov/auth/signin",
+                                "/gov/auth/signup",
+                                "/gov/auth/officer/get-request"
+                        ).permitAll()
+
+                        // Existing officer approval API
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/gov/auth/approval/**"
+                        ).authenticated()
+
+                        // M3 disbursement APIs
+                        .requestMatchers(
+                                "/api/v1/disbursement/**"
+                        ).authenticated()
+
+                        // M3 reports
+                        .requestMatchers(
+                                "/api/v1/reports/**"
+                        ).authenticated()
+
+                        // M3 test/scheduler endpoints
+                        .requestMatchers(
+                                "/api/v1/test/**"
+                        ).authenticated()
+
+                        // Everything else
                         .anyRequest().authenticated()
-                )
-                // Removed httpBasic to stop the native browser popup
-                ;
+                );
 
         return http.build();
     }
 
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.Arrays.asList("http://localhost:5173"));
-        configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
+
+        org.springframework.web.cors.CorsConfiguration configuration =
+                new org.springframework.web.cors.CorsConfiguration();
+
+        configuration.setAllowedOrigins(
+                java.util.Arrays.asList("http://localhost:5173"));
+
+        configuration.setAllowedMethods(
+                java.util.Arrays.asList(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "OPTIONS"
+                ));
+
+        configuration.setAllowedHeaders(
+                java.util.Arrays.asList("*"));
+
         configuration.setAllowCredentials(true);
-        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source =
+                new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(customUserDetailsService);
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(customUserDetailsService);
+
         provider.setPasswordEncoder(passwordEncoder());
+
         return provider;
     }
 
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration configuration) throws Exception {
+
         return configuration.getAuthenticationManager();
     }
-
 }
