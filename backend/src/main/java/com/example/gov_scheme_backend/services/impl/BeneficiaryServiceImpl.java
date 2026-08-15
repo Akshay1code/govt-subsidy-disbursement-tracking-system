@@ -52,7 +52,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         beneficiary.setRemarks(request.getRemarks());
         beneficiary.setIsFlagged(false);
 
-        return mapToResponse(beneficiaryRepo.save(beneficiary));
+        Beneficiary saved = beneficiaryRepo.save(beneficiary);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.CREATE)
+                .description("Registered beneficiary for Application ID: " + request.getApplicationId())
+                .build();
+        auditLogRepo.save(audit);
+
+        return mapToResponse(saved);
     }
 
     @Override
@@ -78,7 +95,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         beneficiary.setDisbursedDate(request.getDisbursedDate());
         beneficiary.setRemarks(request.getRemarks());
 
-        return mapToResponse(beneficiaryRepo.save(beneficiary));
+        Beneficiary saved = beneficiaryRepo.save(beneficiary);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description("Updated beneficiary ID: " + id)
+                .build();
+        auditLogRepo.save(audit);
+
+        return mapToResponse(saved);
     }
 
     /** Marks a beneficiary as flagged with a mandatory reason (e.g. document mismatch, fraud suspicion). */
@@ -93,7 +127,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         beneficiary.setIsFlagged(true);
         beneficiary.setFlagReason(reason);
 
-        return mapToResponse(beneficiaryRepo.save(beneficiary));
+        Beneficiary saved = beneficiaryRepo.save(beneficiary);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description("Flagged beneficiary ID: " + id + " with reason: " + reason)
+                .build();
+        auditLogRepo.save(audit);
+
+        return mapToResponse(saved);
     }
 
     /** Clears the flag from a beneficiary once reviewed. */
@@ -104,7 +155,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         beneficiary.setIsFlagged(false);
         beneficiary.setFlagReason(null);
 
-        return mapToResponse(beneficiaryRepo.save(beneficiary));
+        Beneficiary saved = beneficiaryRepo.save(beneficiary);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description("Unflagged beneficiary ID: " + id)
+                .build();
+        auditLogRepo.save(audit);
+
+        return mapToResponse(saved);
     }
 
     /** Deletes a beneficiary record. */
@@ -113,6 +181,21 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     public void deleteBeneficiary(Long id) {
         Beneficiary beneficiary = getExistingBeneficiary(id);
         beneficiaryRepo.delete(beneficiary);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = usersRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(java.util.UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.DELETE)
+                .description("Deleted beneficiary ID: " + id)
+                .build();
+        auditLogRepo.save(audit);
     }
 
     @Override

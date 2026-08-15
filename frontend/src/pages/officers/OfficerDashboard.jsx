@@ -1,10 +1,12 @@
 import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import ThemeToggle from '../../components/ThemeToggle'
 import logo from '../../assets/icons/logo.png'
 import api from '../../services/api'
+import DashboardTopbar from '../../components/DashboardTopbar'
+import SchemeDashboard from '../scheme-dashboard'
 import { updateApprovalStatus } from '../../services/adminService'
 import { 
   getMyApplications, 
@@ -16,6 +18,7 @@ import {
   getOverdueMilestones,
   getNotifications,
 } from '../../services/officerService'
+import { FaExclamationTriangle, FaCheckCircle, FaCheck } from 'react-icons/fa'
 
 const STATUS_BADGE = {
   Pending: 'badge-status--applied',
@@ -322,32 +325,12 @@ export default function OfficerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Header Sticky Topbar */}
-      <header className="topbar" style={{ background: 'var(--panel-strong)', borderBottom: '1px solid var(--border)' }}>
-        <div className="topbar__brand">
-          <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
-          <div>
-            <strong>GS Gov Subsidy</strong>
-            <span>Officer Portal</span>
-          </div>
-        </div>
-
-        <div className="topbar__user-info">
-          <span className="user-badge">
-            <span className="user-badge__dot"></span>
-            {officer.fullName} ({officer.designation || 'Officer'})
-          </span>
-          <ThemeToggle />
-          <button onClick={handleLogout} className="btn-logout">
-            Logout
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
-        </div>
-      </header>
+      <DashboardTopbar
+        portalName="Officer Portal"
+        userName={officer.fullName}
+        userRole={officer.designation || 'Officer'}
+        onLogout={handleLogout}
+      />
 
       {/* Main Panel Content */}
       <main className="dashboard-main">
@@ -556,97 +539,8 @@ export default function OfficerDashboard() {
 
           {/* TAB 3: REPORTS & ANALYTICS */}
           {activeTab === 'reports' && (
-            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <div className="pane-header">
-                <h2>Reports &amp; Analytics</h2>
-                <p>Application statistics and approval rates.</p>
-              </div>
-
-              <div className="beneficiary-meta-card">
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Total Processed</span>
-                  <span className="meta-card__val">{approved + rejected} / {total}</span>
-                </div>
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Approval Rate</span>
-                  <span className="meta-card__val">{approvalRate}%</span>
-                </div>
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Awaiting Review</span>
-                  <span className="meta-card__val text-secondary flex-align">
-                    <span className="badge-dot-green"></span> {pending} Pending
-                  </span>
-                </div>
-              </div>
-
-              <h3 className="section-title" style={{ marginTop: '2.5rem' }}>Applications by Status</h3>
-              <div className="officer-stats-grid">
-                <div className="officer-stat-card officer-stat-card--total">
-                  <span className="officer-stat-card__label">Total</span>
-                  <span className="officer-stat-card__value">{total}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--pending">
-                  <span className="officer-stat-card__label">Pending</span>
-                  <span className="officer-stat-card__value">{pending}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--approved">
-                  <span className="officer-stat-card__label">Approved</span>
-                  <span className="officer-stat-card__value">{approved}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--rejected">
-                  <span className="officer-stat-card__label">Rejected</span>
-                  <span className="officer-stat-card__value">{rejected}</span>
-                </div>
-              </div>
-
-              <h3 className="section-title" style={{ marginTop: '2.5rem', color: '#ef4444' }}>⚠️ Non-Compliance &amp; Overdue Milestones</h3>
-              {overdueReports.length === 0 ? (
-                <div className="empty-state" style={{ border: '1px dashed var(--border)', padding: '2rem' }}>
-                  <p>All milestones are compliant. No overdue stages found.</p>
-                </div>
-              ) : (
-                <div className="dbt-ledger-wrap" style={{ marginTop: '1rem' }}>
-                  <table className="dbt-ledger">
-                    <thead>
-                      <tr>
-                        <th>Milestone ID</th>
-                        <th>Beneficiary Name</th>
-                        <th>Scheme</th>
-                        <th>Milestone Name</th>
-                        <th>Due Date</th>
-                        <th>Days Overdue</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overdueReports.map(rep => (
-                        <tr key={rep.milestoneId}>
-                          <td className="font-mono text-soft">#{rep.milestoneId}</td>
-                          <td style={{ fontWeight: 600 }}>{rep.beneficiaryName}</td>
-                          <td>{rep.schemeName}</td>
-                          <td>{rep.milestoneName}</td>
-                          <td className="font-mono" style={{ color: '#ef4444' }}>{rep.dueDate}</td>
-                          <td style={{ color: '#ef4444', fontWeight: 'bold' }}>
-                            {rep.daysOverdue} days
-                          </td>
-                          <td>
-                            <button 
-                              className="button button--secondary" 
-                              style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
-                              onClick={() => {
-                                setResolvingMilestoneId(rep.milestoneId)
-                                setShowResolveModal(true)
-                              }}
-                            >
-                              Resolve Override
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} style={{ margin: '-1.5rem', background: '#0F141F' }}>
+              <SchemeDashboard />
             </motion.div>
           )}
 
@@ -931,144 +825,6 @@ export default function OfficerDashboard() {
                               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)' }}
                             />
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* Show live sum tracker */}
-                  {(() => {
-                    const sum = planConfigStages.reduce((acc, curr) => acc + Number(curr.amountToRelease), 0);
-                    const diff = sum - disbursementPlan.totalAmount;
-                    if (Math.abs(diff) > 0.01) {
-                      return (
-                        <div className="sum-warning" style={{ color: '#ef4444', fontWeight: '600', marginBottom: '1rem' }}>
-                          ⚠️ Warning: Sum of stages (₹{sum.toLocaleString('en-IN')}) does not match the total approved grant (₹{disbursementPlan.totalAmount.toLocaleString('en-IN')}). Diff: ₹{diff.toLocaleString('en-IN')}.
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="sum-success" style={{ color: '#22c55e', fontWeight: '600', marginBottom: '1rem' }}>
-                          ✅ Verified: Sum of stages matches exactly the approved grant (₹{sum.toLocaleString('en-IN')}).
-                        </div>
-                      );
-                    }
-                  })()}
-
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                    <button className="button button--ghost" onClick={() => setShowDisbursementManager(false)}>Cancel</button>
-                    <button className="button button--primary" onClick={handleConfigurePlan}>Save Configuration</button>
-                  </div>
-                </div>
-              ) : (
-                // MILESTONE TIMELINE VIEW
-                <div>
-                  <h4 style={{ margin: '0 0 1.5rem 0' }}>Disbursement Milestone Tracking</h4>
-                  
-                  <div className="timeline">
-                    {disbursementPlan.milestones.map((m, idx) => {
-                      const isPrevReleasedOrCompleted = idx === 0 || 
-                        disbursementPlan.milestones.slice(0, idx).every(prev => 
-                          prev.completionStatus === 'RELEASED' || prev.completionStatus === 'COMPLETED'
-                        );
-                      
-                      const hasOverdueEarlier = disbursementPlan.milestones.slice(0, idx).some(prev => 
-                        prev.completionStatus === 'OVERDUE'
-                      );
-
-                      const isReleaseBlocked = !isPrevReleasedOrCompleted || hasOverdueEarlier || m.completionStatus !== 'COMPLETED';
-
-                      return (
-                        <div className="timeline-item" key={m.milestoneId}>
-                          <div className={`timeline-badge status-${m.completionStatus.toLowerCase()}`}>
-                            {m.stageNumber}
-                          </div>
-                          <div className="timeline-content">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <h5 className="timeline-title">{m.milestoneName}</h5>
-                              <span className={`badge-status status-${m.completionStatus.toLowerCase()}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}>
-                                {m.completionStatus}
-                              </span>
-                            </div>
-                            <div className="timeline-meta">
-                              <div><strong>Amount:</strong> ₹{m.amountToRelease.toLocaleString('en-IN')}</div>
-                              <div><strong>Due Date:</strong> {m.dueDate}</div>
-                              {m.completedDate && <div><strong>Completed:</strong> {m.completedDate}</div>}
-                              {m.releaseDate && <div><strong>Released:</strong> {m.releaseDate}</div>}
-                              {m.resolvedReason && (
-                                <div style={{ width: '100%', color: '#22c55e', marginTop: '0.3rem' }}>
-                                  <strong>Override Reason:</strong> {m.resolvedReason} (on {m.resolvedDate})
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="timeline-actions">
-                              {m.completionStatus === 'PENDING' && (
-                                <button 
-                                  className="button button--ghost" 
-                                  style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem' }}
-                                  onClick={() => handleCompleteMilestone(m.milestoneId)}
-                                >
-                                  Mark Completed
-                                </button>
-                              )}
-                              {m.completionStatus === 'COMPLETED' && (
-                                <button 
-                                  className="button button--primary" 
-                                  style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem' }}
-                                  onClick={() => handleReleaseMilestone(m.milestoneId)}
-                                  disabled={isReleaseBlocked}
-                                  title={
-                                    hasOverdueEarlier 
-                                      ? "Release blocked because an earlier stage is OVERDUE." 
-                                      : isReleaseBlocked 
-                                      ? "Previous stage must be complete/released to release funds." 
-                                      : "Release milestone funds"
-                                  }
-                                >
-                                  Release Funds
-                                </button>
-                              )}
-                              {m.completionStatus === 'OVERDUE' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-                                  <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    ⚠️ Non-compliant / Overdue
-                                  </span>
-                                  <button 
-                                    className="button button--secondary" 
-                                    style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem', borderColor: '#ef4444', color: '#ef4444' }}
-                                    onClick={() => {
-                                      setResolvingMilestoneId(m.milestoneId)
-                                      setShowResolveModal(true)
-                                    }}
-                                  >
-                                    Resolve Overdue
-                                  </button>
-                                </div>
-                              )}
-                              {m.completionStatus === 'RELEASED' && (
-                                <span style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  ✓ Funds Disbursed (₹{m.amountReleased.toLocaleString('en-IN')})
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                    <button className="button button--ghost" onClick={() => setShowDisbursementManager(false)}>Close</button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Admin Override Resolve Modal */}
       <AnimatePresence>
         {showResolveModal && (
           <div className="modal-overlay" onClick={() => {

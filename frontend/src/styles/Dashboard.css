@@ -9,10 +9,54 @@
   padding: 1rem;
 }
 
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  border-radius: 16px;
+  margin-bottom: 0.5rem;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.topbar__brand strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.topbar__brand span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 .topbar__user-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .user-badge {
@@ -117,12 +161,17 @@
   font-family: 'Source Serif 4', Georgia, serif;
   font-size: 2.1rem;
   letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--text) 0%, var(--muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .pane-header p {
   margin: 0;
   color: var(--muted);
   font-size: 1.02rem;
+  line-height: 1.6;
 }
 
 /* Filter Bar */
@@ -672,9 +721,11 @@
 .dbt-ledger-wrap {
   width: 100%;
   overflow-x: auto;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.01);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.005));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 .dbt-ledger {
@@ -686,17 +737,26 @@
 
 .dbt-ledger th,
 .dbt-ledger td {
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .dbt-ledger th {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   font-weight: 700;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(8px);
+}
+
+.dbt-ledger tbody tr {
+  transition: background 180ms ease;
+}
+
+.dbt-ledger tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .dbt-ledger tr:last-child td {
