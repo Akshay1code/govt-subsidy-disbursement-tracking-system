@@ -89,4 +89,30 @@ public class DisbursementController {
     public ResponseEntity<DisbursementPlanResponse> seedData() {
         return ResponseEntity.ok(disbursementService.seedData());
     }
+
+    @PostMapping("/overdue/check")
+    public ResponseEntity<?> checkOverdueMilestones() {
+
+        disbursementService.flagOverdueMilestones();
+
+        return ResponseEntity.ok(
+                java.util.Map.of(
+                        "status", true,
+                        "message", "Overdue milestones checked successfully"
+                )
+        );
+    }
+
+    @PostMapping("/reminders/check")
+    public ResponseEntity<?> checkReminders() {
+
+        disbursementService.sendUpcomingReminders();
+
+        return ResponseEntity.ok(
+                java.util.Map.of(
+                        "status", true,
+                        "message", "Upcoming milestone reminders checked"
+                )
+        );
+    }
 }

@@ -44,6 +44,7 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse> signup(@RequestBody SignupRequest user){
+        System.out.println("========== SIGNUP CONTROLLER HIT ==========");
         ApiResponse response = authService.signupService(user);
         if(!response.isStatus()){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
