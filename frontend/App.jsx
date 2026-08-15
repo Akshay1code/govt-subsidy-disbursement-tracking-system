@@ -7,6 +7,7 @@ import Dashboard from './src/pages/beneficiary/Dashboard'
 import SchemeDetail from './src/pages/SchemeDetail'
 import OfficerDashboard from './src/pages/officers/OfficerDashboard'
 import AdminDashboard from './src/pages/admins/AdminDashboard'
+import FinanceDashboard from './src/pages/officers/FinanceDashboard'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/finance" element={<FinanceDashboard />} />
         </Routes>
       </ThemeProvider>
     </BrowserRouter>

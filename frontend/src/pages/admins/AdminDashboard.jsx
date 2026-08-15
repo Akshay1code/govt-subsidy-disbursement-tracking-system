@@ -9,6 +9,7 @@ import { getApplications } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
 import api from '../../services/api'
 import logo from '../../assets/icons/logo.png'
+import { FaChartBar, FaHistory, FaUserShield, FaTools, FaClipboardList, FaComments, FaFileAlt, FaHourglassHalf, FaCheckCircle, FaTimesCircle, FaMoneyBillWave, FaFileInvoice, FaCheck } from 'react-icons/fa'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -189,9 +190,30 @@ export default function AdminDashboard() {
 
   // Load Action Logs when needed
   useEffect(() => {
-    if (activeTab === 'action-logs') {
-      setActionLogs([])
+    async function fetchAuditLogs() {
+      if (activeTab === 'action-logs') {
+        try {
+          const res = await api.get('/api/v1/disbursement/audit-logs')
+          const data = res.data?.data || res.data || []
+          const formattedLogs = data.map(log => ({
+            id: log.auditId || String(log.id),
+            timestamp: log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'N/A',
+            officerName: log.user ? log.user.fullName : 'System / Admin',
+            officerId: log.user ? log.user.uniqueID : 'N/A',
+            action: log.action || 'UNKNOWN',
+            details: log.description || 'No details',
+            targetId: 'N/A'
+          }))
+          // Sort by timestamp descending
+          formattedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          setActionLogs(formattedLogs)
+        } catch (error) {
+          console.error("Failed to fetch audit logs", error)
+          setActionLogs([])
+        }
+      }
     }
+    fetchAuditLogs()
   }, [activeTab])
 
   // Scheme CRUD Handlers
@@ -456,51 +478,51 @@ export default function AdminDashboard() {
           <button
             className={`button ${activeTab === 'analytics' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('analytics')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            📊 Analytics & Insights
+            <FaChartBar /> Analytics & Insights
           </button>
           <button
             className={`button ${activeTab === 'history' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('history')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            📜 Application History ({applications.length})
+            <FaHistory /> Application History ({applications.length})
           </button>
           <button
             className={`button ${activeTab === 'officers' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('officers')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            👮 Officer Work Tracker ({officers.length})
+            <FaUserShield /> Officer Work Tracker ({officers.length})
           </button>
           <button
             className={`button ${activeTab === 'schemes' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('schemes')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            🛠️ Manage Schemes ({schemes.length})
+            <FaTools /> Manage Schemes ({schemes.length})
           </button>
           <button
             className={`button ${activeTab === 'action-logs' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('action-logs')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            👮 Officer Actions History
+            <FaUserShield /> Officer Actions History
           </button>
           <button
             className={`button ${activeTab === 'officer-requests' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('officer-requests')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            📋 Officer Requests ({officerRequests.length})
+            <FaClipboardList /> Officer Requests ({officerRequests.length})
           </button>
           <button
             className={`button ${activeTab === 'queries' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => handleTabChange('queries')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px' }}
+            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            💬 Citizen Queries ({queries.length})
+            <FaComments /> Citizen Queries ({queries.length})
           </button>
         </motion.div>
 
@@ -522,7 +544,7 @@ export default function AdminDashboard() {
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
                   <span>Total Applications</span>
-                  <span>📋</span>
+                  <FaClipboardList style={{ fontSize: '1.1rem', opacity: 0.7 }} />
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)' }}>{totalApps}</div>
                 <span style={{ fontSize: '0.78rem', color: '#82aeca' }}>Across all subsidy schemes</span>
@@ -532,7 +554,7 @@ export default function AdminDashboard() {
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
                   <span>Pending Action</span>
-                  <span>⏳</span>
+                  <FaHourglassHalf style={{ fontSize: '1.1rem', opacity: 0.7 }} />
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b' }}>{pendingApps}</div>
                 <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Requires officer verification</span>
@@ -542,7 +564,7 @@ export default function AdminDashboard() {
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
                   <span>Approved & Sanctioned</span>
-                  <span>✅</span>
+                  <FaCheckCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#22c55e' }} />
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: '#22c55e' }}>{approvedApps}</div>
                 <span style={{ fontSize: '0.78rem', color: '#8ed66a' }}>{((approvedApps / totalApps) * 100).toFixed(1)}% Approval rate</span>
@@ -552,7 +574,7 @@ export default function AdminDashboard() {
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
                   <span>Rejected Applications</span>
-                  <span>❌</span>
+                  <FaTimesCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#ef4444' }} />
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ef4444' }}>{rejectedApps}</div>
                 <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Ineligible / invalid documents</span>
@@ -562,7 +584,7 @@ export default function AdminDashboard() {
               <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
                   <span>Total Funds Disbursed</span>
-                  <span>💰</span>
+                  <FaMoneyBillWave style={{ fontSize: '1.1rem', opacity: 0.7, color: '#ffc76a' }} />
                 </div>
                 <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffc76a' }}>
                   ₹ {totalFundsDisbursed.toLocaleString('en-IN')}
@@ -1003,7 +1025,7 @@ export default function AdminDashboard() {
                                     style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' }}
                                     onClick={() => handleRequestAction(r, 'APPROVED')}
                                   >
-                                    ✓ Approve
+                                    <FaCheck style={{ fontSize: '0.85rem' }} /> Approve
                                   </button>
                                   <button
                                     type="button"
@@ -1011,7 +1033,7 @@ export default function AdminDashboard() {
                                     style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
                                     onClick={() => handleRequestAction(r, 'REJECTED')}
                                   >
-                                    ✕ Reject
+                                    <FaTimesCircle style={{ fontSize: '0.85rem' }} /> Reject
                                   </button>
                                 </div>
                               ) : (
@@ -1139,10 +1161,13 @@ export default function AdminDashboard() {
                 style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
               >
                 <option value="All">All Actions</option>
-                <option value="Verify Document">Verify Document</option>
-                <option value="Unverify Document">Unverify Document</option>
-                <option value="Approve Application">Approve Application</option>
-                <option value="Reject Application">Reject Application</option>
+                <option value="CREATE">CREATE</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+                <option value="APPROVE">APPROVE</option>
+                <option value="DISBURSE">DISBURSE</option>
+                <option value="LOGIN">LOGIN</option>
+                <option value="LOGOUT">LOGOUT</option>
               </select>
 
               <select
@@ -1179,10 +1204,11 @@ export default function AdminDashboard() {
                   ) : (
                     filteredLogs.map(log => {
                       let actionColor = '#82aeca'
-                      if (log.action.includes('Approve')) actionColor = '#22c55e'
-                      if (log.action.includes('Reject')) actionColor = '#ef4444'
-                      if (log.action.includes('Verify')) actionColor = '#22c55e'
-                      if (log.action.includes('Unverify')) actionColor = '#f59e0b'
+                      if (log.action.includes('APPROVE')) actionColor = '#22c55e'
+                      if (log.action.includes('UPDATE')) actionColor = '#f59e0b'
+                      if (log.action.includes('DELETE')) actionColor = '#ef4444'
+                      if (log.action.includes('CREATE')) actionColor = '#22c55e'
+                      if (log.action.includes('DISBURSE')) actionColor = '#10b981'
 
                       return (
                         <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -1226,7 +1252,7 @@ export default function AdminDashboard() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text)' }}>Application Audit: {selectedApp.id}</h3>
-                <button onClick={() => setSelectedApp(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                <button onClick={() => setSelectedApp(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><FaTimesCircle /></button>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.9rem' }}>
@@ -1243,8 +1269,8 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {selectedApp.documents?.map((doc, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.04)', fontSize: '0.84rem' }}>
-                      <span>📄 {doc.name}</span>
-                      <span style={{ fontWeight: 700, color: doc.verified ? '#22c55e' : '#f59e0b' }}>{doc.verified ? '✓ Verified' : '⏳ Pending'}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FaFileInvoice /> {doc.name}</span>
+                      <span style={{ fontWeight: 700, color: doc.verified ? '#22c55e' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{doc.verified ? <><FaCheck /> Verified</> : <><FaHourglassHalf /> Pending</>}</span>
                     </div>
                   ))}
                 </div>
@@ -1257,10 +1283,10 @@ export default function AdminDashboard() {
 
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                   <button className="button button--primary btn-approve" style={{ flex: 1, background: '#16a34a' }} onClick={() => handleAdminStatusChange(selectedApp.id, 'Approved')}>
-                    ✓ Admin Approve
+                    <FaCheck /> Admin Approve
                   </button>
                   <button className="button button--primary btn-reject" style={{ flex: 1, background: '#dc2626' }} onClick={() => handleAdminStatusChange(selectedApp.id, 'Rejected')}>
-                    ✕ Admin Reject
+                    <FaTimesCircle /> Admin Reject
                   </button>
                 </div>
               </div>
@@ -1324,7 +1350,7 @@ export default function AdminDashboard() {
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text)' }}>Activity Audit: {selectedOfficer.officer.fullName}</h3>
                   <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Officer ID: {selectedOfficer.officer.officerId}</span>
                 </div>
-                <button onClick={() => setSelectedOfficer(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1.2rem', cursor: 'cursor' }}>✕</button>
+                <button onClick={() => setSelectedOfficer(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1rem', cursor: 'cursor', display: 'flex', alignItems: 'center' }}><FaTimesCircle /></button>
               </div>
 
               <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>Assigned Applications Workload ({selectedOfficer.apps.length})</h4>
@@ -1364,7 +1390,7 @@ export default function AdminDashboard() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text)' }}>Query Ticket: {selectedQuery.id}</h3>
-                <button onClick={() => setSelectedQuery(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                <button onClick={() => setSelectedQuery(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><FaTimesCircle /></button>
               </div>
 
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', marginBottom: '1.2rem', fontSize: '0.86rem' }}>
@@ -1395,7 +1421,7 @@ export default function AdminDashboard() {
                     setSelectedQuery(null)
                   }}
                 >
-                  ✓ Send Response & Resolve
+                  <FaCheck /> Send Response & Resolve
                 </button>
                 <button
                   className="button button--ghost"
@@ -1637,7 +1663,7 @@ export default function AdminDashboard() {
 
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                   <button type="submit" className="button button--primary" style={{ flex: 1 }}>
-                    {editingScheme ? '✓ Save Changes' : '✓ Create Scheme'}
+                    {editingScheme ? <><FaCheck /> Save Changes</> : <><FaCheck /> Create Scheme</>}
                   </button>
                   <button type="button" className="button button--ghost" style={{ flex: 1 }} onClick={() => setShowSchemeModal(false)}>
                     Cancel

@@ -1292,74 +1292,178 @@
 /* ─── Officer Dashboard ─── */
 .officer-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .officer-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .officer-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .officer-stat-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.6rem;
-  border-radius: 22px;
+  gap: 0.75rem;
+  padding: 1.5rem 1.6rem;
+  border-radius: 20px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-  border-left: 4px solid var(--border);
-  transition: all 200ms ease;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.officer-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  transition: background 300ms ease;
+}
+
+.officer-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.03), transparent 70%);
+  transform: translate(30%, -30%);
+  pointer-events: none;
 }
 
 .officer-stat-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .officer-stat-card__label {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   font-weight: 700;
 }
 
 .officer-stat-card__value {
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 800;
   font-family: 'Source Serif 4', Georgia, serif;
-  line-height: 1.1;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
+/* --- Total Card Variant --- */
 .officer-stat-card--total {
-  border-left-color: var(--solar);
+  border-color: rgba(140, 187, 224, 0.18);
+  background:
+    linear-gradient(145deg, rgba(140, 187, 224, 0.08), rgba(140, 187, 224, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.officer-stat-card--total::before {
+  background: linear-gradient(90deg, transparent, rgba(140, 187, 224, 0.6), rgba(140, 187, 224, 0.3), transparent);
+}
+
+.officer-stat-card--total:hover {
+  border-color: rgba(140, 187, 224, 0.35);
 }
 
 .officer-stat-card--total .officer-stat-card__value {
-  color: #a4d3f5;
+  background: linear-gradient(135deg, #a4d3f5, #6faad4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+/* --- Pending Card Variant --- */
 .officer-stat-card--pending {
-  border-left-color: var(--accent);
+  border-color: rgba(230, 140, 36, 0.18);
+  background:
+    linear-gradient(145deg, rgba(230, 140, 36, 0.08), rgba(230, 140, 36, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.officer-stat-card--pending::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 182, 108, 0.6), rgba(255, 182, 108, 0.3), transparent);
+}
+
+.officer-stat-card--pending:hover {
+  border-color: rgba(255, 182, 108, 0.35);
 }
 
 .officer-stat-card--pending .officer-stat-card__value {
-  color: #ffb66c;
+  background: linear-gradient(135deg, #ffce73, #e68c24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+/* --- Approved Card Variant --- */
 .officer-stat-card--approved {
-  border-left-color: var(--secondary);
+  border-color: rgba(102, 176, 82, 0.18);
+  background:
+    linear-gradient(145deg, rgba(102, 176, 82, 0.08), rgba(102, 176, 82, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.officer-stat-card--approved::before {
+  background: linear-gradient(90deg, transparent, rgba(142, 214, 106, 0.6), rgba(142, 214, 106, 0.3), transparent);
+}
+
+.officer-stat-card--approved:hover {
+  border-color: rgba(142, 214, 106, 0.35);
 }
 
 .officer-stat-card--approved .officer-stat-card__value {
-  color: #8ed66a;
+  background: linear-gradient(135deg, #a8e890, #66b052);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+/* --- Rejected Card Variant --- */
 .officer-stat-card--rejected {
-  border-left-color: #dc3545;
+  border-color: rgba(220, 53, 69, 0.18);
+  background:
+    linear-gradient(145deg, rgba(220, 53, 69, 0.06), rgba(220, 53, 69, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.officer-stat-card--rejected::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 107, 118, 0.6), rgba(255, 107, 118, 0.3), transparent);
+}
+
+.officer-stat-card--rejected:hover {
+  border-color: rgba(255, 107, 118, 0.35);
 }
 
 .officer-stat-card--rejected .officer-stat-card__value {
-  color: #ff6b76;
+  background: linear-gradient(135deg, #ff8e96, #dc3545);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .officer-view-btn {
@@ -1371,13 +1475,15 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: all 200ms ease;
 }
 
 .officer-view-btn:hover {
   border-color: var(--accent-strong);
   color: var(--accent-strong);
+  background: rgba(255, 206, 115, 0.08);
   transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 206, 115, 0.12);
 }
 
 /* Document verification list (inside modal) */

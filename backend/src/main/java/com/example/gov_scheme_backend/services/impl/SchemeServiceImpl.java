@@ -33,6 +33,10 @@ public class SchemeServiceImpl {
     SchemeRepo schemeRepo;
     @Autowired
     SchemeCategoryRepository schemeCategoryRepository;
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.UserRepo userRepo;
 
     @Transactional(readOnly = true)
     public List<SchemeResponseDTO> getAllSchemes() {
@@ -95,6 +99,21 @@ public class SchemeServiceImpl {
 
         schemeRepo.save(scheme);
 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = userRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.CREATE)
+                .description("Created scheme with code: " + scheme.getSchemeCode() + " and name: " + scheme.getSchemeName())
+                .build();
+        auditLogRepo.save(audit);
+
         return new ApiResponse(true, "Scheme and related configuration saved successfully");
     }
 
@@ -155,6 +174,21 @@ public class SchemeServiceImpl {
         scheme.getRequiredFields().addAll(fields);
 
         schemeRepo.save(scheme);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = userRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description("Updated scheme with code: " + scheme.getSchemeCode())
+                .build();
+        auditLogRepo.save(audit);
 
         return new ApiResponse(true, "Scheme updated successfully");
     }

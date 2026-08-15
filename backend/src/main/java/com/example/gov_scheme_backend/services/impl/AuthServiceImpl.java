@@ -35,6 +35,8 @@ public class AuthServiceImpl {
     AuthenticationManager authenticationManager;
     @Autowired
     JwtService jwtService;
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
 
     public String loginService(LoginRequest user){
         Users dbUser = userRepo.findByUsername(user.getUsername()).orElseThrow();
@@ -43,6 +45,17 @@ public class AuthServiceImpl {
                 dbUser.getPassword()
         ));
         Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
+        
+        if (dbUser.getRole() != Role.BENEFICIARY) {
+            com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                    .auditId(UUID.randomUUID().toString())
+                    .user(dbUser)
+                    .action(com.example.gov_scheme_backend.enums.AuditAction.LOGIN)
+                    .description("User logged in as " + dbUser.getRole().name())
+                    .build();
+            auditLogRepo.save(audit);
+        }
+
         String token = jwtService.generateToken((Users) authentication.getPrincipal());
         return token;
     }
@@ -183,8 +196,21 @@ public class AuthServiceImpl {
         request.setStatus(requestStatus);
         requestRepo.save(request);
 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        com.example.gov_scheme_backend.entities.Users performer = null;
+        if (username != null) {
+            performer = userRepo.findByUsername(username).orElse(null);
+        }
+
+        com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(performer)
+                .action(com.example.gov_scheme_backend.enums.AuditAction.UPDATE)
+                .description((requestStatus == Status.APPROVED ? "Approved" : "Rejected") + " officer request for: " + request.getFullName() + " (UniqueID: " + request.getUniqueID() + ")")
+                .build();
+        auditLogRepo.save(audit);
+
         return new ApiResponse(true,requestStatus+" Successfully");
     }
 }
-
-
