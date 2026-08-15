@@ -23,8 +23,12 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
 
     private static boolean isNumericRuleField(RuleField field) {
         return field == RuleField.AGE
-                || field == RuleField.INCOME
-                || field == RuleField.CGPA;
+                || field == RuleField.ANNUAL_INCOME
+                || field == RuleField.LAND_AREA;
+    }
+
+    private static double safeTolerance(SchemeEligibilityRule rule) {
+        return rule.getTolerance() == null ? 0.0 : rule.getTolerance();
     }
 
     private static Double parseDoubleSafely(String value) {
@@ -89,7 +93,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                     if (user > expected) {
                         score += rule.getPoints();
                     }
-                    else if ((expected - user) <= rule.getTolerance()) {
+                    else if ((expected - user) <= safeTolerance(rule)) {
                         score += rule.getPoints() * rule.getPartialPercentage();
                     }
 
@@ -109,7 +113,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                     if (user >= expected) {
                         score += rule.getPoints();
                     }
-                    else if ((expected - user) <= rule.getTolerance()) {
+                    else if ((expected - user) <= safeTolerance(rule)) {
                         score += rule.getPoints() * rule.getPartialPercentage();
                     }
 
@@ -129,7 +133,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                     if (user < expected) {
                         score += rule.getPoints();
                     }
-                    else if ((user - expected) <= rule.getTolerance()) {
+                    else if ((user - expected) <= safeTolerance(rule)) {
                         score += rule.getPoints() * rule.getPartialPercentage();
                     }
 
@@ -149,7 +153,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                     if (user <= expected) {
                         score += rule.getPoints();
                     }
-                    else if ((user - expected) <= rule.getTolerance()) {
+                    else if ((user - expected) <= safeTolerance(rule)) {
                         score += rule.getPoints() * rule.getPartialPercentage();
                     }
 
