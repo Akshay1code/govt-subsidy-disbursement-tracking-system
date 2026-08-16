@@ -1303,4 +1303,66 @@
   background: #bd2130;
 }
 
-/* ==========================================================================
+/* Desktop Sidebar layout overrides */
+@media (min-width: 992px) {
+  .dashboard-main {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 2rem;
+    align-items: start;
+    margin-top: 1.5rem;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 1.5rem;
+  }
+
+  .dashboard-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0;
+    position: sticky;
+    top: 90px;
+    box-shadow: 0 10px 30px rgba(28, 25, 23, 0.03);
+  }
+
+  .dashboard-tab,
+  .dashboard-tabs .button {
+    display: flex !important;
+    width: 100% !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    padding: 0.85rem 1rem !important;
+    font-size: 0.92rem !important;
+    font-weight: 600 !important;
+    color: var(--muted) !important;
+    border-radius: 8px !important;
+    border-bottom: none !important;
+    border-left: 2px solid transparent !important;
+    background: transparent !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    transition: all 180ms ease !important;
+    margin: 0 !important;
+  }
+
+  .dashboard-tab:hover,
+  .dashboard-tabs .button:hover {
+    color: var(--text) !important;
+    background: rgba(28, 25, 23, 0.03) !important;
+  }
+
+  .dashboard-tab.active,
+  .dashboard-tabs .button.button--primary {
+    border-bottom: none !important;
+    border-left: 2.5px solid var(--accent) !important;
+    background: rgba(133, 77, 14, 0.06) !important;
+    color: var(--accent) !important;
+    font-weight: 700 !important;
+  }
+}

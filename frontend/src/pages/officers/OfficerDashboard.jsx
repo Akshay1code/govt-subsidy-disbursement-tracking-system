@@ -1,12 +1,10 @@
 import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import ThemeToggle from '../../components/ThemeToggle'
 import logo from '../../assets/icons/logo.png'
 import api from '../../services/api'
-import DashboardTopbar from '../../components/DashboardTopbar'
-import SchemeDashboard from '../scheme-dashboard'
 import { updateApprovalStatus } from '../../services/adminService'
 import { 
   getMyApplications, 
@@ -18,7 +16,6 @@ import {
   getOverdueMilestones,
   getNotifications,
 } from '../../services/officerService'
-import { FaExclamationTriangle, FaCheckCircle, FaCheck } from 'react-icons/fa'
 
 const STATUS_BADGE = {
   Pending: 'badge-status--applied',
@@ -42,6 +39,10 @@ export default function OfficerDashboard() {
   const [rejectMode, setRejectMode] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [toast, setToast] = useState(null)
+
+  const [activeDocTab, setActiveDocTab] = useState('aadhaar')
+  const [checklist, setChecklist] = useState({ address: false, business: false, assets: false })
+  const [fieldNotes, setFieldNotes] = useState('')
 
   // Disbursement states
   const [disbursementPlan, setDisbursementPlan] = useState(null)
@@ -325,12 +326,32 @@ export default function OfficerDashboard() {
         )}
       </AnimatePresence>
 
-      <DashboardTopbar
-        portalName="Officer Portal"
-        userName={officer.fullName}
-        userRole={officer.designation || 'Officer'}
-        onLogout={handleLogout}
-      />
+      {/* Header Sticky Topbar */}
+      <header className="topbar" style={{ background: 'var(--panel-strong)', borderBottom: '1px solid var(--border)' }}>
+        <div className="topbar__brand">
+          <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
+          <div>
+            <strong>GS Gov Subsidy</strong>
+            <span>Officer Portal</span>
+          </div>
+        </div>
+
+        <div className="topbar__user-info">
+          <span className="user-badge">
+            <span className="user-badge__dot"></span>
+            {officer.fullName} ({officer.designation || 'Officer'})
+          </span>
+          <ThemeToggle />
+          <button onClick={handleLogout} className="btn-logout">
+            Logout
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </div>
+      </header>
 
       {/* Main Panel Content */}
       <main className="dashboard-main">
@@ -539,8 +560,97 @@ export default function OfficerDashboard() {
 
           {/* TAB 3: REPORTS & ANALYTICS */}
           {activeTab === 'reports' && (
-            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} style={{ margin: '-1.5rem', background: '#0F141F' }}>
-              <SchemeDashboard />
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+              <div className="pane-header">
+                <h2>Reports &amp; Analytics</h2>
+                <p>Application statistics and approval rates.</p>
+              </div>
+
+              <div className="beneficiary-meta-card">
+                <div className="meta-card__item">
+                  <span className="meta-card__label">Total Processed</span>
+                  <span className="meta-card__val">{approved + rejected} / {total}</span>
+                </div>
+                <div className="meta-card__item">
+                  <span className="meta-card__label">Approval Rate</span>
+                  <span className="meta-card__val">{approvalRate}%</span>
+                </div>
+                <div className="meta-card__item">
+                  <span className="meta-card__label">Awaiting Review</span>
+                  <span className="meta-card__val text-secondary flex-align">
+                    <span className="badge-dot-green"></span> {pending} Pending
+                  </span>
+                </div>
+              </div>
+
+              <h3 className="section-title" style={{ marginTop: '2.5rem' }}>Applications by Status</h3>
+              <div className="officer-stats-grid">
+                <div className="officer-stat-card officer-stat-card--total">
+                  <span className="officer-stat-card__label">Total</span>
+                  <span className="officer-stat-card__value">{total}</span>
+                </div>
+                <div className="officer-stat-card officer-stat-card--pending">
+                  <span className="officer-stat-card__label">Pending</span>
+                  <span className="officer-stat-card__value">{pending}</span>
+                </div>
+                <div className="officer-stat-card officer-stat-card--approved">
+                  <span className="officer-stat-card__label">Approved</span>
+                  <span className="officer-stat-card__value">{approved}</span>
+                </div>
+                <div className="officer-stat-card officer-stat-card--rejected">
+                  <span className="officer-stat-card__label">Rejected</span>
+                  <span className="officer-stat-card__value">{rejected}</span>
+                </div>
+              </div>
+
+              <h3 className="section-title" style={{ marginTop: '2.5rem', color: '#ef4444' }}>⚠️ Non-Compliance &amp; Overdue Milestones</h3>
+              {overdueReports.length === 0 ? (
+                <div className="empty-state" style={{ border: '1px dashed var(--border)', padding: '2rem' }}>
+                  <p>All milestones are compliant. No overdue stages found.</p>
+                </div>
+              ) : (
+                <div className="dbt-ledger-wrap" style={{ marginTop: '1rem' }}>
+                  <table className="dbt-ledger">
+                    <thead>
+                      <tr>
+                        <th>Milestone ID</th>
+                        <th>Beneficiary Name</th>
+                        <th>Scheme</th>
+                        <th>Milestone Name</th>
+                        <th>Due Date</th>
+                        <th>Days Overdue</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueReports.map(rep => (
+                        <tr key={rep.milestoneId}>
+                          <td className="font-mono text-soft">#{rep.milestoneId}</td>
+                          <td style={{ fontWeight: 600 }}>{rep.beneficiaryName}</td>
+                          <td>{rep.schemeName}</td>
+                          <td>{rep.milestoneName}</td>
+                          <td className="font-mono" style={{ color: '#ef4444' }}>{rep.dueDate}</td>
+                          <td style={{ color: '#ef4444', fontWeight: 'bold' }}>
+                            {rep.daysOverdue} days
+                          </td>
+                          <td>
+                            <button 
+                              className="button button--secondary" 
+                              style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem', borderColor: '#ef4444', color: '#ef4444' }}
+                              onClick={() => {
+                                setResolvingMilestoneId(rep.milestoneId)
+                                setShowResolveModal(true)
+                              }}
+                            >
+                              Resolve Override
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -662,88 +772,318 @@ export default function OfficerDashboard() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '600px', textAlign: 'left' }}
+              style={{ maxWidth: '850px', width: '90%', textAlign: 'left' }}
             >
-              <div className="tracking-card__header" style={{ marginBottom: '1.2rem' }}>
-                <h3 style={{ margin: 0 }}>
-                  {selectedApp.id || selectedApp.applicationId} · {selectedApp.applicant || selectedApp.applicantName}
-                </h3>
-                <span className={`badge-status ${STATUS_BADGE[selectedApp.status] || ''}`}>{selectedApp.status}</span>
-              </div>
-
-              <div className="beneficiary-meta-card" style={{ marginBottom: '1.5rem' }}>
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Scheme</span>
-                  <span className="meta-card__val">{selectedApp.schemeName || selectedApp.schemeId || '—'}</span>
-                </div>
-                {selectedApp.annualIncome && (
-                  <div className="meta-card__item">
-                    <span className="meta-card__label">Annual Income</span>
-                    <span className="meta-card__val font-mono">₹{selectedApp.annualIncome}</span>
+              {officer?.role === 'FIELD_OFFICER' ? (
+                // FIELD INSPECTOR DETAILED SCREEN (Image 3 & 4)
+                <>
+                  <div className="applicant-review-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.8rem' }}>
+                    <div className="applicant-review-header__title">
+                      <h2 style={{ margin: 0, fontSize: '1.6rem', fontFamily: 'Source Serif 4, Georgia, serif' }}>Field Inspection Report</h2>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>Complete the verification findings for the assigned application.</p>
+                    </div>
+                    <div className="applicant-review-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="custom-badge-pending" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                        <span className="custom-badge-pending__dot"></span>
+                        Inspection Stage
+                      </span>
+                    </div>
                   </div>
-                )}
-                {selectedApp.aadhaar && (
-                  <div className="meta-card__item">
-                    <span className="meta-card__label">Aadhaar</span>
-                    <span className="meta-card__val font-mono">{selectedApp.aadhaar}</span>
+
+                  {/* Two Column Layout */}
+                  <div className="review-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.2rem', marginBottom: '1.5rem' }}>
+                    {/* Left Card: Beneficiary Context */}
+                    <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Beneficiary Context
+                      </h4>
+                      <div className="detail-form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Beneficiary Name</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.applicant || selectedApp.applicantName} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Application ID</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.id || selectedApp.applicationId} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Scheme Category</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                            <span className="custom-badge-verified" style={{ background: '#dcfce7', color: '#15803d', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                              ● {selectedApp.schemeName || selectedApp.schemeId || 'Agricultural Innovation Grant'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Inspection Location</label>
+                          <input className="detail-field__input" type="text" readOnly value={`${selectedApp.district || 'Lucknow District'}, ${selectedApp.state || 'Uttar Pradesh'}`} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Card: Verification Checklist */}
+                    <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                          <path d="m9 12 2 2 4-4" />
+                        </svg>
+                        Verification Checklist
+                      </h4>
+                      <div className="checklist-tiles" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        <div 
+                          className={`checklist-tile ${checklist.address ? 'checklist-tile--checked' : ''}`}
+                          onClick={() => setChecklist(prev => ({ ...prev, address: !prev.address }))}
+                          style={{ border: '1px solid var(--border)', padding: '0.65rem 0.85rem', borderRadius: '6px', display: 'flex', gap: '0.75rem', cursor: 'pointer', background: checklist.address ? 'rgba(22, 163, 74, 0.03)' : 'transparent', transition: 'all 150ms ease' }}
+                        >
+                          <input type="checkbox" checked={checklist.address} readOnly style={{ accentColor: 'var(--accent)' }} />
+                          <div className="checklist-tile__info">
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text)' }}>Address Verified</strong>
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.1rem' }}>Physical location matches application address.</span>
+                          </div>
+                        </div>
+
+                        <div 
+                          className={`checklist-tile ${checklist.business ? 'checklist-tile--checked' : ''}`}
+                          onClick={() => setChecklist(prev => ({ ...prev, business: !prev.business }))}
+                          style={{ border: '1px solid var(--border)', padding: '0.65rem 0.85rem', borderRadius: '6px', display: 'flex', gap: '0.75rem', cursor: 'pointer', background: checklist.business ? 'rgba(22, 163, 74, 0.03)' : 'transparent', transition: 'all 150ms ease' }}
+                        >
+                          <input type="checkbox" checked={checklist.business} readOnly style={{ accentColor: 'var(--accent)' }} />
+                          <div className="checklist-tile__info">
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text)' }}>Business Activity Confirmed</strong>
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.1rem' }}>Operations align with proposed subsidy goals.</span>
+                          </div>
+                        </div>
+
+                        <div 
+                          className={`checklist-tile ${checklist.assets ? 'checklist-tile--checked' : ''}`}
+                          onClick={() => setChecklist(prev => ({ ...prev, assets: !prev.assets }))}
+                          style={{ border: '1px solid var(--border)', padding: '0.65rem 0.85rem', borderRadius: '6px', display: 'flex', gap: '0.75rem', cursor: 'pointer', background: checklist.assets ? 'rgba(22, 163, 74, 0.03)' : 'transparent', transition: 'all 150ms ease' }}
+                        >
+                          <input type="checkbox" checked={checklist.assets} readOnly style={{ accentColor: 'var(--accent)' }} />
+                          <div className="checklist-tile__info">
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text)' }}>Assets Inspected</strong>
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.1rem' }}>Farming equipment/facilities verified and functional.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {selectedApp.phone && (
-                  <div className="meta-card__item">
-                    <span className="meta-card__label">Contact</span>
-                    <span className="meta-card__val font-mono">{selectedApp.phone}</span>
+
+                  {/* Site Evidence preview thumbnails block */}
+                  <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px', marginBottom: '1.2rem' }}>
+                    <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                      Site Evidence
+                    </h4>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ width: '120px', height: '90px', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                        <img src="/farm_evidence_1.jpg" alt="Evidence 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <div style={{ width: '120px', height: '90px', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                        <img src="/farm_evidence_2.jpg" alt="Evidence 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <div style={{ width: '120px', height: '90px', border: '2px dashed var(--border)', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', cursor: 'pointer' }}>
+                        <span style={{ fontSize: '1.2rem' }}>+</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Add Photo</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {selectedApp.remarks && (
-                <p style={{ color: 'var(--muted)', fontSize: '0.88rem', marginTop: '1rem' }}>
-                  <strong>Remarks:</strong> {selectedApp.remarks}
-                </p>
-              )}
+                  {/* Field Observations Notes */}
+                  <div className="detail-field" style={{ marginBottom: '1.8rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>Field Observations & Inspector Notes</label>
+                    <textarea 
+                      placeholder="Add compliance notes or report comments here..."
+                      value={fieldNotes}
+                      onChange={(e) => setFieldNotes(e.target.value)}
+                      style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.88rem', outline: 'none', color: 'var(--text)' }}
+                    />
+                  </div>
 
-              {rejectMode && (
-                <div className="delete-confirm-box" style={{ marginTop: '1.2rem' }}>
-                  <label>Reason for rejection</label>
-                  <input
-                    type="text"
-                    placeholder="Enter reason for rejecting this application"
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', alignItems: 'center' }}>
-                <button className="button button--ghost btn-apply" onClick={closeModal}>Close</button>
-                {(selectedApp.status === 'Approved' || selectedApp.status === 'APPROVED') && (
-                  <button 
-                    className="button button--primary" 
-                    onClick={() => {
-                      closeModal();
-                      fetchAndOpenDisbursement(selectedApp.id);
-                    }}
-                  >
-                    Manage Disbursement
-                  </button>
-                )}
-                {selectedApp.status !== 'Rejected' && selectedApp.status !== 'REJECTED' && (
-                  rejectMode ? (
-                    <button className="btn-danger-confirm btn-reject" onClick={handleReject}>
-                      Confirm Reject
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    <button className="button button--ghost" onClick={closeModal} style={{ padding: '0.55rem 1.25rem' }}>Cancel</button>
+                    <button 
+                      className="button button--primary" 
+                      onClick={() => {
+                        if (!checklist.address || !checklist.business || !checklist.assets) {
+                          setToast({ type: 'error', message: 'All checklist items must be verified to submit the report.' });
+                          return;
+                        }
+                        handleApprove();
+                      }}
+                      style={{ padding: '0.55rem 1.25rem', background: 'var(--accent)', color: '#fff' }}
+                    >
+                      Submit Inspection Report
                     </button>
-                  ) : (
-                    <button className="btn-danger-outline btn-reject" onClick={() => setRejectMode(true)}>
-                      Reject Application
-                    </button>
-                  )
-                )}
-                {selectedApp.status !== 'Approved' && selectedApp.status !== 'APPROVED' && !rejectMode && (
-                  <button className="button button--primary btn-approve" onClick={handleApprove}>
-                    Approve Application
-                  </button>
-                )}
-              </div>
+                  </div>
+                </>
+              ) : (
+                // DISTRICT OFFICER REVIEW STAGE (Image 2)
+                <>
+                  <div className="applicant-review-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.8rem' }}>
+                    <div className="applicant-review-header__title">
+                      <h2 style={{ margin: 0, fontSize: '1.6rem', fontFamily: 'Source Serif 4, Georgia, serif' }}>{selectedApp.applicant || selectedApp.applicantName}</h2>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>ID: {selectedApp.id || selectedApp.applicationId} · Application Review Stage</p>
+                    </div>
+                    <div className="applicant-review-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="custom-badge-pending" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                        <span className="custom-badge-pending__dot"></span>
+                        Verification Pending
+                      </span>
+                    </div>
+                  </div>
+
+                  {rejectMode && (
+                    <div className="delete-confirm-box" style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.85rem', borderRadius: '6px', marginBottom: '1rem' }}>
+                      <label style={{ color: '#991b1b', fontWeight: 'bold', display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Rejection Reason/Description</label>
+                      <textarea
+                        placeholder="Enter detailed reason for rejecting this application..."
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        style={{ width: '100%', minHeight: '60px', padding: '0.5rem', background: '#fff', border: '1px solid #fca5a5', borderRadius: '4px', fontSize: '0.85rem', outline: 'none' }}
+                      />
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button className="button button--ghost" onClick={() => setRejectMode(false)} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}>Cancel</button>
+                        <button className="button btn-danger-confirm" onClick={handleReject} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px' }}>Confirm Rejection</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Two Column Grid */}
+                  <div className="review-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.2rem', marginBottom: '1.5rem' }}>
+                    {/* Left Card: Applicant Details */}
+                    <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Applicant Details
+                      </h4>
+                      <div className="detail-form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Full Name</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.applicant || selectedApp.applicantName} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Date of Birth</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.dob || '14 May 1985'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Aadhaar Number</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.aadhaar || 'XXXX-XXXX-4921'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Annual Income</label>
+                          <input className="detail-field__input" type="text" readOnly value={`₹ ${Number(selectedApp.annualIncome || selectedApp.amount || 120000).toLocaleString('en-IN')}`} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                        <div className="detail-field">
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Scheme Name</label>
+                          <input className="detail-field__input" type="text" readOnly value={selectedApp.schemeName || selectedApp.schemeId || 'National Rural Livelihood Mission (NRLM) Enterprise Subsidy'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Card: Documents Preview Pane */}
+                    <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        Documents
+                      </h4>
+
+                      {/* Doc tabs */}
+                      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.8rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>
+                        <button 
+                          className={`document-tab-btn ${activeDocTab === 'aadhaar' ? 'active' : ''}`}
+                          onClick={() => setActiveDocTab('aadhaar')}
+                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'aadhaar' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'aadhaar' ? '2px solid var(--accent)' : 'none' }}
+                        >
+                          Aadhaar
+                        </button>
+                        <button 
+                          className={`document-tab-btn ${activeDocTab === 'income' ? 'active' : ''}`}
+                          onClick={() => setActiveDocTab('income')}
+                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'income' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'income' ? '2px solid var(--accent)' : 'none' }}
+                        >
+                          Income Cert
+                        </button>
+                        <button 
+                          className={`document-tab-btn ${activeDocTab === 'passbook' ? 'active' : ''}`}
+                          onClick={() => setActiveDocTab('passbook')}
+                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'passbook' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'passbook' ? '2px solid var(--accent)' : 'none' }}
+                        >
+                          Bank Passbook
+                        </button>
+                      </div>
+
+                      {/* Doc preview block */}
+                      <div className="doc-preview-pane" style={{ border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', background: '#fafaf9' }}>
+                        <div className="doc-preview-pane__header" style={{ padding: '0.45rem 0.75rem', background: '#f5f4f0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: 'var(--text-soft)' }}>
+                          <span>
+                            {activeDocTab === 'aadhaar' && 'Aadhaar_Card_Scan.jpg'}
+                            {activeDocTab === 'income' && 'Income_Certificate.pdf'}
+                            {activeDocTab === 'passbook' && 'Bank_Passbook_Copy.pdf'}
+                          </span>
+                        </div>
+                        <div className="doc-preview-pane__body" style={{ minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {activeDocTab === 'aadhaar' ? (
+                            <img src="/aadhaar_mock.jpg" alt="Aadhaar Card Preview" style={{ width: '100%', height: 'auto', maxHeight: '180px', objectFit: 'contain' }} />
+                          ) : (
+                            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem', padding: '1rem' }}>
+                              <span>Document preview is not available in mock viewer</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions buttons */}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem', alignItems: 'center' }}>
+                    <button className="button button--ghost" onClick={closeModal} style={{ padding: '0.55rem 1.25rem' }}>Close</button>
+                    {(selectedApp.status === 'Approved' || selectedApp.status === 'APPROVED') && (
+                      <button 
+                        className="button button--primary" 
+                        onClick={() => {
+                          closeModal();
+                          fetchAndOpenDisbursement(selectedApp.id);
+                        }}
+                        style={{ padding: '0.55rem 1.25rem', background: 'var(--accent)', color: '#fff' }}
+                      >
+                        Manage Disbursement
+                      </button>
+                    )}
+                    {selectedApp.status !== 'Rejected' && selectedApp.status !== 'REJECTED' && (
+                      rejectMode ? (
+                        <button className="btn-danger-confirm" onClick={handleReject} style={{ padding: '0.55rem 1.25rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                          Confirm Reject
+                        </button>
+                      ) : (
+                        <button className="button button--ghost" onClick={() => setRejectMode(true)} style={{ padding: '0.55rem 1.25rem', color: '#ef4444', borderColor: '#fca5a5' }}>
+                          ✕ Reject
+                        </button>
+                      )
+                    )}
+                    {selectedApp.status !== 'Approved' && selectedApp.status !== 'APPROVED' && !rejectMode && (
+                      <button className="button button--primary" onClick={handleApprove} style={{ padding: '0.55rem 1.25rem', background: 'var(--accent)', color: '#fff' }}>
+                        ✓ Approve Application
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}
@@ -825,6 +1165,144 @@ export default function OfficerDashboard() {
                               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg)', color: 'var(--text)' }}
                             />
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Show live sum tracker */}
+                  {(() => {
+                    const sum = planConfigStages.reduce((acc, curr) => acc + Number(curr.amountToRelease), 0);
+                    const diff = sum - disbursementPlan.totalAmount;
+                    if (Math.abs(diff) > 0.01) {
+                      return (
+                        <div className="sum-warning" style={{ color: '#ef4444', fontWeight: '600', marginBottom: '1rem' }}>
+                          ⚠️ Warning: Sum of stages (₹{sum.toLocaleString('en-IN')}) does not match the total approved grant (₹{disbursementPlan.totalAmount.toLocaleString('en-IN')}). Diff: ₹{diff.toLocaleString('en-IN')}.
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="sum-success" style={{ color: '#22c55e', fontWeight: '600', marginBottom: '1rem' }}>
+                          ✅ Verified: Sum of stages matches exactly the approved grant (₹{sum.toLocaleString('en-IN')}).
+                        </div>
+                      );
+                    }
+                  })()}
+
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                    <button className="button button--ghost" onClick={() => setShowDisbursementManager(false)}>Cancel</button>
+                    <button className="button button--primary" onClick={handleConfigurePlan}>Save Configuration</button>
+                  </div>
+                </div>
+              ) : (
+                // MILESTONE TIMELINE VIEW
+                <div>
+                  <h4 style={{ margin: '0 0 1.5rem 0' }}>Disbursement Milestone Tracking</h4>
+                  
+                  <div className="timeline">
+                    {disbursementPlan.milestones.map((m, idx) => {
+                      const isPrevReleasedOrCompleted = idx === 0 || 
+                        disbursementPlan.milestones.slice(0, idx).every(prev => 
+                          prev.completionStatus === 'RELEASED' || prev.completionStatus === 'COMPLETED'
+                        );
+                      
+                      const hasOverdueEarlier = disbursementPlan.milestones.slice(0, idx).some(prev => 
+                        prev.completionStatus === 'OVERDUE'
+                      );
+
+                      const isReleaseBlocked = !isPrevReleasedOrCompleted || hasOverdueEarlier || m.completionStatus !== 'COMPLETED';
+
+                      return (
+                        <div className="timeline-item" key={m.milestoneId}>
+                          <div className={`timeline-badge status-${m.completionStatus.toLowerCase()}`}>
+                            {m.stageNumber}
+                          </div>
+                          <div className="timeline-content">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <h5 className="timeline-title">{m.milestoneName}</h5>
+                              <span className={`badge-status status-${m.completionStatus.toLowerCase()}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}>
+                                {m.completionStatus}
+                              </span>
+                            </div>
+                            <div className="timeline-meta">
+                              <div><strong>Amount:</strong> ₹{m.amountToRelease.toLocaleString('en-IN')}</div>
+                              <div><strong>Due Date:</strong> {m.dueDate}</div>
+                              {m.completedDate && <div><strong>Completed:</strong> {m.completedDate}</div>}
+                              {m.releaseDate && <div><strong>Released:</strong> {m.releaseDate}</div>}
+                              {m.resolvedReason && (
+                                <div style={{ width: '100%', color: '#22c55e', marginTop: '0.3rem' }}>
+                                  <strong>Override Reason:</strong> {m.resolvedReason} (on {m.resolvedDate})
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="timeline-actions">
+                              {m.completionStatus === 'PENDING' && (
+                                <button 
+                                  className="button button--ghost" 
+                                  style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem' }}
+                                  onClick={() => handleCompleteMilestone(m.milestoneId)}
+                                >
+                                  Mark Completed
+                                </button>
+                              )}
+                              {m.completionStatus === 'COMPLETED' && (
+                                <button 
+                                  className="button button--primary" 
+                                  style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem' }}
+                                  onClick={() => handleReleaseMilestone(m.milestoneId)}
+                                  disabled={isReleaseBlocked}
+                                  title={
+                                    hasOverdueEarlier 
+                                      ? "Release blocked because an earlier stage is OVERDUE." 
+                                      : isReleaseBlocked 
+                                      ? "Previous stage must be complete/released to release funds." 
+                                      : "Release milestone funds"
+                                  }
+                                >
+                                  Release Funds
+                                </button>
+                              )}
+                              {m.completionStatus === 'OVERDUE' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                  <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    ⚠️ Non-compliant / Overdue
+                                  </span>
+                                  <button 
+                                    className="button button--secondary" 
+                                    style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem', borderColor: '#ef4444', color: '#ef4444' }}
+                                    onClick={() => {
+                                      setResolvingMilestoneId(m.milestoneId)
+                                      setShowResolveModal(true)
+                                    }}
+                                  >
+                                    Resolve Overdue
+                                  </button>
+                                </div>
+                              )}
+                              {m.completionStatus === 'RELEASED' && (
+                                <span style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  ✓ Funds Disbursed (₹{m.amountReleased.toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                    <button className="button button--ghost" onClick={() => setShowDisbursementManager(false)}>Close</button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Override Resolve Modal */}
       <AnimatePresence>
         {showResolveModal && (
           <div className="modal-overlay" onClick={() => {

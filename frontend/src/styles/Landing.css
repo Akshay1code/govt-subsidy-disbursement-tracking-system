@@ -4,7 +4,7 @@
   min-height: 100vh;
   overflow: hidden;
   padding: 1rem 1rem 2rem;
-  background: #07130f;
+  background: var(--bg);
 }
 
 .landing-backdrop {
@@ -12,8 +12,8 @@
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(7, 19, 15, 0.2) 0%, rgba(7, 19, 15, 0.1) 45%, rgba(7, 19, 15, 0.4) 100%),
-    linear-gradient(90deg, rgba(4, 12, 10, 0.4) 0%, rgba(4, 12, 10, 0.2) 38%, rgba(4, 12, 10, 0.02) 100%),
+    linear-gradient(180deg, rgba(10, 25, 47, 0.2) 0%, rgba(10, 25, 47, 0.1) 45%, rgba(10, 25, 47, 0.4) 100%),
+    linear-gradient(90deg, rgba(7, 18, 36, 0.4) 0%, rgba(7, 18, 36, 0.2) 38%, rgba(7, 18, 36, 0.02) 100%),
     url('../assets/images/farm-hero.png') center center / cover no-repeat;
   filter: saturate(1.18) contrast(1.06);
 }
@@ -23,8 +23,8 @@
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(7, 19, 15, 0.2) 0%, rgba(7, 19, 15, 0.1) 45%, rgba(7, 19, 15, 0.4) 100%),
-    linear-gradient(90deg, rgba(4, 12, 10, 0.4) 0%, rgba(4, 12, 10, 0.2) 38%, rgba(4, 12, 10, 0.02) 100%),
+    linear-gradient(180deg, rgba(10, 25, 47, 0.2) 0%, rgba(10, 25, 47, 0.1) 45%, rgba(10, 25, 47, 0.4) 100%),
+    linear-gradient(90deg, rgba(7, 18, 36, 0.4) 0%, rgba(7, 18, 36, 0.2) 38%, rgba(7, 18, 36, 0.02) 100%),
     url('../assets/images/farm-hero.png') center center / cover no-repeat;
   filter: saturate(1.18) contrast(1.06) blur(12px);
   will-change: opacity;
@@ -39,7 +39,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(120deg, rgba(7, 19, 15, 0.3) 0%, rgba(7, 19, 15, 0.15) 42%, rgba(7, 19, 15, 0.01) 100%),
+    linear-gradient(120deg, rgba(10, 25, 47, 0.3) 0%, rgba(10, 25, 47, 0.15) 42%, rgba(10, 25, 47, 0.01) 100%),
     radial-gradient(circle at 18% 26%, rgba(255, 199, 106, 0.05), transparent 26%),
     radial-gradient(circle at 82% 30%, rgba(130, 174, 202, 0.04), transparent 22%);
 }
@@ -57,7 +57,7 @@
   padding: 0.9rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: rgba(7, 19, 15, 0.66);
+  background: var(--panel);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(18px);
 }
