@@ -466,14 +466,14 @@ export default function AdminDashboard() {
       </header>
 
       {/* ── Main Content Container ── */}
-      <div ref={contentRef} style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', scrollMarginTop: '1rem' }}>
+      <main ref={contentRef} className="dashboard-main" style={{ maxWidth: '1440px', margin: '0 auto', padding: '2rem 1.5rem', scrollMarginTop: '1rem' }}>
 
         {/* Tab Navigation */}
         <motion.div
           initial={{ opacity: 0, y: -10, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}
+          className="dashboard-tabs"
         >
           <button
             className={`button ${activeTab === 'analytics' ? 'button--primary' : 'button--ghost'}`}
@@ -526,6 +526,7 @@ export default function AdminDashboard() {
           </button>
         </motion.div>
 
+        <div className="tab-pane">
         {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
         <AnimatePresence mode="wait">
         {activeTab === 'analytics' && (
@@ -1236,8 +1237,9 @@ export default function AdminDashboard() {
         )}
 
         </AnimatePresence>
+        </div>
 
-      </div>
+      </main>
 
       {/* ── MODAL 1: APPLICATION DETAILS & ADMIN OVERRIDE ── */}
       <AnimatePresence>

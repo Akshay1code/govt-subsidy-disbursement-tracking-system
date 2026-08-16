@@ -12,18 +12,18 @@
 
 /* Left panel */
 .login-page__left {
-  --bg: #f5f8f3;
-  --text: #0f1c12;
-  --text-soft: #3a473d;
-  --muted: #657569;
-  --accent-strong: #c98804;
-  --border-light: rgba(22, 60, 30, 0.08);
-  --bg-input: rgba(255, 255, 255, 0.7);
+  --bg: var(--bg-elevated);
+  --text: var(--text);
+  --text-soft: var(--text-soft);
+  --muted: var(--muted);
+  --accent-strong: var(--accent-strong);
+  --border-light: var(--border);
+  --bg-input: var(--bg-elevated);
 
   display: flex;
   flex-direction: column;
   padding: 1.5rem 2.5rem;
-  background: linear-gradient(160deg, #eaf3ea 0%, #fdf5d6 100%);
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, rgba(10, 53, 92, 0.02) 100%);
   color: var(--text);
   overflow: hidden;
 }
@@ -116,9 +116,9 @@
 }
 
 .login-form__input-wrap:focus-within {
-  border-color: #f5c842;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.15);
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 3px rgba(10, 53, 92, 0.1);
 }
 
 .login-form__icon {
@@ -193,9 +193,9 @@
 }
 
 .role-chip.active {
-  border-color: #f5c842;
-  background: #fdf5d3;
-  color: #9c6c00;
+  border-color: var(--accent);
+  background: rgba(10, 53, 92, 0.08);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -249,18 +249,18 @@
   padding: 0.95rem;
   border-radius: 14px;
   border: none;
-  background: linear-gradient(135deg, #e6a020, #c47d10);
-  color: #0d1a0e;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #ffffff;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.03em;
   cursor: pointer;
   transition: opacity 160ms ease, box-shadow 160ms ease;
-  box-shadow: 0 8px 28px rgba(200, 130, 20, 0.35);
+  box-shadow: 0 8px 28px rgba(10, 53, 92, 0.15);
 }
 
 .login-form__submit:hover {
-  box-shadow: 0 12px 36px rgba(200, 130, 20, 0.5);
+  box-shadow: 0 12px 36px rgba(10, 53, 92, 0.25);
 }
 
 .login-form__submit:disabled {
@@ -272,8 +272,8 @@
   display: inline-block;
   width: 1.2rem;
   height: 1.2rem;
-  border: 2px solid rgba(0, 0, 0, 0.3);
-  border-top-color: #0d1a0e;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

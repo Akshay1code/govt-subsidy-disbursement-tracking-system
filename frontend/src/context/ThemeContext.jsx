@@ -16,7 +16,7 @@ export function ThemeProvider({ children }) {
   ].includes(path)
   const isThemeEnabled = !isExcluded
 
-  const [theme, setTheme] = useState('dark')
+  const [theme, setTheme] = useState('light')
 
   useEffect(() => {
     if (isThemeEnabled && theme === 'light') {
@@ -41,7 +41,7 @@ export function useTheme() {
   const context = useContext(ThemeContext)
   if (!context) {
     // Fallback if rendered outside provider
-    return { theme: 'dark', toggleTheme: () => {} }
+    return { theme: 'light', toggleTheme: () => {} }
   }
   return context
 }
