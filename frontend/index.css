@@ -1,30 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700;8..60,800&display=swap');
 
 :root {
-  --bg: #0a192f;
-  --bg-elevated: #0f2747;
-  --panel: rgba(15, 39, 71, 0.65);
-  --panel-strong: rgba(15, 39, 71, 0.95);
-  --text: #f8fafc;
-  --text-soft: rgba(248, 250, 252, 0.85);
-  --muted: rgba(248, 250, 252, 0.55);
-  --accent: #3b82f6;
-  --accent-strong: #60a5fa;
+  --bg: #F8FAFC;
+  --bg-elevated: #FFFFFF;
+  --panel: rgba(255, 255, 255, 0.95);
+  --panel-strong: #FFFFFF;
+  --text: #0F172A;
+  --text-soft: #334155;
+  --muted: #64748b;
+  --accent: #16A34A; /* Forest Green */
+  --accent-strong: #15803d;
   --secondary: #10b981;
-  --solar: #f59e0b;
-  --border: rgba(248, 250, 252, 0.08);
-  --border-strong: rgba(248, 250, 252, 0.16);
-  --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-  --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.25);
+  --solar: #EAB308; /* Saffron Yellow */
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   
-  font-family: 'Inter', 'Noto Sans', system-ui, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -76,9 +76,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--bg);
-  background-image: 
-    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.04), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(245, 158, 11, 0.04), transparent 25%);
+  background-image: none; /* Removed complex background gradients for simplicity and contrast */
   color: var(--text);
   font-size: 16px;
   overflow-x: hidden;
@@ -171,22 +169,22 @@ img {
   max-width: 100%;
 }
 
-/* LIGHT MODE STYLING OVERRIDES ([data-theme="light"])
+/* LIGHT MODE STYLING OVERRIDES (Enforced)
    ------------------------------------------------------------- */
 [data-theme="light"] {
-  --bg: #f1f5f9;
-  --bg-elevated: #ffffff;
+  --bg: #F8FAFC;
+  --bg-elevated: #FFFFFF;
   --panel: rgba(255, 255, 255, 0.95);
-  --panel-strong: #ffffff;
-  --text: #0f172a;
+  --panel-strong: #FFFFFF;
+  --text: #0F172A;
   --text-soft: #334155;
   --muted: #64748b;
-  --accent: #0a355c;
-  --accent-strong: #072542;
-  --secondary: #16a34a;
-  --solar: #ea580c;
-  --border: #cbd5e1;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --accent: #16A34A;
+  --accent-strong: #15803d;
+  --secondary: #10b981;
+  --solar: #EAB308;
+  --border: #e2e8f0;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 

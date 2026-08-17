@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { getSchemes } from '../services/schemeService'
-import { getApplications, submitApplicationBySchemeCode, cancelApplicationById } from '../services/applicationService'
+import { getApplications, submitApplicationBySchemeCode, cancelApplicationById, uploadApplicationDocuments } from '../services/applicationService'
 import { runEligibilityEngine } from '../services/eligibilityService'
 import api from '../services/api'
-import ThemeToggle from '../components/ThemeToggle'
 
 function normalizeRuleField(fieldName) {
   return String(fieldName || '')
@@ -40,6 +39,37 @@ function getApplicationStatus(application) {
 
 function isDraftStatus(status) {
   return status === 'DRAFT' || status === 'PENDING'
+}
+
+function humanizeEnum(value) {
+  return String(value || '')
+    .replace(/_/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+function getDocumentDefinitions(scheme) {
+  const configuredDocuments = Array.isArray(scheme?.documents) ? scheme.documents : []
+
+  if (configuredDocuments.length === 0) {
+    return [
+      { key: 'AADHAAR', documentType: 'AADHAAR', label: 'Identity proof', hint: 'Aadhaar, voter ID, or equivalent', mandatory: true },
+      { key: 'INCOME_CERTIFICATE', documentType: 'INCOME_CERTIFICATE', label: 'Income proof', hint: 'Certificate or salary slip', mandatory: true },
+      { key: 'LAND_RECORD', documentType: 'LAND_RECORD', label: 'Supporting document', hint: 'Land record, category proof, or scheme-specific file', mandatory: true },
+    ]
+  }
+
+  return configuredDocuments.map((doc, index) => {
+    const documentType = String(doc.documentType || `DOCUMENT_${index + 1}`).trim().toUpperCase()
+    return {
+      key: documentType,
+      documentType,
+      label: humanizeEnum(documentType),
+      hint: doc.mandatory === false ? 'Optional document' : 'Required document',
+      mandatory: doc.mandatory !== false,
+    }
+  })
 }
 
 export default function SchemeDetail() {
@@ -93,7 +123,7 @@ export default function SchemeDetail() {
         const res = await api.get('/gov/auth/profile/get')
         const profileData = res.data?.data || res.data || null
         setProfile(profileData)
-      } catch (error) {
+      } catch {
         setProfile(null)
       } finally {
         setLoadingProfile(false)
@@ -109,7 +139,7 @@ export default function SchemeDetail() {
         const data = await getApplications()
         const list = Array.isArray(data) ? data : data?.data || []
         setApplications(list)
-      } catch (error) {
+      } catch {
         setApplications([])
       } finally {
         setLoadingApplications(false)
@@ -125,7 +155,7 @@ export default function SchemeDetail() {
       const list = Array.isArray(data) ? data : data?.data || []
       setApplications(list)
       return list
-    } catch (error) {
+    } catch {
       setApplications([])
       return []
     } finally {
@@ -155,6 +185,8 @@ export default function SchemeDetail() {
   if (loadingSchemes || loadingProfile) return null
   if (!scheme) return null
 
+  const requiredDocuments = getDocumentDefinitions(scheme)
+
   const matchingApplication = applications.find(app => {
     const appSchemeCode = app?.schemeCode || app?.schemeId || app?.scheme?.schemeCode
     return appSchemeCode === scheme.schemeCode
@@ -162,8 +194,6 @@ export default function SchemeDetail() {
   const currentApplicationStatus = getApplicationStatus(matchingApplication)
   const isDraftApplication = matchingApplication ? isDraftStatus(currentApplicationStatus) : false
   const hasProfile = !!profile
-  const hasTrackedApplication = !!matchingApplication && !isDraftApplication
-  const appDetails = matchingApplication
   const eligibilityPayload = {
     schemeCode: scheme.schemeCode,
     fields: Object.entries(formInputs)
@@ -255,14 +285,10 @@ export default function SchemeDetail() {
   const handleSubmitDocuments = async () => {
     if (!canProceedToDocs) return
 
-    const missingDocs = [
-      'identityProof',
-      'incomeProof',
-      'supportingDocs',
-    ].filter(docName => !docsFiles[docName])
+    const missingDocs = requiredDocuments.filter(doc => doc.mandatory && !docsFiles[doc.key])
 
     if (missingDocs.length > 0) {
-      setDocsError('Please upload all required documents before submitting.')
+      setDocsError(`Please upload all required documents before submitting: ${missingDocs.map(doc => doc.label).join(', ')}.`)
       return
     }
 
@@ -270,9 +296,24 @@ export default function SchemeDetail() {
     setIsSubmittingDocs(true)
 
     try {
+      const selectedDocs = requiredDocuments
+        .map(doc => ({ ...doc, file: docsFiles[doc.key] }))
+        .filter(doc => doc.file)
+
+      if (selectedDocs.length > 0) {
+        await uploadApplicationDocuments(
+          scheme.schemeCode,
+          selectedDocs.map(doc => doc.file),
+          selectedDocs.map(doc => doc.documentType)
+        )
+      }
+
       await submitApplicationBySchemeCode(scheme.schemeCode)
       await refreshApplications()
       setViewState('success')
+      setDocsFiles({})
+    } catch (error) {
+      setDocsError(error.message || 'Failed to upload documents and submit the application.')
     } finally {
       setIsSubmittingDocs(false)
     }
@@ -302,7 +343,6 @@ export default function SchemeDetail() {
             <span className="user-badge__dot"></span>
             {profile?.fullName || 'Beneficiary'}
           </span>
-          <ThemeToggle />
         </div>
       </header>
 
@@ -634,21 +674,17 @@ export default function SchemeDetail() {
                 </p>
 
                 <div className="docs-grid">
-                  {[
-                    { name: 'identityProof', label: 'Identity proof', hint: 'Aadhaar, voter ID, or equivalent' },
-                    { name: 'incomeProof', label: 'Income proof', hint: 'Certificate or salary slip' },
-                    { name: 'supportingDocs', label: 'Supporting document', hint: 'Land record, category proof, or scheme-specific file' },
-                  ].map((doc) => (
-                    <label className="doc-upload-card" key={doc.name}>
+                  {requiredDocuments.map((doc) => (
+                    <label className="doc-upload-card" key={doc.key}>
                       <span className="doc-upload-card__label">{doc.label}</span>
                       <span className="doc-upload-card__hint">{doc.hint}</span>
                       <input
                         type="file"
-                        name={doc.name}
+                        name={doc.key}
                         onChange={handleDocFileChange}
                       />
                       <span className="doc-upload-card__file">
-                        {docsFiles[doc.name]?.name || 'No file selected'}
+                        {docsFiles[doc.key]?.name || 'No file selected'}
                       </span>
                     </label>
                   ))}

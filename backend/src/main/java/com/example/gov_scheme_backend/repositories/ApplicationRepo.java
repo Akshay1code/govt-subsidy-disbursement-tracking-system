@@ -18,6 +18,10 @@ public interface ApplicationRepo extends JpaRepository<Application, Long> {
             String schemeCode
     );
 
+    List<Application> findByUser_IdOrderByCreatedAtDesc(Long userId);
+
+    List<Application> findAllByOrderByCreatedAtDesc();
+
     List<Application> findByScheme_SchemeCode(String schemeCode);
 
     List<Application> findByUser_District(String district);

@@ -73,7 +73,10 @@ function mapScheme(scheme) {
     active: !!scheme.active,
     minimumEligibleScore: scheme.minimumEligibleScore,
     categoryDescription: scheme.categoryDescription || '',
-    rules,
+    rules: rules.map((rule) => ({
+      ...rule,
+      partialPercentage: rule?.partialPercentage ?? 0,
+    })),
     documents,
     fields,
     requiredDocs: documents.map((doc) => humanizeEnum(doc.documentType)).filter(Boolean),

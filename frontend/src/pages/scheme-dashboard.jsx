@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useRef } from "react";
-import { motion, useMotionValue, useTransform, animate, useInView } from "framer-motion";
+import '../styles/Dashboard.css';
+import { useEffect, useState, useRef } from "react";
+import { useDashboardAnalytics } from "../hooks/useDashboardAnalytics";
+import { getProfilesByRole } from "../services/adminService";
+import { motion, useMotionValue, animate, useInView } from "framer-motion";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   LineChart, Line, RadialBarChart, RadialBar, ResponsiveContainer, AreaChart, Area,
 } from "recharts";
+import DashboardTopbar from "../components/DashboardTopbar";
 
-/* ------------------------------------------------------------------ */
-/* Tokens                                                              */
-/* ------------------------------------------------------------------ */
 const C = {
   ink: "var(--bg)",
   panel: "var(--bg-elevated)",
@@ -31,42 +32,7 @@ const SERIF = "'Source Serif 4', serif";
 const SANS = "'Noto Sans', system-ui, sans-serif";
 const MONO = "monospace";
 
-/* ------------------------------------------------------------------ */
-/* Mock data                                                           */
-/* ------------------------------------------------------------------ */
-const statusData = [
-  { name: "Disbursed", value: 0, color: C.teal },
-  { name: "Approved", value: 0, color: C.slate },
-  { name: "Pending", value: 0, color: C.gold },
-  { name: "Rejected", value: 0, color: C.brick },
-];
-
-const categoryApplications = [];
-const schemeApplications = [];
-const schemeFundUsage = [];
-const categoryAmounts = [];
-const monthly = [];
-const sparkline = [];
-const officerQueue = [];
-const flagReasons = [];
-const rejectionReasons = [];
-const schemeTable = [];
-
-const kpis = [
-  { no: "01", label: "Total applications", value: 0, prefix: "", suffix: "" },
-  { no: "02", label: "Pending review", value: 0, prefix: "", suffix: "" },
-  { no: "03", label: "Approved", value: 0, prefix: "", suffix: "" },
-  { no: "04", label: "Rejected", value: 0, prefix: "", suffix: "" },
-  { no: "05", label: "Beneficiaries disbursed", value: 0, prefix: "", suffix: "" },
-  { no: "06", label: "Leftover budget", value: 0, prefix: "\u20B9", suffix: " Cr" },
-];
-
-const fundSummary = [
-  { label: "Allocated funds", value: "\u20B90 Cr", tone: C.text },
-  { label: "Sanctioned amount", value: "\u20B90 Cr", tone: C.slate },
-  { label: "Disbursed amount", value: "\u20B90 Cr", tone: C.teal },
-  { label: "Leftover / unspent", value: "\u20B90 Cr", tone: C.gold },
-];
+/* Mock data removed — all state lives in useDashboardAnalytics() */
 
 /* ------------------------------------------------------------------ */
 /* Small helpers                                                       */
@@ -241,9 +207,54 @@ function RegisterSeal({ percent = 68 }) {
 /* Main dashboard                                                      */
 /* ------------------------------------------------------------------ */
 export default function SchemeDashboard() {
+  const { data, loading, error } = useDashboardAnalytics()
+  const [officers, setOfficers] = useState([])
+  const [officersLoading, setOfficersLoading] = useState(true)
+  const {
+    statusData, categoryApplications, schemeApplications, schemeFundUsage,
+    categoryAmounts, monthly, sparkline, officerQueue, flagReasons,
+    rejectionReasons, schemeTable, kpis, fundSummary,
+    disbursedPct, approvalRate, pendingCount, awaitingDisbursement, flaggedCount,
+    avgApprovalDays, avgDisbursementDays, missingDocsPct,
+  } = data
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchOfficers() {
+      setOfficersLoading(true)
+      try {
+        const res = await getProfilesByRole('FIELD_OFFICER')
+        const items = Array.isArray(res) ? res : res?.data || []
+        if (!cancelled) setOfficers(items)
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[SchemeDashboard] officer roster load failed', err)
+          setOfficers([])
+        }
+      } finally {
+        if (!cancelled) setOfficersLoading(false)
+      }
+    }
+
+    fetchOfficers()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
-    <div style={{ background: C.ink, minHeight: "100vh", fontFamily: SANS }}>
-      <div className="max-w-6xl mx-auto px-6 py-10">
+    <div className="dashboard-layout">
+      <DashboardTopbar
+        brandTitle="GS GOV SUBSIDY"
+        brandSubtitle="SCHEME ANALYTICS"
+        homeLink="/"
+        homeLabel="Back to Home"
+        showHomeLink
+      />
+
+      <main className="dashboard-main">
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
         {/* Hero */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-10 mb-10" style={{ borderBottom: `1px solid ${C.hair}` }}>
@@ -274,13 +285,97 @@ export default function SchemeDashboard() {
               status across all active welfare schemes. Updated as of 12 August 2026.
             </motion.p>
           </div>
-          <RegisterSeal percent={0} />
-        </div>
+          {loading && (
+            <Panel style={{ padding: '0.6rem 1rem', alignSelf: 'center' }}>
+              <span style={{ fontFamily: SANS, fontSize: 12, color: C.muted }}>Loading dashboard data…</span>
+            </Panel>
+          )}
+        {error && (
+          <Panel style={{ padding: '0.6rem 1rem', alignSelf: 'center', border: `1px solid ${C.brick}` }}>
+            <span style={{ fontFamily: SANS, fontSize: 12, color: C.brick }}>{error}</span>
+          </Panel>
+        )}
+        <RegisterSeal percent={disbursedPct} />
+      </div>
+
+        <Reveal>
+          <SectionHeader index="00" title="Officer Directory" note="PROFILE DETAILS" />
+        </Reveal>
+        <Reveal delay={0.05}>
+          <Panel>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, color: C.text }}>Field officer profiles</h3>
+                <p style={{ margin: '0.35rem 0 0', fontFamily: SANS, color: C.muted, fontSize: 13 }}>
+                  Showing officer details only. Approval or rejection status is intentionally hidden here.
+                </p>
+              </div>
+              <span style={{ fontFamily: MONO, fontSize: 12, color: C.teal, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                {officers.length.toLocaleString('en-IN')} records
+              </span>
+            </div>
+
+            <div className="table-card" style={{ overflow: 'hidden' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Full Name</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Officer ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Mobile No</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Region / District</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>State</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {officersLoading ? (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                        Loading officer profiles...
+                      </td>
+                    </tr>
+                  ) : officers.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                        No officer profiles found.
+                      </td>
+                    </tr>
+                  ) : (
+                    officers.map((officer, idx) => (
+                      <tr key={officer.officerId || officer.uniqueID || officer.uniqueId || officer.id || idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600, color: C.text }}>
+                          {officer.fullName || officer.name || 'Unnamed Officer'}
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', color: C.muted }}>
+                          {officer.officerId || officer.uniqueID || officer.uniqueId || officer.id || 'N/A'}
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', color: C.muted }}>
+                          {officer.mobileNo || officer.phone || officer.mobile || 'N/A'}
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem' }}>
+                          <div style={{ fontWeight: 500, color: C.text }}>
+                            {officer.department || officer.region || officer.district || 'District Office'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem', color: C.muted }}>
+                          {officer.state || 'State N/A'}
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem', color: C.muted }}>
+                          {officer.email || 'N/A'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </Reveal>
 
         {/* KPI ledger row */}
         <Reveal>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
-            {kpis.map((k, i) => (
+            {kpis.map((k) => (
               <motion.div
                 key={k.no}
                 whileHover={{ y: -6, scale: 1.02, boxShadow: "0 15px 35px rgba(0,0,0,0.25)" }}
@@ -344,12 +439,12 @@ export default function SchemeDashboard() {
                 <div>
                   <div className="flex justify-between mb-2">
                     <span style={{ fontFamily: SANS, fontSize: 12, color: C.muted }}>Disbursed / Allocated</span>
-                    <span style={{ fontFamily: MONO, fontSize: 12, color: C.teal }}>0.0%</span>
+                    <span style={{ fontFamily: MONO, fontSize: 12, color: C.teal }}>{disbursedPct.toFixed(1)}%</span>
                   </div>
                   <div style={{ height: 8, borderRadius: 4, background: C.hair, overflow: "hidden" }}>
                     <motion.div
                       initial={{ width: 0 }}
-                      whileInView={{ width: "0%" }}
+                      whileInView={{ width: `${disbursedPct}%` }}
                       viewport={{ once: true }}
                       transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
                       style={{ height: "100%", background: C.teal }}
@@ -500,19 +595,21 @@ export default function SchemeDashboard() {
               <Panel>
                 <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 8 }}>Pending applications</div>
                 <div style={{ fontFamily: MONO, fontSize: 30, color: C.gold, fontWeight: 600 }}>
-                  <AnimatedNumber value={0} />
+                  <AnimatedNumber value={pendingCount} />
                 </div>
               </Panel>
               <Panel>
+                {/* TODO: awaitingDisbursement needs GET /api/v1/dashboard/queue (status=APPROVED) */}
                 <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 8 }}>Awaiting disbursement</div>
                 <div style={{ fontFamily: MONO, fontSize: 30, color: C.slate, fontWeight: 600 }}>
-                  <AnimatedNumber value={0} />
+                  <AnimatedNumber value={awaitingDisbursement} />
                 </div>
               </Panel>
               <Panel>
+                {/* TODO: flaggedCount needs GET /api/v1/dashboard/flags */}
                 <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 8 }}>Flagged cases</div>
                 <div style={{ fontFamily: MONO, fontSize: 30, color: C.brick, fontWeight: 600 }}>
-                  <AnimatedNumber value={0} />
+                  <AnimatedNumber value={flaggedCount} />
                 </div>
               </Panel>
             </div>
@@ -567,12 +664,14 @@ export default function SchemeDashboard() {
             <Panel className="flex items-center gap-5">
               <div className="flex items-center gap-5">
                 <ResponsiveContainer width={90} height={90}>
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={7} data={[{ value: 0, fill: C.teal }]} startAngle={90} endAngle={-270}>
+                  <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={7} data={[{ value: approvalRate, fill: C.teal }]} startAngle={90} endAngle={-270}>
                     <RadialBar dataKey="value" cornerRadius={4} background={{ fill: C.hair }} />
                   </RadialBarChart>
                 </ResponsiveContainer>
                 <div>
-                  <div style={{ fontFamily: MONO, fontSize: 22, color: C.teal, fontWeight: 600 }}>0%</div>
+                  <div style={{ fontFamily: MONO, fontSize: 22, color: C.teal, fontWeight: 600 }}>
+                    <AnimatedNumber value={approvalRate} suffix="%" />
+                  </div>
                   <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted }}>Approval rate</div>
                 </div>
               </div>
@@ -580,16 +679,22 @@ export default function SchemeDashboard() {
           </Reveal>
 
           <Reveal delay={0.1}>
+            {/* TODO: avgApprovalDays needs GET /api/v1/dashboard/avg-processing-time */}
             <Panel>
               <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 8 }}>Avg. application &rarr; approval</div>
-              <div style={{ fontFamily: MONO, fontSize: 28, color: C.text, fontWeight: 600 }}>0 <span style={{ fontSize: 14, color: C.faint }}>days</span></div>
+              <div style={{ fontFamily: MONO, fontSize: 28, color: C.text, fontWeight: 600 }}>
+                <AnimatedNumber value={avgApprovalDays} /> <span style={{ fontSize: 14, color: C.faint }}>days</span>
+              </div>
             </Panel>
           </Reveal>
 
           <Reveal delay={0.15}>
+            {/* TODO: avgDisbursementDays needs GET /api/v1/dashboard/avg-processing-time */}
             <Panel>
               <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 8 }}>Avg. approval &rarr; disbursement</div>
-              <div style={{ fontFamily: MONO, fontSize: 28, color: C.text, fontWeight: 600 }}>0 <span style={{ fontSize: 14, color: C.faint }}>days</span></div>
+              <div style={{ fontFamily: MONO, fontSize: 28, color: C.text, fontWeight: 600 }}>
+                <AnimatedNumber value={avgDisbursementDays} /> <span style={{ fontSize: 14, color: C.faint }}>days</span>
+              </div>
             </Panel>
           </Reveal>
 
@@ -617,13 +722,16 @@ export default function SchemeDashboard() {
           </Reveal>
 
           <Reveal delay={0.15}>
+            {/* TODO: missingDocsPct needs GET /api/v1/dashboard/document-issues */}
             <Panel>
               <div style={{ fontFamily: SANS, fontSize: 12, color: C.muted, marginBottom: 10 }}>Applications with missing docs</div>
-              <div style={{ fontFamily: MONO, fontSize: 26, color: C.brick, fontWeight: 600, marginBottom: 10 }}>0%</div>
+              <div style={{ fontFamily: MONO, fontSize: 26, color: C.brick, fontWeight: 600, marginBottom: 10 }}>
+                <AnimatedNumber value={missingDocsPct} suffix="%" />
+              </div>
               <div style={{ height: 6, borderRadius: 3, background: C.hair, overflow: "hidden" }}>
                 <motion.div
                   initial={{ width: 0 }}
-                  whileInView={{ width: "0%" }}
+                  whileInView={{ width: `${missingDocsPct}%` }}
                   viewport={{ once: true }}
                   transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
                   style={{ height: "100%", background: C.brick }}
@@ -636,13 +744,15 @@ export default function SchemeDashboard() {
         {/* Footer */}
         <div className="pt-6 flex justify-between items-center" style={{ borderTop: `1px solid ${C.hair}` }}>
           <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, letterSpacing: "0.08em" }}>
-            REGISTER SNAPSHOT &middot; STATIC DEMO DATA
+            REGISTER SNAPSHOT &middot; LIVE DATA
           </span>
           <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, letterSpacing: "0.08em" }}>
             PAGE 01 / 01
           </span>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
+

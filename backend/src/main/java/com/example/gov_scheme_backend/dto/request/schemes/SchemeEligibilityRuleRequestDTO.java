@@ -16,4 +16,6 @@ public class SchemeEligibilityRuleRequestDTO {
     private String expectedValue;
 
     private Integer points;
+
+    private Double partialPercentage;
 }

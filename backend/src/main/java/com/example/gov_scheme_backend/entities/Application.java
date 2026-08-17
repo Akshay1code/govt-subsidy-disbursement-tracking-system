@@ -1,6 +1,7 @@
 package com.example.gov_scheme_backend.entities;
 
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
+import com.example.gov_scheme_backend.enums.ReviewStage;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -62,4 +63,8 @@ public class Application {
             orphanRemoval = true
     )
     private List<ApplicationDocument> documents;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stage", length = 20)
+    private ReviewStage stage = ReviewStage.FIELD;
 }

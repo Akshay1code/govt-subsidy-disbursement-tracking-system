@@ -31,6 +31,14 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
         return rule.getTolerance() == null ? 0.0 : rule.getTolerance();
     }
 
+    private static double safePartialMultiplier(SchemeEligibilityRule rule) {
+        double percentage = rule.getPartialPercentage() == null ? 0.0 : rule.getPartialPercentage();
+        if (percentage <= 0) {
+            return 0.0;
+        }
+        return percentage > 1 ? percentage / 100.0 : percentage;
+    }
+
     private static Double parseDoubleSafely(String value) {
         if (value == null) {
             return null;
@@ -68,16 +76,18 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                 continue;
             }
 
-            boolean matched = false;
-
             switch (rule.getOperator()) {
 
                 case EQUALS:
-                    matched = userValue.equalsIgnoreCase(rule.getRuleValue());
+                    if (userValue.equalsIgnoreCase(rule.getRuleValue())) {
+                        score += rule.getPoints();
+                    }
                     break;
 
                 case NOT_EQUALS:
-                    matched = !userValue.equalsIgnoreCase(rule.getRuleValue());
+                    if (!userValue.equalsIgnoreCase(rule.getRuleValue())) {
+                        score += rule.getPoints();
+                    }
                     break;
 
                 case GREATER_THAN: {
@@ -94,7 +104,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                         score += rule.getPoints();
                     }
                     else if ((expected - user) <= safeTolerance(rule)) {
-                        score += rule.getPoints() * rule.getPartialPercentage();
+                        score += rule.getPoints() * safePartialMultiplier(rule);
                     }
 
                     break;
@@ -114,7 +124,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                         score += rule.getPoints();
                     }
                     else if ((expected - user) <= safeTolerance(rule)) {
-                        score += rule.getPoints() * rule.getPartialPercentage();
+                        score += rule.getPoints() * safePartialMultiplier(rule);
                     }
 
                     break;
@@ -134,7 +144,7 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                         score += rule.getPoints();
                     }
                     else if ((user - expected) <= safeTolerance(rule)) {
-                        score += rule.getPoints() * rule.getPartialPercentage();
+                        score += rule.getPoints() * safePartialMultiplier(rule);
                     }
 
                     break;
@@ -154,14 +164,11 @@ public class EligibilityEngineServiceImpl implements EligibilityEngineService {
                         score += rule.getPoints();
                     }
                     else if ((user - expected) <= safeTolerance(rule)) {
-                        score += rule.getPoints() * rule.getPartialPercentage();
+                        score += rule.getPoints() * safePartialMultiplier(rule);
                     }
 
                     break;
                 }
-            }
-            if (matched) {
-                score += rule.getPoints();
             }
         }
         return score;
