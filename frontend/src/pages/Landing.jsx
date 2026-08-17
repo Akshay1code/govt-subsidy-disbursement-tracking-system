@@ -21,8 +21,8 @@ const COPY = {
     titleAccent: 'Subsidy',
     subtitle:
       'Apply for schemes, become a verified beneficiary, and track every fund movement through a transparent, professional public-service workflow.',
-    primary: 'Proceed to Login',
-    secondary: 'Send a Query',
+    primary: 'Get Started',
+    secondary: 'Browse Schemes',
     servicesTitle: 'What This Portal Offers',
     servicesIntro:
       'A clean civic-tech experience that helps citizens apply, verify, and monitor their subsidy journey without confusion.',
@@ -62,8 +62,8 @@ const COPY = {
     titleAccent: 'Subsidy',
     subtitle:
       'योजनाओं के लिए आवेदन करें, सत्यापित लाभार्थी बनें, और हर धन प्रवाह को पारदर्शी, पेशेवर सार्वजनिक सेवा प्रक्रिया में ट्रैक करें।',
-    primary: 'Login',
-    secondary: 'प्रश्न भेजें',
+    primary: 'शुरू करें',
+    secondary: 'योजनाएँ देखें',
     servicesTitle: 'यह पोर्टल क्या प्रदान करता है',
     servicesIntro:
       'एक स्वच्छ सार्वजनिक-सेवा अनुभव जो नागरिकों को बिना उलझन के आवेदन, सत्यापन और ट्रैकिंग में मदद करता है।',
@@ -103,8 +103,8 @@ const COPY = {
     titleAccent: 'Subsidy',
     subtitle:
       'योजनांसाठी अर्ज करा, पात्र लाभार्थी बना, आणि प्रत्येक निधी प्रवाह पारदर्शक, व्यावसायिक सार्वजनिक सेवेच्या प्रक्रियेत ट्रॅक करा.',
-    primary: 'Login',
-    secondary: 'प्रश्न पाठवा',
+    primary: 'सुरु करा',
+    secondary: 'योजना पहा',
     servicesTitle: 'हे पोर्टल काय देते',
     servicesIntro:
       'नागरिकांना अर्ज, पडताळणी आणि ट्रॅकिंगमध्ये मदत करणारा स्वच्छ सार्वजनिक-सेवा अनुभव.',
@@ -144,8 +144,8 @@ const COPY = {
     titleAccent: 'Subsidy',
     subtitle:
       'പദ്ധതികൾക്ക് അപേക്ഷിച്ച് അംഗീകൃത ഗുണഭോക്താവാകുക, ഓരോ ഫണ്ട് നീക്കവും സുതാര്യമായ ഒരു പൊതുസേവന പ്രവാഹത്തിൽ പിന്തുടരുക.',
-    primary: 'Login',
-    secondary: 'ചോദ്യം അയയ്ക്കുക',
+    primary: 'തുടങ്ങുക',
+    secondary: 'പദ്ധതികൾ കാണുക',
     servicesTitle: 'ഈ പോർട്ടൽ നൽകുന്നത്',
     servicesIntro:
       'നാഗരികർക്കു അപേക്ഷ, സ്ഥിരീകരണം, ട്രാക്കിംഗ് എന്നിവയിൽ സഹായിക്കുന്ന ശുദ്ധമായ പൊതുസേവന അനുഭവം.',
@@ -185,8 +185,8 @@ const COPY = {
     titleAccent: 'Subsidy',
     subtitle:
       'திட்டங்களுக்கு விண்ணப்பித்து, உறுதிப்படுத்தப்பட்ட பயனாளராகி, ஒவ்வொரு நிதி நகர்வையும் வெளிப்படையான, தொழில்முறை பொதுச் சேவை செயல்பாட்டில் கண்காணிக்கவும்.',
-    primary: 'Login',
-    secondary: 'கேள்வி அனுப்பவும்',
+    primary: 'தொடங்கவும்',
+    secondary: 'திட்டங்களை பார்க்க',
     servicesTitle: 'இந்த போர்டல் வழங்குவது',
     servicesIntro:
       'மக்கள் விண்ணப்பம், சரிபார்ப்பு மற்றும் கண்காணிப்பை எளிதாக செய்ய உதவும் சுத்தமான பொதுச் சேவை அனுபவம்.',
@@ -237,67 +237,12 @@ const itemVariants = {
 
 function useStoredLanguage() {
   const [language, setLanguage] = useState('en')
-  const [showLanguageModal, setShowLanguageModal] = useState(true)
 
   const selectLanguage = (code) => {
     setLanguage(code)
-    setShowLanguageModal(false)
   }
 
-  return { language, showLanguageModal, setShowLanguageModal, selectLanguage }
-}
-
-function LanguageModal({ open, selected, onSelect, onClose, copy }) {
-  return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          className="language-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="language-title"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.button
-            type="button"
-            className="language-modal__backdrop"
-            onClick={onClose}
-            aria-label="Close language chooser"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-          <motion.div
-            className="language-modal__panel"
-            initial={{ opacity: 0, y: 28, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-          >
-            <p className="eyebrow">{copy.languagePrompt}</p>
-            <h2 id="language-title">Choose your language</h2>
-            <p className="modal-copy">{copy.languageHint}</p>
-
-            <div className="language-grid">
-              {LANGUAGES.map((language) => (
-                <button
-                  key={language.code}
-                  type="button"
-                  className={`language-chip ${selected === language.code ? 'active' : ''}`}
-                  onClick={() => onSelect(language.code)}
-                >
-                  <span>{language.native}</span>
-                  <small>{language.label}</small>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  )
+  return { language, selectLanguage }
 }
 
 function AnimatedWords({ text, accentWord, className = '' }) {
@@ -481,12 +426,13 @@ function Landing() {
   const { scrollYProgress } = useScroll()
   const backdropOpacity = useTransform(scrollYProgress, [0, 0.4], [0, 1])
   const heroY = useTransform(scrollYProgress, [0, 1], [0, -18])
-  const { language, showLanguageModal, setShowLanguageModal, selectLanguage } = useStoredLanguage()
+  const { language, selectLanguage } = useStoredLanguage()
   const copy = useMemo(() => COPY[language] ?? COPY.en, [language])
   const selectedLanguage = LANGUAGES.find((item) => item.code === language) ?? LANGUAGES[0]
 
   // Query Form State
   const [queryForm, setQueryForm] = useState({ name: '', phone: '', email: '', subject: '', message: '' })
+  const [queryToast, setQueryToast] = useState(null)
   const [submittedTicket, setSubmittedTicket] = useState(null)
 
   function handleQueryChange(e) {
@@ -522,27 +468,28 @@ function Landing() {
     return () => document.body.classList.remove('landing-active')
   }, [])
 
-  useEffect(() => {
-    document.body.style.overflow = showLanguageModal ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [showLanguageModal])
 
   const motionViewport = reduceMotion ? { once: true, amount: 0.01 } : { once: false, amount: 0.24 }
 
   return (
     <main className="landing-shell">
-      <LanguageModal
-        open={showLanguageModal}
-        selected={language}
-        onSelect={selectLanguage}
-        onClose={() => setShowLanguageModal(false)}
-        copy={copy}
-      />
 
       <div className="landing-backdrop" aria-hidden="true" />
       <motion.div className="landing-backdrop--blurred" aria-hidden="true" style={{ opacity: backdropOpacity }} />
+
+      <AnimatePresence>
+        {queryToast && (
+          <motion.div
+            className={`toast toast--${queryToast.type}`}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            style={{ position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 1200 }}
+          >
+            {queryToast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <header className="topbar">
         <div className="topbar__brand">
@@ -563,12 +510,6 @@ function Landing() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <LanguageDropdown selectedLanguage={selectedLanguage} selectLanguage={selectLanguage} />
-          <Link to="/officer/register" className="button button--ghost" style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', borderColor: 'rgba(217, 130, 43, 0.4)', color: '#ffc76a' }}>
-            Officer Register
-          </Link>
-          <Link to="/admin/dashboard" className="button button--ghost" style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', borderColor: 'rgba(130, 174, 202, 0.4)', color: '#82aeca' }}>
-            Admin Center
-          </Link>
         </div>
       </header>
 
@@ -596,18 +537,10 @@ function Landing() {
                 </Link>
               </motion.div>
               <motion.div whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                <Link className="button button--ghost" to="/register" style={{ borderColor: 'rgba(142, 214, 106, 0.4)', color: '#8ed66a' }}>
-                  Register Beneficiary
-                </Link>
+                <a className="button button--ghost" href="#schemes" style={{ borderColor: 'rgba(15, 23, 42, 0.2)', color: '#0F172A' }}>
+                  {copy.secondary}
+                </a>
               </motion.div>
-              <motion.div whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                <Link className="button button--ghost" to="/officer/register" style={{ borderColor: 'rgba(217, 130, 43, 0.5)', color: '#ffc76a' }}>
-                  Officer Registration
-                </Link>
-              </motion.div>
-              <motion.a className="button button--ghost" href="#queries" whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }}>
-                {copy.secondary}
-              </motion.a>
             </div>
           </motion.div>
         </div>

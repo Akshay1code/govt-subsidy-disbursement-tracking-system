@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { login as apiLogin } from '../../services/authService'
+import { clearPortalSessionCaches } from '../../services/sessionCleanup'
 import logo from '../../assets/icons/logo.png'
 
 function EyeIcon({ open }) {
@@ -48,6 +49,7 @@ export default function Login() {
       const result = await apiLogin({ username: form.identifier.trim(), password: form.password })
 
       if (result.status) {
+        clearPortalSessionCaches()
         // Fetch profile to determine role-based redirect
         try {
           const { default: api } = await import('../../services/api')
@@ -58,21 +60,23 @@ export default function Login() {
 
           if (role === 'ADMIN') {
             navigate('/admin/dashboard')
+          } else if (role === 'FINANCE_OFFICER') {
+            navigate('/finance')
           } else if (role?.includes('OFFICER')) {
             navigate('/officer/dashboard')
           } else {
-            navigate('/dashboard')
+            navigate('/dashboard', { state: { fromLogin: true } })
           }
         } catch {
           // Fallback: go to beneficiary dashboard if profile fetch fails
-          navigate('/dashboard')
+          navigate('/dashboard', { state: { fromLogin: true } })
         }
       } else {
-        setError(result.message || 'Invalid credentials. Please try again.')
+        setError(result.message || 'Incorrect credentials. Please check and try again.')
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError(err.message || 'Invalid username or password.')
+      setError('Unable to connect. Please check your internet connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -101,28 +105,12 @@ export default function Login() {
             <p>Login as a citizen, officer, or administrator to access the government subsidy portal.</p>
           </div>
 
-          {/* Role Info Badges */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-            {[
-              { label: 'Beneficiary', color: '#16a34a', icon: '👤' },
-              { label: 'Officer',     color: '#0284c7', icon: '👮' },
-              { label: 'Admin',       color: '#ea580c', icon: '🛡️' },
-            ].map(r => (
-              <span key={r.label} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem',
-                borderRadius: '99px', background: `${r.color}12`,
-                border: `1px solid ${r.color}30`, color: r.color
-              }}>
-                {r.icon} {r.label}
-              </span>
-            ))}
-          </div>
+
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             {/* Username/ID */}
             <div className="login-form__field">
-              <label htmlFor="identifier">Username / Admin ID</label>
+              <label htmlFor="identifier">Username</label>
               <div className="login-form__input-wrap">
                 <svg className="login-form__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
@@ -132,7 +120,7 @@ export default function Login() {
                   id="identifier"
                   name="identifier"
                   type="text"
-                  placeholder="Enter your username"
+                  placeholder="Enter your details"
                   autoComplete="username"
                   value={form.identifier}
                   onChange={handleChange}

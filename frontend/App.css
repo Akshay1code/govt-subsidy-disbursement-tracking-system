@@ -94,7 +94,11 @@ img {
   min-height: 100vh;
   overflow: hidden;
   padding: 1rem 1rem 2rem;
-  background: #07130f;
+  background:
+    radial-gradient(ellipse at 14% 14%, rgba(187, 247, 208, 0.42) 0%, transparent 44%),
+    radial-gradient(ellipse at 86% 18%, rgba(254, 240, 138, 0.34) 0%, transparent 42%),
+    radial-gradient(ellipse at 52% 88%, rgba(236, 253, 245, 0.72) 0%, transparent 50%),
+    linear-gradient(135deg, #f7fdf4 0%, #fff9db 48%, #eefbf3 100%);
 }
 
 .landing-backdrop {
@@ -102,10 +106,11 @@ img {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(7, 19, 15, 0.2) 0%, rgba(7, 19, 15, 0.1) 45%, rgba(7, 19, 15, 0.4) 100%),
-    linear-gradient(90deg, rgba(4, 12, 10, 0.4) 0%, rgba(4, 12, 10, 0.2) 38%, rgba(4, 12, 10, 0.02) 100%),
-    url('/farm-hero.png') center center / cover no-repeat;
-  filter: saturate(1.18) contrast(1.06);
+    linear-gradient(135deg, rgba(247, 253, 244, 0.55) 0%, rgba(255, 249, 219, 0.26) 52%, rgba(238, 251, 243, 0.12) 100%),
+    radial-gradient(ellipse at 18% 46%, rgba(134, 239, 172, 0.38) 0%, transparent 52%),
+    radial-gradient(ellipse at 82% 20%, rgba(254, 240, 138, 0.44) 0%, transparent 48%),
+    radial-gradient(ellipse at 58% 82%, rgba(187, 247, 208, 0.26) 0%, transparent 46%);
+  filter: saturate(1.08) contrast(1.02);
 }
 
 .landing-backdrop--blurred {
@@ -113,10 +118,11 @@ img {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(7, 19, 15, 0.2) 0%, rgba(7, 19, 15, 0.1) 45%, rgba(7, 19, 15, 0.4) 100%),
-    linear-gradient(90deg, rgba(4, 12, 10, 0.4) 0%, rgba(4, 12, 10, 0.2) 38%, rgba(4, 12, 10, 0.02) 100%),
-    url('/farm-hero.png') center center / cover no-repeat;
-  filter: saturate(1.18) contrast(1.06) blur(12px);
+    linear-gradient(135deg, rgba(247, 253, 244, 0.55) 0%, rgba(255, 249, 219, 0.26) 52%, rgba(238, 251, 243, 0.12) 100%),
+    radial-gradient(ellipse at 18% 46%, rgba(134, 239, 172, 0.38) 0%, transparent 52%),
+    radial-gradient(ellipse at 82% 20%, rgba(254, 240, 138, 0.44) 0%, transparent 48%),
+    radial-gradient(ellipse at 58% 82%, rgba(187, 247, 208, 0.26) 0%, transparent 46%);
+  filter: saturate(1.08) contrast(1.02) blur(12px);
   will-change: opacity;
 }
 
@@ -129,9 +135,9 @@ img {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(120deg, rgba(7, 19, 15, 0.3) 0%, rgba(7, 19, 15, 0.15) 42%, rgba(7, 19, 15, 0.01) 100%),
-    radial-gradient(circle at 18% 26%, rgba(255, 199, 106, 0.05), transparent 26%),
-    radial-gradient(circle at 82% 30%, rgba(130, 174, 202, 0.04), transparent 22%);
+    linear-gradient(120deg, rgba(247, 253, 244, 0.4) 0%, rgba(255, 249, 219, 0.18) 42%, rgba(238, 251, 243, 0.06) 100%),
+    radial-gradient(circle at 18% 26%, rgba(255, 199, 106, 0.12), transparent 26%),
+    radial-gradient(circle at 82% 30%, rgba(130, 174, 202, 0.06), transparent 22%);
 }
 
 .topbar {
@@ -142,13 +148,13 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  width: min(1220px, 100%);
+  width: min(1600px, 100%);
   margin: 0 auto 1rem;
   padding: 0.9rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: rgba(7, 19, 15, 0.66);
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.24);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 42px rgba(47, 79, 49, 0.12);
   backdrop-filter: blur(18px);
 }
 
@@ -178,7 +184,7 @@ img {
 }
 
 .topbar__brand span {
-  color: var(--muted);
+  color: #475569;
   font-size: 0.74rem;
 }
 
@@ -192,7 +198,7 @@ img {
 
 .topbar__nav a {
   position: relative;
-  color: rgba(246, 242, 234, 0.86);
+  color: #0f172a;
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -227,10 +233,10 @@ img {
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.9rem 0.55rem 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #d7e5d1;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -239,8 +245,8 @@ img {
 }
 
 .language-dropdown__btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(249, 252, 242, 0.98);
+  border-color: #bfd5b4;
 }
 
 .language-dropdown__btn .chevron {
@@ -259,12 +265,12 @@ img {
   top: calc(100% + 0.6rem);
   right: 0;
   min-width: 150px;
-  background: rgba(7, 19, 15, 0.9);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #d7e5d1;
   border-radius: 14px;
   padding: 0.4rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 32px rgba(47, 79, 49, 0.14);
   list-style: none;
   margin: 0;
   z-index: 50;
@@ -279,7 +285,7 @@ img {
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-soft);
+  color: #334155;
   border: none;
   font-size: 0.9rem;
   cursor: pointer;
@@ -288,19 +294,19 @@ img {
 
 .language-dropdown__menu button:hover,
 .language-dropdown__menu button:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  background: rgba(245, 250, 240, 0.98);
+  color: #0f172a;
 }
 
 .language-dropdown__menu button.active {
-  background: rgba(255, 199, 106, 0.12);
-  color: var(--accent-strong);
+  background: rgba(255, 248, 201, 0.65);
+  color: #b45309;
   font-weight: 700;
 }
 
 .hero,
 .section {
-  width: min(1220px, 100%);
+  width: min(1600px, 100%);
   margin: 0 auto;
 }
 
@@ -321,10 +327,10 @@ img {
   width: min(1080px, 100%);
   padding: 2.5rem 2rem;
   border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: radial-gradient(120% 120% at 50% 0%, rgba(255, 199, 106, 0.04) 0%, rgba(12, 27, 18, 0.4) 30%, rgba(8, 19, 15, 0.1) 100%);
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 252, 242, 0.96) 100%);
   backdrop-filter: blur(6px);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(47, 79, 49, 0.08);
 }
 
 .hero__copy {
@@ -348,7 +354,7 @@ img {
 .section__heading h2,
 .language-modal__panel h2 {
   margin: 0;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   letter-spacing: -0.04em;
 }
 
@@ -356,7 +362,7 @@ img {
   max-width: 20ch;
   font-size: clamp(3rem, 5.8vw, 5.8rem);
   line-height: 0.94;
-  text-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+  text-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
   text-align: center;
 }
 
@@ -379,7 +385,7 @@ img {
 
 .animated-letter {
   display: inline-block;
-  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
 }
 
 .hero__subtitle,
@@ -479,12 +485,10 @@ img {
 .feature-card {
   min-height: 100%;
   padding: 1.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #e2e8f0;
   border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(13, 29, 19, 0.9), rgba(15, 25, 18, 0.78)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(250, 252, 243, 0.98) 100%);
+  box-shadow: 0 4px 12px rgba(47, 79, 49, 0.08);
   backdrop-filter: blur(14px);
 }
 
@@ -512,9 +516,9 @@ img {
 .process-panel,
 .query-card {
   padding: 1.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #e2e8f0;
   border-radius: 28px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 30px rgba(47, 79, 49, 0.08);
   backdrop-filter: blur(16px);
 }
 
@@ -523,20 +527,18 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 1.25rem;
-  background: linear-gradient(180deg, rgba(12, 27, 18, 0.88), rgba(12, 22, 17, 0.76));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 251, 240, 0.95) 100%);
 }
 
 .process-panel {
-  background: linear-gradient(180deg, rgba(12, 27, 18, 0.92), rgba(15, 25, 18, 0.84));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 251, 240, 0.95) 100%);
 }
 
 .query-card {
   max-width: 720px;
   margin: 0 auto;
   padding: 2rem 2.5rem;
-  background:
-    linear-gradient(180deg, rgba(14, 32, 24, 0.94), rgba(8, 19, 15, 0.94)),
-    rgba(130, 174, 202, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 251, 240, 0.95) 100%);
 }
 
 .query-form-wrap {
@@ -617,7 +619,7 @@ img {
 }
 
 .footer {
-  width: min(1220px, 100%);
+  width: min(1600px, 100%);
   margin: 1.25rem auto 0;
   padding: 0 0.25rem 1rem;
   text-align: center;
@@ -797,7 +799,7 @@ img {
   display: flex;
   flex-direction: column;
   padding: 1.5rem 2.5rem;
-  background: linear-gradient(160deg, #eaf3ea 0%, #fdf5d6 100%);
+  background: linear-gradient(160deg, #f7fdf4 0%, #fff9db 48%, #eefbf3 100%);
   color: var(--text);
   overflow: hidden;
 }
@@ -836,7 +838,7 @@ img {
 
 .login-page__copy h1 {
   margin: 0 0 0.25rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: clamp(1.6rem, 3vw, 2.2rem);
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -883,7 +885,7 @@ img {
 
 .login-form__input-wrap:focus-within {
   border-color: #f5c842;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.15);
 }
 
@@ -951,7 +953,7 @@ img {
 
 .role-chip.active {
   border-color: #f5c842;
-  background: #fdf5d3;
+  background: linear-gradient(180deg, rgba(255, 248, 201, 0.82), rgba(240, 251, 232, 0.95));
   color: #9c6c00;
   font-weight: 700;
 }
@@ -1006,18 +1008,18 @@ img {
   padding: 0.95rem;
   border-radius: 14px;
   border: none;
-  background: linear-gradient(135deg, #e6a020, #c47d10);
+  background: linear-gradient(135deg, #16a34a, #84cc16);
   color: #0d1a0e;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   cursor: pointer;
   transition: opacity 160ms ease, box-shadow 160ms ease;
-  box-shadow: 0 8px 28px rgba(200, 130, 20, 0.35);
+  box-shadow: 0 8px 28px rgba(22, 163, 74, 0.22);
 }
 
 .login-form__submit:hover {
-  box-shadow: 0 12px 36px rgba(200, 130, 20, 0.5);
+  box-shadow: 0 12px 36px rgba(22, 163, 74, 0.3);
 }
 
 .login-form__submit:disabled {
@@ -1067,7 +1069,54 @@ img {
 .login-page__right-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(4, 14, 10, 0.35) 0%, rgba(4, 14, 10, 0.15) 100%);
+  background:
+    linear-gradient(135deg, rgba(220, 252, 231, 0.22) 0%, rgba(254, 240, 138, 0.14) 50%, rgba(255, 255, 255, 0.08) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(8, 18, 12, 0.08) 100%);
+}
+
+@media (max-width: 640px) {
+  .login-page__left {
+    padding: 1rem !important;
+  }
+
+  .login-page__form-area {
+    max-width: 100% !important;
+    padding: 1.1rem !important;
+    border-radius: 14px;
+    box-sizing: border-box;
+  }
+
+  .login-page__copy h1,
+  .login-page__copy h2 {
+    font-size: clamp(1.35rem, 6vw, 1.7rem) !important;
+  }
+
+  .login-page__copy p {
+    font-size: 0.84rem !important;
+  }
+
+  .form-group-row,
+  .login-form__role-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .login-form__field > label {
+    font-size: 0.76rem !important;
+  }
+
+  .login-form__input-wrap {
+    padding: 0.7rem 0.85rem !important;
+  }
+
+  .login-form__input-wrap input,
+  .login-form__input-wrap select {
+    font-size: 0.9rem !important;
+  }
+
+  .login-form__submit {
+    font-size: 1rem !important;
+    padding: 0.9rem 1rem !important;
+  }
 }
 
 /* ── Control buttons (X and edit) ── */
@@ -1297,6 +1346,8 @@ img {
   background: var(--bg);
   color: var(--text);
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar__user-info {
@@ -1347,8 +1398,23 @@ img {
 }
 
 .dashboard-main {
-  width: min(1220px, 100%);
+  width: min(1600px, 100%);
   margin: 1.5rem auto 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.tab-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-tabs {
@@ -1398,13 +1464,63 @@ img {
   font-weight: 800;
 }
 
+/* ── Admin Dashboard Layout ─────────────────────────────── */
+/* Admin-specific layout: horizontal scrollable tabs + full-width content */
+.admin-main {
+  width: min(1600px, 100%);
+  margin: 1.5rem auto 0;
+  padding: 0 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  scroll-margin-top: 1rem;
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.8rem;
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  transition: all 180ms ease;
+  white-space: nowrap;
+}
+
+.admin-tab:hover {
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-tab.active {
+  color: var(--accent-strong);
+  background: rgba(255, 199, 106, 0.05);
+  border-bottom: 2px solid var(--accent-strong);
+}
+
+
 .pane-header {
   margin-bottom: 2rem;
 }
 
 .pane-header h2 {
   margin: 0 0 0.4rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 2.1rem;
   letter-spacing: -0.02em;
 }
@@ -1570,7 +1686,7 @@ img {
 .scheme-card h3 {
   margin: 0 0 0.6rem;
   font-size: 1.28rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
 }
 
 .scheme-card__desc {
@@ -1679,7 +1795,7 @@ img {
 }
 
 .tracking-empty-card h3 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.45rem;
   margin: 0 0 0.5rem;
 }
@@ -1743,7 +1859,7 @@ img {
 
 .section-title {
   margin: 1rem 0 0.5rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.35rem;
 }
 
@@ -1767,7 +1883,7 @@ img {
 .tracking-card__header h4 {
   margin: 0;
   font-size: 1.22rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
 }
 
 .tracking-badge {
@@ -1954,7 +2070,7 @@ img {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 .profile-sidebar {
@@ -1990,7 +2106,7 @@ img {
 
 .profile-avatar-card h3 {
   margin: 0 0 0.2rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.35rem;
 }
 
@@ -2058,7 +2174,7 @@ img {
 
 .card-title-bar h3 {
   margin: 0;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.35rem;
 }
 
@@ -2195,7 +2311,7 @@ img {
 
 .modal-panel h3 {
   margin: 0 0 0.8rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.5rem;
 }
 
@@ -2274,7 +2390,7 @@ img {
 }
 
 .scheme-main {
-  width: min(1220px, 100%);
+  width: min(1600px, 100%);
   margin: 1.5rem auto 0;
 }
 
@@ -2294,7 +2410,7 @@ img {
 
 .scheme-title {
   margin: 0.75rem 0 1rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 2.65rem;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -2308,7 +2424,7 @@ img {
 }
 
 .section-subtitle-detail {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.45rem;
   margin: 2rem 0 0.8rem;
 }
@@ -2349,7 +2465,7 @@ img {
 }
 
 .detail-section-block h3 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.45rem;
   margin: 0 0 0.6rem;
 }
@@ -2440,7 +2556,7 @@ img {
 
 .gate-card h3 {
   margin: 0 0 0.8rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.35rem;
 }
 
@@ -2536,7 +2652,7 @@ img {
 
 .form-header-bar h2 {
   margin: 0 0 0.25rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 2.1rem;
 }
 
@@ -2559,7 +2675,7 @@ img {
 .form-column-inputs h3,
 .form-column-scanner h3 {
   margin: 0 0 0.25rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
   font-size: 1.38rem;
 }
 
@@ -2768,7 +2884,7 @@ img {
 .diagnostic-results-panel h4 {
   margin: 0 0 0.75rem;
   font-size: 0.9rem;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: inherit;
 }
 
 .metrics-grid {
@@ -2910,70 +3026,54 @@ img {
   gap: 1.25rem;
 }
 
-.officer-stat-card {
+.stat-card {
+  padding: 1.6rem;
+  border-radius: 16px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.6rem;
-  border-radius: 22px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-  border-left: 4px solid var(--border);
-  transition: all 200ms ease;
+  gap: 0.35rem;
+  transition: all 220ms ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-.officer-stat-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+.stat-card:hover {
+  transform: translateY(-2px);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
 }
 
-.officer-stat-card__label {
-  font-size: 0.74rem;
+/* Colour-variant accent borders */
+.stat-card--total    { border-left-color: #60a5fa; }
+.stat-card--pending  { border-left-color: #f59e0b; }
+.stat-card--approved { border-left-color: #22c55e; }
+.stat-card--rejected { border-left-color: #ef4444; }
+.stat-card--funds    { border-left-color: #ffc76a; }
+
+.stat-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 700;
+  margin-bottom: 0.25rem;
 }
 
-.officer-stat-card__value {
+.stat-card__value {
   font-size: 2.4rem;
   font-weight: 800;
-  font-family: 'Source Serif 4', Georgia, serif;
   line-height: 1.1;
+  color: var(--text);
 }
 
-.officer-stat-card--total {
-  border-left-color: var(--solar);
-}
-
-.officer-stat-card--total .officer-stat-card__value {
-  color: #a4d3f5;
-}
-
-.officer-stat-card--pending {
-  border-left-color: var(--accent);
-}
-
-.officer-stat-card--pending .officer-stat-card__value {
-  color: #ffb66c;
-}
-
-.officer-stat-card--approved {
-  border-left-color: var(--secondary);
-}
-
-.officer-stat-card--approved .officer-stat-card__value {
-  color: #8ed66a;
-}
-
-.officer-stat-card--rejected {
-  border-left-color: #dc3545;
-}
-
-.officer-stat-card--rejected .officer-stat-card__value {
-  color: #ff6b76;
+.stat-card__desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
 }
 
 .officer-view-btn {
@@ -3157,15 +3257,20 @@ img {
 }
 
 [data-theme="light"] .landing-shell {
-  background: #f4f7f5;
+  background:
+    radial-gradient(ellipse at 14% 14%, rgba(187, 247, 208, 0.42) 0%, transparent 44%),
+    radial-gradient(ellipse at 86% 18%, rgba(254, 240, 138, 0.34) 0%, transparent 42%),
+    radial-gradient(ellipse at 52% 88%, rgba(236, 253, 245, 0.72) 0%, transparent 50%),
+    linear-gradient(135deg, #f7fdf4 0%, #fff9db 48%, #eefbf3 100%);
 }
 
 [data-theme="light"] .landing-backdrop {
   background:
-    linear-gradient(180deg, rgba(244, 247, 245, 0.88) 0%, rgba(244, 247, 245, 0.8) 45%, rgba(244, 247, 245, 0.95) 100%),
-    linear-gradient(90deg, rgba(244, 247, 245, 0.9) 0%, rgba(244, 247, 245, 0.75) 38%, rgba(244, 247, 245, 0.5) 100%),
-    url('/farm-hero.png') center center / cover no-repeat;
-  filter: none;
+    linear-gradient(135deg, rgba(247, 253, 244, 0.55) 0%, rgba(255, 249, 219, 0.26) 52%, rgba(238, 251, 243, 0.12) 100%),
+    radial-gradient(ellipse at 18% 46%, rgba(134, 239, 172, 0.38) 0%, transparent 52%),
+    radial-gradient(ellipse at 82% 20%, rgba(254, 240, 138, 0.44) 0%, transparent 48%),
+    radial-gradient(ellipse at 58% 82%, rgba(187, 247, 208, 0.26) 0%, transparent 46%);
+  filter: saturate(1.08) contrast(1.02);
 }
 
 [data-theme="light"] .landing-nav {
@@ -3188,20 +3293,28 @@ img {
 [data-theme="light"] .officer-card,
 [data-theme="light"] .login-page__left,
 [data-theme="light"] .modal-content,
-[data-theme="light"] .stat-card,
 [data-theme="light"] .table-card,
 [data-theme="light"] .admin-card,
 [data-theme="light"] .officer-progress-card,
 [data-theme="light"] .scheme-info-panel,
 [data-theme="light"] .gate-card,
 [data-theme="light"] .tracking-card {
-  background: #ffffff !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(249, 252, 242, 0.98) 100%) !important;
   border: 1px solid rgba(15, 23, 42, 0.1) !important;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06) !important;
 }
 
-[data-theme="light"] .login-page__left {
+/* stat-card light mode — keep colored left border accent */
+[data-theme="light"] .stat-card {
   background: #ffffff !important;
+  border-top: 1px solid rgba(15, 23, 42, 0.1) !important;
+  border-right: 1px solid rgba(15, 23, 42, 0.1) !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.07) !important;
+}
+
+[data-theme="light"] .login-page__left {
+  background: linear-gradient(160deg, #f7fdf4 0%, #fff9db 48%, #eefbf3 100%) !important;
   color: #0f172a !important;
 }
 

@@ -17,6 +17,26 @@ export async function submitApplicationBySchemeCode(schemeCode) {
   return response.data
 }
 
+export async function uploadApplicationDocuments(schemeCode, files, types) {
+  const formData = new FormData()
+
+  files.forEach((file) => {
+    formData.append('files', file)
+  })
+
+  types.forEach((type) => {
+    formData.append('types', type)
+  })
+
+  const response = await api.post(`/gov/applications/upload-documents/${schemeCode}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+
+  return response.data
+}
+
 export async function cancelApplicationById(applicationId) {
   const response = await api.delete(`/gov/applications/${applicationId}`)
   return response.data

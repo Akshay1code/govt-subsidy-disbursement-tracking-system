@@ -1,40 +1,44 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import ThemeToggle from './ThemeToggle'
 import logo from '../assets/icons/logo.png'
 import { FaSignOutAlt, FaUserCircle } from 'react-icons/fa'
 
 /**
- * DashboardTopbar – shared across OfficerDashboard, FinanceDashboard, AdminDashboard
+ * DashboardTopbar - shared across OfficerDashboard, FinanceDashboard, AdminDashboard
  *
  * Props:
- *  - portalName   {string}   subtitle under the logo, e.g. "Officer Portal"
- *  - userName     {string}   display name shown in the user badge
- *  - userRole     {string}   role label shown in brackets
- *  - onLogout     {function} logout handler
- *  - extraActions {ReactNode} optional extra buttons rendered after ThemeToggle
+ *  - brandTitle   {string}   primary logo title
+ *  - brandSubtitle {string}  subtitle under the logo
+ *  - userName     {string}    display name shown in the user badge
+ *  - userRole     {string}    role label shown in brackets
+ *  - onLogout     {function}  logout handler
+ *  - homeLink     {string}    optional back/home link
+ *  - homeLabel    {string}    label for the home link
+ *  - extraActions {ReactNode} optional extra buttons rendered before Logout
  */
 export default function DashboardTopbar({
-  portalName = 'Officer Portal',
+  brandTitle = 'GS Gov Subsidy',
+  brandSubtitle = 'Officer Portal',
   userName = '',
   userRole = '',
   onLogout,
+  homeLink = '/',
+  homeLabel = 'Back to Home',
   extraActions = null,
+  showHomeLink = true,
 }) {
   return (
     <header className="topbar" style={{ background: 'var(--panel-strong)', borderBottom: '1px solid var(--border)' }}>
-      {/* Brand */}
       <div className="topbar__brand">
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
           <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
           <div>
-            <strong style={{ color: 'var(--text)' }}>GS Gov Subsidy</strong>
-            <span style={{ color: 'var(--muted)', display: 'block', fontSize: '0.75rem' }}>{portalName}</span>
+            <strong>{brandTitle}</strong>
+            <span>{brandSubtitle}</span>
           </div>
         </Link>
       </div>
 
-      {/* Right side controls */}
       <div className="topbar__user-info">
         {userName && (
           <span className="user-badge">
@@ -43,7 +47,11 @@ export default function DashboardTopbar({
           </span>
         )}
 
-        <ThemeToggle />
+        {showHomeLink && homeLink && (
+          <Link to={homeLink} className="button button--ghost" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+            {homeLabel}
+          </Link>
+        )}
 
         {extraActions}
 

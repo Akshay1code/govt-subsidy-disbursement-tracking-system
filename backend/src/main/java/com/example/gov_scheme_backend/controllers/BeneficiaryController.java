@@ -30,6 +30,12 @@ public class BeneficiaryController {
         return ResponseEntity.ok(beneficiaryService.getAllBeneficiaries());
     }
 
+    /** Returns the beneficiary row for the currently authenticated user. */
+    @GetMapping("/me")
+    public ResponseEntity<BeneficiaryResponseDTO> getCurrentBeneficiary() {
+        return ResponseEntity.ok(beneficiaryService.getCurrentBeneficiary());
+    }
+
     /** Updates editable beneficiary fields (amounts, dates, remarks). */
     @PutMapping("/{id}")
     public ResponseEntity<BeneficiaryResponseDTO> updateBeneficiary(
