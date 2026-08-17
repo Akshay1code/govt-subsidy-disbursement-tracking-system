@@ -248,7 +248,7 @@ public class SchemeServiceImpl {
             rule.setRuleKey(resolveRuleKey(ruleRequest.getFieldName()));
             rule.setRuleValue(ruleRequest.getExpectedValue());
             rule.setTolerance(0.0);
-            rule.setPartialPercentage(0.0);
+            rule.setPartialPercentage(ruleRequest.getPartialPercentage() == null ? 0.0 : ruleRequest.getPartialPercentage());
             rules.add(rule);
         }
         return rules;
@@ -313,6 +313,7 @@ public class SchemeServiceImpl {
             ruleDto.setOperator(rule.getOperator());
             ruleDto.setExpectedValue(rule.getExpectedValue());
             ruleDto.setPoints(rule.getPoints());
+            ruleDto.setPartialPercentage(rule.getPartialPercentage());
             return ruleDto;
         }).collect(Collectors.toList()));
         dto.setDocuments(scheme.getRequiredDocuments() == null ? List.of() : scheme.getRequiredDocuments().stream().map(document -> {

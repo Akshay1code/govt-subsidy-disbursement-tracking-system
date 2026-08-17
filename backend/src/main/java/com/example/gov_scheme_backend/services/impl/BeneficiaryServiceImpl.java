@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +76,19 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     public BeneficiaryResponseDTO getBeneficiary(Long id) {
         return mapToResponse(getExistingBeneficiary(id));
+    }
+
+    @Override
+    public BeneficiaryResponseDTO getCurrentBeneficiary() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+        if (!StringUtils.hasText(username)) {
+            throw new ResourceNotFoundException("Authenticated beneficiary user not found");
+        }
+
+        Beneficiary beneficiary = beneficiaryRepo.findByUser_Username(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Beneficiary record not found for current user"));
+        return mapToResponse(beneficiary);
     }
 
     @Override

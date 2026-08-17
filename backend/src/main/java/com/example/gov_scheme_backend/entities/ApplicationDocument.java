@@ -40,4 +40,14 @@ public class ApplicationDocument {
     @CreationTimestamp
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
-}
+
+    /**
+     * Cloudinary secure_url for the uploaded document.
+     * Example: https://res.cloudinary.com/<cloud>/image/upload/.../document.pdf
+     *
+     * This is the URL that should be used by the frontend to access/download the document.
+     * The actual file binary is NOT stored in the database.
+     */
+    @Column(name = "document_url", length = 2048)
+    private String documentUrl;
+}

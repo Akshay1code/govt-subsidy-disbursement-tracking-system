@@ -16,7 +16,7 @@ public class DisbursementPlan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
+    @Column(name = "plan_id")
     private Long planId;
 
     @Column(name = "application_id", nullable = false)

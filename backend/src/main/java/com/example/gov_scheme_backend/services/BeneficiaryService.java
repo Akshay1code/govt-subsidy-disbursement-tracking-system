@@ -11,6 +11,8 @@ public interface BeneficiaryService {
 
     BeneficiaryResponseDTO getBeneficiary(Long id);
 
+    BeneficiaryResponseDTO getCurrentBeneficiary();
+
     List<BeneficiaryResponseDTO> getAllBeneficiaries();
 
     BeneficiaryResponseDTO updateBeneficiary(Long id, BeneficiaryRequestDTO request);

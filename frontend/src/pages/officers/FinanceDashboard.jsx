@@ -2,11 +2,12 @@ import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import ThemeToggle from '../../components/ThemeToggle'
-import logo from '../../assets/icons/logo.png'
 import api from '../../services/api'
 import { getMyApplications } from '../../services/officerService'
+import { clearPortalSessionCaches } from '../../services/sessionCleanup'
 import DashboardTopbar from '../../components/DashboardTopbar'
+import ProfilePanel from '../../components/ProfilePanel'
+import { FaUserCircle } from 'react-icons/fa'
 
 const SCHEME_NAMES = {
   'pm-kisan': 'PM-KISAN (Farmers Income Support)',
@@ -77,7 +78,7 @@ export default function FinanceDashboard() {
     try {
       await api.post('/gov/auth/signout')
     } catch { /* ignore */ }
-    sessionStorage.removeItem('gov-subsidy-auth')
+    clearPortalSessionCaches()
     navigate('/login')
   }
 
@@ -135,21 +136,6 @@ export default function FinanceDashboard() {
         return app
       })
       setApplications(nextApps)
-      window.localStorage.setItem('gov-subsidy-officer-applications', JSON.stringify(nextApps))
-
-      // Sync beneficiary's tracking state in localStorage too
-      const storedCitizenApps = window.localStorage.getItem('gov-subsidy-applications')
-      if (storedCitizenApps && selectedApp.schemeId) {
-        const citizenApps = JSON.parse(storedCitizenApps)
-        if (citizenApps[selectedApp.schemeId]) {
-          citizenApps[selectedApp.schemeId] = {
-            ...citizenApps[selectedApp.schemeId],
-            status: 'Disbursed',
-            remarks: remarks || `Disbursed ₹${disbursedAmount} on ${disbursedDate}`
-          }
-          window.localStorage.setItem('gov-subsidy-applications', JSON.stringify(citizenApps))
-        }
-      }
 
       // 2. Append new audit history log
       const newAuditLog = {
@@ -160,7 +146,6 @@ export default function FinanceDashboard() {
       }
       const nextLogs = [newAuditLog, ...auditLogs]
       setAuditLogs(nextLogs)
-      window.localStorage.setItem('gov-subsidy-finance-audit-logs', JSON.stringify(nextLogs))
 
       setModalLoading(false)
       setSelectedApp(null)
@@ -194,7 +179,8 @@ export default function FinanceDashboard() {
       </AnimatePresence>
 
       <DashboardTopbar
-        portalName="Finance & Disbursement Officer Portal"
+        brandTitle="GS Officer Portal"
+        brandSubtitle="Finance & Disbursement Officer Portal"
         userName={officer?.fullName}
         userRole={officer?.role === 'FINANCE_OFFICER' ? 'Finance Officer' : officer?.role}
         onLogout={handleLogout}
@@ -223,6 +209,12 @@ export default function FinanceDashboard() {
               <polyline points="12 6 12 12 16 14" />
             </svg>
             Finance Audit &amp; History
+          </button>
+          <button
+            className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <FaUserCircle /> Profile
           </button>
         </div>
 
@@ -350,6 +342,18 @@ export default function FinanceDashboard() {
                   </table>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {activeTab === 'profile' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+              <ProfilePanel
+                profile={officer}
+                role={officer?.role || 'FINANCE_OFFICER'}
+                editable={false}
+                deletable={false}
+                subtitle="Review the finance officer account details stored in the backend."
+              />
             </motion.div>
           )}
         </div>

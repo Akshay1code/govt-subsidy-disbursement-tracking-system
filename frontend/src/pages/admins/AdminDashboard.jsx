@@ -3,17 +3,19 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
-import ThemeToggle from '../../components/ThemeToggle'
+import DashboardTopbar from '../../components/DashboardTopbar'
 import { updateApprovalStatus, getOfficerRequests } from '../../services/adminService'
 import { getApplications } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
+import { clearPortalSessionCaches } from '../../services/sessionCleanup'
+import ProfilePanel from '../../components/ProfilePanel'
 import api from '../../services/api'
-import logo from '../../assets/icons/logo.png'
-import { FaChartBar, FaHistory, FaUserShield, FaTools, FaClipboardList, FaComments, FaFileAlt, FaHourglassHalf, FaCheckCircle, FaTimesCircle, FaMoneyBillWave, FaFileInvoice, FaCheck } from 'react-icons/fa'
+import { FaHistory, FaUserShield, FaTools, FaClipboardList, FaComments, FaHourglassHalf, FaTimesCircle, FaFileInvoice, FaCheck, FaUserCircle } from 'react-icons/fa'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const contentRef = useRef(null)
+  const [profile, setProfile] = useState(null)
 
   // Auth guard: backend cookie + profile role check
   useEffect(() => {
@@ -23,7 +25,9 @@ export default function AdminDashboard() {
         const user = res.data?.data || res.data
         if (!user || String(user.role || '').toUpperCase() !== 'ADMIN') {
           navigate('/login')
+          return
         }
+        setProfile(user)
       } catch {
         navigate('/login')
       }
@@ -33,6 +37,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     api.post('/gov/auth/signout').catch(() => {})
+    clearPortalSessionCaches()
     navigate('/login')
   }
 
@@ -103,6 +108,14 @@ export default function AdminDashboard() {
     }
   }
 
+  const normalizeRuleForm = (rule = {}) => ({
+    fieldName: rule.fieldName || 'AGE',
+    operator: rule.operator || 'GREATER_THAN_EQUAL',
+    expectedValue: rule.expectedValue ?? '',
+    points: Number(rule.points ?? 0),
+    partialPercentage: Number(rule.partialPercentage ?? 0),
+  })
+
   // Log filter State
   const [logSearch, setLogSearch] = useState('')
   const [logActionFilter, setLogActionFilter] = useState('All')
@@ -114,7 +127,7 @@ export default function AdminDashboard() {
   const [queries, setQueries] = useState([])
 
   // View state (declared early so useEffects below can reference it)
-  const [activeTab, setActiveTab] = useState('analytics') // 'analytics' | 'history' | 'officers' | 'queries'
+  const [activeTab, setActiveTab] = useState('history') // 'history' | 'officers' | 'schemes' | 'action-logs' | 'officer-requests' | 'queries' | 'profile'
 
   // Officer Requests from backend (GET /gov/auth/officer/get-request)
   const [officerRequests, setOfficerRequests] = useState([])
@@ -175,6 +188,36 @@ export default function AdminDashboard() {
   const [reassignApp, setReassignApp] = useState(null)
   const [targetOfficerId, setTargetOfficerId] = useState('')
   const [toast, setToast] = useState(null)
+  const tabContentMeta = {
+    history: {
+      title: 'Application History',
+      subtitle: 'Review submitted applications, current statuses, and the latest review history.',
+    },
+    officers: {
+      title: 'Officer Work Tracker',
+      subtitle: 'Monitor officer workload, coverage, and assignment distribution.',
+    },
+    schemes: {
+      title: 'Manage Schemes',
+      subtitle: 'Create, edit, and retire welfare schemes from a single control panel.',
+    },
+    'action-logs': {
+      title: 'Officer Actions History',
+      subtitle: 'Audit administrative and officer actions recorded across the system.',
+    },
+    'officer-requests': {
+      title: 'Officer Requests',
+      subtitle: 'Process new officer onboarding and role change requests.',
+    },
+    queries: {
+      title: 'Citizen Queries',
+      subtitle: 'Respond to citizen support requests and unresolved issues.',
+    },
+    profile: {
+      title: 'Profile',
+      subtitle: 'Review and update the administrator account details.',
+    },
+  }
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -244,14 +287,14 @@ export default function AdminDashboard() {
       minimumEligibleScore: scheme.minimumEligibleScore || 50,
       active: scheme.active ?? true,
       categoryId: scheme.categoryId || scheme.category?.id || 1,
-      rules: scheme.rules || [],
+      rules: Array.isArray(scheme.rules) ? scheme.rules.map(normalizeRuleForm) : [],
       documents: scheme.documents || [],
       fields: scheme.fields || []
     })
     setShowSchemeModal(true)
   }
 
-  const addRule = () => setSchemeForm(p => ({ ...p, rules: [...p.rules, { fieldName: 'AGE', operator: 'GREATER_THAN_EQUAL', expectedValue: '', points: 0 }] }))
+  const addRule = () => setSchemeForm(p => ({ ...p, rules: [...p.rules, { fieldName: 'AGE', operator: 'GREATER_THAN_EQUAL', expectedValue: '', points: 0, partialPercentage: 0 }] }))
   const removeRule = (i) => setSchemeForm(p => ({ ...p, rules: p.rules.filter((_, idx) => idx !== i) }))
   const updateRule = (i, k, v) => setSchemeForm(p => { const r = [...p.rules]; r[i][k] = v; return { ...p, rules: r } })
 
@@ -270,6 +313,7 @@ export default function AdminDashboard() {
       return
     }
 
+    const processedRules = schemeForm.rules.map(normalizeRuleForm)
     const processedScheme = {
       schemeCode: schemeForm.schemeCode,
       schemeName: schemeForm.schemeName,
@@ -279,7 +323,7 @@ export default function AdminDashboard() {
       active: schemeForm.active,
       categoryId: Number(schemeForm.categoryId),
       categoryName: getCategoryNameById(schemeForm.categoryId),
-      rules: schemeForm.rules,
+      rules: processedRules,
       documents: schemeForm.documents,
       fields: schemeForm.fields
     }
@@ -298,7 +342,7 @@ export default function AdminDashboard() {
       } else {
         showToast(res.message || 'Failed to save scheme', 'error')
       }
-    } catch (error) {
+    } catch {
       showToast('Error saving scheme to backend', 'error')
     }
   }
@@ -320,20 +364,6 @@ export default function AdminDashboard() {
     const matchesOfficer = logOfficerFilter === 'All' || log.officerId === logOfficerFilter
     return matchesSearch && matchesAction && matchesOfficer
   })
-
-  // Calculate high-level analytics
-  const totalApps = applications.length
-  const pendingApps = applications.filter(a => a.status === 'Pending').length
-  const approvedApps = applications.filter(a => a.status === 'Approved').length
-  const rejectedApps = applications.filter(a => a.status === 'Rejected').length
-
-  const totalFundsDisbursed = applications
-    .filter(a => a.status === 'Approved')
-    .reduce((sum, a) => {
-      const scheme = schemes.find(s => s.id === a.schemeId)
-      // Extract number from amount e.g. 6000 or 50000 or scheme monetary value
-      return sum + (a.amount || (scheme ? parseInt(scheme.amount.replace(/[^0-9]/g, '')) || 10000 : 10000))
-    }, 0)
 
   // Filtered applications for History tab
   const filteredApps = applications.filter(app => {
@@ -406,7 +436,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="dashboard-layout" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="dashboard-layout">
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
@@ -423,50 +453,19 @@ export default function AdminDashboard() {
       </AnimatePresence>
 
       {/* ── Admin Top Navigation Bar ── */}
-      <header
-        className="topbar"
-        style={{
-          display: 'flex',
-          justify: 'space-between',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          background: 'var(--panel-strong)',
-          borderBottom: '1px solid var(--border)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <img src={logo} alt="GS Portal" style={{ height: '36px' }} />
-            <div>
-              <strong style={{ fontSize: '1.1rem', color: 'var(--text)', display: 'block' }}>GS Admin Command Center</strong>
-              <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>National Subsidy Tracking & Oversight</span>
-            </div>
-          </Link>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.4rem 0.8rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>System Administrator</span>
-          </div>
-
-          <ThemeToggle />
-
-          <Link to="/" className="button button--ghost" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-            Back to Home
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="button button--primary"
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', background: '#dc2626', border: 'none', cursor: 'pointer' }}
-          >
-            Logout
-          </button>
-        </div>
-      </header>
+      <DashboardTopbar
+        brandTitle="GS GOV SUBSIDY"
+        brandSubtitle="ADMIN DASHBOARD"
+        userName={profile?.fullName || 'System Administrator'}
+        userRole={profile?.role || 'ADMIN'}
+        onLogout={handleLogout}
+        homeLink="/"
+        homeLabel="Back to Home"
+        showHomeLink
+      />
 
       {/* ── Main Content Container ── */}
-      <main ref={contentRef} className="dashboard-main" style={{ maxWidth: '1440px', margin: '0 auto', padding: '2rem 1.5rem', scrollMarginTop: '1rem' }}>
+      <main ref={contentRef} className="dashboard-main">
 
         {/* Tab Navigation */}
         <motion.div
@@ -476,163 +475,55 @@ export default function AdminDashboard() {
           className="dashboard-tabs"
         >
           <button
-            className={`button ${activeTab === 'analytics' ? 'button--primary' : 'button--ghost'}`}
-            onClick={() => handleTabChange('analytics')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <FaChartBar /> Analytics & Insights
-          </button>
-          <button
-            className={`button ${activeTab === 'history' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => handleTabChange('history')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaHistory /> Application History ({applications.length})
           </button>
           <button
-            className={`button ${activeTab === 'officers' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'officers' ? 'active' : ''}`}
             onClick={() => handleTabChange('officers')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaUserShield /> Officer Work Tracker ({officers.length})
           </button>
           <button
-            className={`button ${activeTab === 'schemes' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'schemes' ? 'active' : ''}`}
             onClick={() => handleTabChange('schemes')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaTools /> Manage Schemes ({schemes.length})
           </button>
           <button
-            className={`button ${activeTab === 'action-logs' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'action-logs' ? 'active' : ''}`}
             onClick={() => handleTabChange('action-logs')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaUserShield /> Officer Actions History
           </button>
           <button
-            className={`button ${activeTab === 'officer-requests' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'officer-requests' ? 'active' : ''}`}
             onClick={() => handleTabChange('officer-requests')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaClipboardList /> Officer Requests ({officerRequests.length})
           </button>
           <button
-            className={`button ${activeTab === 'queries' ? 'button--primary' : 'button--ghost'}`}
+            className={`dashboard-tab ${activeTab === 'queries' ? 'active' : ''}`}
             onClick={() => handleTabChange('queries')}
-            style={{ fontSize: '0.9rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <FaComments /> Citizen Queries ({queries.length})
+          </button>
+          <button
+            className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => handleTabChange('profile')}
+          >
+            <FaUserCircle /> Profile
           </button>
         </motion.div>
 
         <div className="tab-pane">
+          <div className="pane-header">
+            <h2>{tabContentMeta[activeTab]?.title || 'Admin Dashboard'}</h2>
+            <p>{tabContentMeta[activeTab]?.subtitle || 'Manage the subsidy platform from one consistent portal.'}</p>
+          </div>
         {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
-        <AnimatePresence mode="wait">
-        {activeTab === 'analytics' && (
-          <motion.div
-            key="analytics"
-            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            style={{ transformOrigin: 'top center' }}
-          >
-            {/* High Level Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-
-              {/* Card 1: Total Applications */}
-              <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
-                  <span>Total Applications</span>
-                  <FaClipboardList style={{ fontSize: '1.1rem', opacity: 0.7 }} />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)' }}>{totalApps}</div>
-                <span style={{ fontSize: '0.78rem', color: '#82aeca' }}>Across all subsidy schemes</span>
-              </div>
-
-              {/* Card 2: Pending Applications */}
-              <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
-                  <span>Pending Action</span>
-                  <FaHourglassHalf style={{ fontSize: '1.1rem', opacity: 0.7 }} />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b' }}>{pendingApps}</div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Requires officer verification</span>
-              </div>
-
-              {/* Card 3: Approved */}
-              <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
-                  <span>Approved & Sanctioned</span>
-                  <FaCheckCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#22c55e' }} />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#22c55e' }}>{approvedApps}</div>
-                <span style={{ fontSize: '0.78rem', color: '#8ed66a' }}>{((approvedApps / totalApps) * 100).toFixed(1)}% Approval rate</span>
-              </div>
-
-              {/* Card 4: Rejected */}
-              <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
-                  <span>Rejected Applications</span>
-                  <FaTimesCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#ef4444' }} />
-                </div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ef4444' }}>{rejectedApps}</div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Ineligible / invalid documents</span>
-              </div>
-
-              {/* Card 5: Disbursed Funds */}
-              <div className="admin-card" style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '0.84rem', marginBottom: '0.5rem' }}>
-                  <span>Total Funds Disbursed</span>
-                  <FaMoneyBillWave style={{ fontSize: '1.1rem', opacity: 0.7, color: '#ffc76a' }} />
-                </div>
-                <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffc76a' }}>
-                  ₹ {totalFundsDisbursed.toLocaleString('en-IN')}
-                </div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Direct Benefit Transfer (DBT) confirmed into beneficiary bank accounts</span>
-              </div>
-
-            </div>
-
-            {/* Visual Analytics & Number Representations */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-
-              {/* Application Status Distribution */}
-              <div className="admin-card" style={{ padding: '1.5rem', borderRadius: '12px', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '1.2rem', color: 'var(--text)' }}>Application Status Breakdown</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
-                    <span style={{ fontWeight: 600, color: '#22c55e', fontSize: '0.95rem' }}>Approved</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#22c55e' }}>{approvedApps}</span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>/ {totalApps} ({totalApps > 0 ? ((approvedApps / totalApps) * 100).toFixed(0) : 0}%)</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.06)', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
-                    <span style={{ fontWeight: 600, color: '#f59e0b', fontSize: '0.95rem' }}>Pending</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f59e0b' }}>{pendingApps}</span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>/ {totalApps} ({totalApps > 0 ? ((pendingApps / totalApps) * 100).toFixed(0) : 0}%)</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                    <span style={{ fontWeight: 600, color: '#ef4444', fontSize: '0.95rem' }}>Rejected</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ef4444' }}>{rejectedApps}</span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>/ {totalApps} ({totalApps > 0 ? ((rejectedApps / totalApps) * 100).toFixed(0) : 0}%)</span>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
-          </motion.div>
-        )}
 
         {/* ── TAB 2: APPLICATION HISTORY & AUDIT ── */}
         {activeTab === 'history' && (
@@ -1052,6 +943,25 @@ export default function AdminDashboard() {
         )}
 
         {/* ── TAB 5: MANAGE SCHEMES CRUD ── */}
+        {activeTab === 'profile' && (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <ProfilePanel
+              profile={profile}
+              role={profile?.role || 'ADMIN'}
+              editable={false}
+              deletable={false}
+              subtitle="Manage the administrator account details stored in the backend."
+            />
+          </motion.div>
+        )}
+
         {activeTab === 'schemes' && (
           <motion.div
             key="schemes"
@@ -1236,7 +1146,6 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        </AnimatePresence>
         </div>
 
       </main>
@@ -1556,7 +1465,7 @@ export default function AdminDashboard() {
                   </div>
                   {schemeForm.rules.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>No rules added.</p>}
                   {schemeForm.rules.map((rule, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 80px 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 110px 80px 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                       <select value={rule.fieldName} onChange={e => updateRule(i, 'fieldName', e.target.value)} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
                         <option value="AGE">Age</option>
                         <option value="INCOME">Income</option>
@@ -1574,6 +1483,7 @@ export default function AdminDashboard() {
                         <option value="NOT_EQUALS">Not Equals (!=)</option>
                       </select>
                       <input type="text" placeholder="Expected Value" value={rule.expectedValue} onChange={e => updateRule(i, 'expectedValue', e.target.value)} required style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }} />
+                      <input type="number" min="0" max="100" step="0.1" placeholder="Partial %" value={rule.partialPercentage ?? 0} onChange={e => updateRule(i, 'partialPercentage', Number(e.target.value))} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }} />
                       <input type="number" placeholder="Pts" value={rule.points} onChange={e => updateRule(i, 'points', Number(e.target.value))} required style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }} />
                       <button type="button" onClick={() => removeRule(i)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}>×</button>
                     </div>
@@ -1679,3 +1589,5 @@ export default function AdminDashboard() {
     </div>
   )
 }
+
+

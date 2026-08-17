@@ -2,20 +2,26 @@ import '../../styles/Dashboard.css';
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import ThemeToggle from '../../components/ThemeToggle'
-import logo from '../../assets/icons/logo.png'
+import DashboardTopbar from '../../components/DashboardTopbar'
+import ProfilePanel from '../../components/ProfilePanel'
+import { FaClipboardList, FaHourglassHalf, FaCheckCircle, FaTimesCircle, FaHome, FaChartLine, FaBell, FaUserCircle } from 'react-icons/fa'
 import api from '../../services/api'
-import { updateApprovalStatus } from '../../services/adminService'
 import { 
   getMyApplications, 
   getDisbursementPlan, 
   configureDisbursementPlan, 
-  completeMilestone, 
-  releaseMilestone, 
+  completeMilestone,
+  releaseMilestone,
   resolveMilestone,
   getOverdueMilestones,
   getNotifications,
+  updateApprovalStatus,
+  getInspectionContext,
+  submitInspectionReport,
+  uploadInspectionMedia,
 } from '../../services/officerService'
+import { clearPortalSessionCaches } from '../../services/sessionCleanup'
+import SchemeDashboard from '../scheme-dashboard'
 
 const STATUS_BADGE = {
   Pending: 'badge-status--applied',
@@ -43,6 +49,12 @@ export default function OfficerDashboard() {
   const [activeDocTab, setActiveDocTab] = useState('aadhaar')
   const [checklist, setChecklist] = useState({ address: false, business: false, assets: false })
   const [fieldNotes, setFieldNotes] = useState('')
+
+  // Field Inspection states
+  const [uploadedMediaIds, setUploadedMediaIds] = useState([])          // [{ mediaId, url, fileName, uploading }]
+  const [, setInspectionLoading] = useState(false)      // pre-fill fetch
+  const [submittingInspection, setSubmittingInspection] = useState(false) // submit in flight
+  const [, setInspectionContext] = useState(null)        // context from backend
 
   // Disbursement states
   const [disbursementPlan, setDisbursementPlan] = useState(null)
@@ -91,6 +103,7 @@ export default function OfficerDashboard() {
 
   const handleLogout = async () => {
     try { await api.post('/gov/auth/signout') } catch { /* ignore */ }
+    clearPortalSessionCaches()
     navigate('/officer/login')
   }
 
@@ -100,23 +113,6 @@ export default function OfficerDashboard() {
   const approved = applications.filter(a => a.status === 'Approved' || a.status === 'APPROVED').length
   const rejected = applications.filter(a => a.status === 'Rejected' || a.status === 'REJECTED').length
   const approvalRate = total ? Math.round((approved / total) * 100) : 0
-
-  const officerProfileChecks = officer ? [
-    { label: 'Full Name', value: officer.fullName, required: true },
-    { label: 'Username', value: officer.username, required: true },
-    { label: 'Role', value: officer.role, required: true },
-    { label: 'Mobile Number', value: officer.mobileNo, required: true },
-    { label: 'Region', value: officer.region, required: true },
-    { label: 'District', value: officer.district, required: true },
-    { label: 'State', value: officer.state, required: true },
-    { label: 'Officer ID', value: officer.uniqueID || officer.uniqueId || officer.id, required: false },
-    { label: 'Created On', value: officer.createdAt, required: false },
-    { label: 'Updated On', value: officer.updatedAt, required: false },
-  ] : []
-  const profileFilledCount = officerProfileChecks.filter(item => Boolean(item.value)).length
-  const profileCompletion = officerProfileChecks.length
-    ? Math.round((profileFilledCount / officerProfileChecks.length) * 100)
-    : 0
 
   const filteredApps = applications.filter(app => {
     const term = searchTerm.toLowerCase()
@@ -130,23 +126,122 @@ export default function OfficerDashboard() {
     return matchesSearch && matchesStatus
   })
 
-  const openApplication = (app) => {
+  const openApplication = async (app) => {
     setSelectedApp(app)
     setRejectMode(false)
     setRejectReason('')
+    // Reset inspection state
+    setChecklist({ address: false, business: false, assets: false })
+    setFieldNotes('')
+    setUploadedMediaIds([])
+    setInspectionContext(null)
+
+    // Pre-fill from backend if this is a field officer
+    if (officer?.role === 'FIELD_OFFICER') {
+      const appId = app.id || app.applicationId
+      setInspectionLoading(true)
+      try {
+        const ctx = await getInspectionContext(appId)
+        setInspectionContext(ctx)
+        if (ctx.addressVerified != null) {
+          setChecklist({
+            address: Boolean(ctx.addressVerified),
+            business: Boolean(ctx.businessActivityConfirmed),
+            assets: Boolean(ctx.assetsInspected),
+          })
+        }
+        if (ctx.notes) setFieldNotes(ctx.notes)
+        if (ctx.evidenceMediaIds?.length) {
+          setUploadedMediaIds(ctx.evidenceMediaIds.map(id => ({ mediaId: id, url: null, fileName: id, uploading: false })))
+        }
+      } catch {
+        console.warn('Could not pre-fill inspection context')
+      } finally {
+        setInspectionLoading(false)
+      }
+    }
   }
 
   const closeModal = () => {
     setSelectedApp(null)
     setRejectMode(false)
     setRejectReason('')
+    setInspectionContext(null)
+    setUploadedMediaIds([])
+  }
+
+  // Media upload handler for inspection evidence
+  const handleMediaUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    const placeholders = files.map(f => ({ mediaId: null, url: URL.createObjectURL(f), fileName: f.name, uploading: true }))
+    setUploadedMediaIds(prev => [...prev, ...placeholders])
+    const startIdx = uploadedMediaIds.length
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const result = await uploadInspectionMedia(files[i])
+        setUploadedMediaIds(prev => prev.map((item, idx) => {
+          if (idx === startIdx + i) return { ...item, mediaId: result.mediaId, uploading: false }
+          return item
+        }))
+      } catch {
+        showToast('Failed to upload evidence image. Please try again.', 'error')
+        setUploadedMediaIds(prev => prev.filter((_, idx) => idx !== startIdx + i))
+      }
+    }
+  }
+
+  // Field inspection submit handler
+  const handleInspectionSubmit = async () => {
+    if (!checklist.address || !checklist.business || !checklist.assets) {
+      setToast({ type: 'error', message: 'All checklist items must be verified to submit the report.' })
+      setTimeout(() => setToast(null), 3000)
+      return
+    }
+    const pendingUploads = uploadedMediaIds.filter(m => m.uploading)
+    if (pendingUploads.length > 0) {
+      setToast({ type: 'error', message: 'Please wait for all evidence images to finish uploading.' })
+      setTimeout(() => setToast(null), 3000)
+      return
+    }
+    const appId = selectedApp.id || selectedApp.applicationId
+    setSubmittingInspection(true)
+    try {
+      await submitInspectionReport({
+        applicationId: appId,
+        addressVerified: checklist.address,
+        businessActivityConfirmed: checklist.business,
+        assetsInspected: checklist.assets,
+        notes: fieldNotes,
+        evidenceMediaIds: uploadedMediaIds.filter(m => m.mediaId).map(m => m.mediaId),
+      })
+      // Update local table status
+      setApplications(prev =>
+        prev.map(a => (a.id || a.applicationId) === appId
+          ? { ...a, status: 'INSPECTION_COMPLETED' }
+          : a
+        )
+      )
+      setToast({ type: 'success', message: 'Inspection Report Submitted Successfully' })
+      setTimeout(() => setToast(null), 4000)
+      closeModal()
+    } catch {
+      setToast({ type: 'error', message: 'Failed to submit report. Please check your connection and try again.' })
+      setTimeout(() => setToast(null), 4000)
+    } finally {
+      setSubmittingInspection(false)
+    }
   }
 
   const decide = async (status) => {
     if (!selectedApp) return
     const appId = selectedApp.id || selectedApp.applicationId
     try {
-      const result = await updateApprovalStatus(appId, status.toUpperCase())
+      const result = await updateApprovalStatus(
+        appId,
+        status.toUpperCase(),
+        status.toUpperCase() === 'REJECTED' ? rejectReason : ''
+      )
       if (result.status) {
         setApplications(prev =>
           prev.map(a => (a.id || a.applicationId) === appId ? { ...a, status } : a)
@@ -327,31 +422,14 @@ export default function OfficerDashboard() {
       </AnimatePresence>
 
       {/* Header Sticky Topbar */}
-      <header className="topbar" style={{ background: 'var(--panel-strong)', borderBottom: '1px solid var(--border)' }}>
-        <div className="topbar__brand">
-          <img src={logo} alt="GS Gov Subsidy Logo" className="brand-logo" />
-          <div>
-            <strong>GS Gov Subsidy</strong>
-            <span>Officer Portal</span>
-          </div>
-        </div>
-
-        <div className="topbar__user-info">
-          <span className="user-badge">
-            <span className="user-badge__dot"></span>
-            {officer.fullName} ({officer.designation || 'Officer'})
-          </span>
-          <ThemeToggle />
-          <button onClick={handleLogout} className="btn-logout">
-            Logout
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
-        </div>
-      </header>
+      <DashboardTopbar
+        brandTitle="GS Officer Portal"
+        brandSubtitle="National Subsidy Tracking & Oversight"
+        userName={officer.fullName}
+        userRole={officer.designation || 'Officer'}
+        onLogout={handleLogout}
+        showHomeLink={false}
+      />
 
       {/* Main Panel Content */}
       <main className="dashboard-main">
@@ -360,55 +438,33 @@ export default function OfficerDashboard() {
             className={`dashboard-tab ${activeTab === 'home' ? 'active' : ''}`}
             onClick={() => setActiveTab('home')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-            Dashboard Home
+            <FaHome /> Dashboard Home
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'applications' ? 'active' : ''}`}
             onClick={() => setActiveTab('applications')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            Application Management
+            <FaClipboardList /> Application Management
             {pending > 0 && <span className="tab-badge">{pending}</span>}
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'reports' ? 'active' : ''}`}
             onClick={() => setActiveTab('reports')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 3v18h18" />
-              <rect x="7" y="10" width="3" height="8" />
-              <rect x="12" y="6" width="3" height="12" />
-              <rect x="17" y="13" width="3" height="5" />
-            </svg>
-            Reports &amp; Analytics
+            <FaChartLine /> Reports &amp; Analytics
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'notifications' ? 'active' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            Alerts &amp; Reminders
+            <FaBell /> Alerts &amp; Reminders
             {notifications.length > 0 && <span className="tab-badge" style={{ background: '#a855f7' }}>{notifications.length}</span>}
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21a8 8 0 1 0-16 0" />
-              <circle cx="12" cy="8" r="4" />
-            </svg>
-            Profile Check
+            <FaUserCircle /> Profile
           </button>
         </div>
 
@@ -423,22 +479,45 @@ export default function OfficerDashboard() {
                 </div>
               </div>
 
-              <div className="officer-stats-grid">
-                <div className="officer-stat-card officer-stat-card--total">
-                  <span className="officer-stat-card__label">Total Applications</span>
-                  <span className="officer-stat-card__value">{total}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                {/* Total Applications */}
+                <div className="stat-card stat-card--total">
+                  <div className="stat-card__header">
+                    <span>Total Applications</span>
+                    <FaClipboardList style={{ fontSize: '1.1rem', opacity: 0.7 }} />
+                  </div>
+                  <div className="stat-card__value">{total}</div>
+                  <span className="stat-card__desc" style={{ color: '#82aeca' }}>Overall assigned workload</span>
                 </div>
-                <div className="officer-stat-card officer-stat-card--pending">
-                  <span className="officer-stat-card__label">Pending Applications</span>
-                  <span className="officer-stat-card__value">{pending}</span>
+
+                {/* Pending Applications */}
+                <div className="stat-card stat-card--pending">
+                  <div className="stat-card__header">
+                    <span>Pending Action</span>
+                    <FaHourglassHalf style={{ fontSize: '1.1rem', opacity: 0.7 }} />
+                  </div>
+                  <div className="stat-card__value" style={{ color: '#f59e0b' }}>{pending}</div>
+                  <span className="stat-card__desc">Awaiting your verification</span>
                 </div>
-                <div className="officer-stat-card officer-stat-card--approved">
-                  <span className="officer-stat-card__label">Approved Applications</span>
-                  <span className="officer-stat-card__value">{approved}</span>
+
+                {/* Approved Applications */}
+                <div className="stat-card stat-card--approved">
+                  <div className="stat-card__header">
+                    <span>Approved & Eligible</span>
+                    <FaCheckCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#22c55e' }} />
+                  </div>
+                  <div className="stat-card__value" style={{ color: '#22c55e' }}>{approved}</div>
+                  <span className="stat-card__desc" style={{ color: '#8ed66a' }}>{approvalRate}% Approval rate</span>
                 </div>
-                <div className="officer-stat-card officer-stat-card--rejected">
-                  <span className="officer-stat-card__label">Rejected Applications</span>
-                  <span className="officer-stat-card__value">{rejected}</span>
+
+                {/* Rejected Applications */}
+                <div className="stat-card stat-card--rejected">
+                  <div className="stat-card__header">
+                    <span>Rejected Applications</span>
+                    <FaTimesCircle style={{ fontSize: '1.1rem', opacity: 0.7, color: '#ef4444' }} />
+                  </div>
+                  <div className="stat-card__value" style={{ color: '#ef4444' }}>{rejected}</div>
+                  <span className="stat-card__desc">Ineligible or issues found</span>
                 </div>
               </div>
 
@@ -561,46 +640,9 @@ export default function OfficerDashboard() {
           {/* TAB 3: REPORTS & ANALYTICS */}
           {activeTab === 'reports' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <div className="pane-header">
-                <h2>Reports &amp; Analytics</h2>
-                <p>Application statistics and approval rates.</p>
-              </div>
-
-              <div className="beneficiary-meta-card">
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Total Processed</span>
-                  <span className="meta-card__val">{approved + rejected} / {total}</span>
-                </div>
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Approval Rate</span>
-                  <span className="meta-card__val">{approvalRate}%</span>
-                </div>
-                <div className="meta-card__item">
-                  <span className="meta-card__label">Awaiting Review</span>
-                  <span className="meta-card__val text-secondary flex-align">
-                    <span className="badge-dot-green"></span> {pending} Pending
-                  </span>
-                </div>
-              </div>
-
-              <h3 className="section-title" style={{ marginTop: '2.5rem' }}>Applications by Status</h3>
-              <div className="officer-stats-grid">
-                <div className="officer-stat-card officer-stat-card--total">
-                  <span className="officer-stat-card__label">Total</span>
-                  <span className="officer-stat-card__value">{total}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--pending">
-                  <span className="officer-stat-card__label">Pending</span>
-                  <span className="officer-stat-card__value">{pending}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--approved">
-                  <span className="officer-stat-card__label">Approved</span>
-                  <span className="officer-stat-card__value">{approved}</span>
-                </div>
-                <div className="officer-stat-card officer-stat-card--rejected">
-                  <span className="officer-stat-card__label">Rejected</span>
-                  <span className="officer-stat-card__value">{rejected}</span>
-                </div>
+              
+              <div style={{ margin: '-2rem -2rem 2rem -2rem', overflow: 'hidden', borderRadius: '12px' }}>
+                <SchemeDashboard />
               </div>
 
               <h3 className="section-title" style={{ marginTop: '2.5rem', color: '#ef4444' }}>⚠️ Non-Compliance &amp; Overdue Milestones</h3>
@@ -706,57 +748,13 @@ export default function OfficerDashboard() {
           {/* TAB 5: PROFILE CHECK */}
           {activeTab === 'profile' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <div className="pane-header">
-                <h2>Profile Check</h2>
-                <p>Review the officer account details that are already stored in the backend.</p>
-              </div>
-
-              <div className="profile-container">
-                <div className="profile-sidebar">
-                  <div className="profile-avatar-card">
-                    <div className="avatar-circle">
-                      {(officer.fullName || officer.username || 'O').charAt(0).toUpperCase()}
-                    </div>
-                    <h3>{officer.fullName || 'Officer'}</h3>
-                    <p>@{officer.username || 'unknown'}</p>
-                    <span className="profile-occup-badge">{officer.role || 'OFFICER'}</span>
-                  </div>
-
-                  <div className="profile-actions-panel">
-                    <div className="beneficiary-meta-card" style={{ width: '100%' }}>
-                      <div className="meta-card__item" style={{ width: '100%' }}>
-                        <span className="meta-card__label">Profile Completion</span>
-                        <span className="meta-card__val">{profileCompletion}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="profile-form-card officer-profile-card">
-                  <div className="card-title-bar">
-                    <h3>Account Information</h3>
-                  </div>
-
-                  <div className="profile-form officer-profile-form">
-                    <div className="form-grid">
-                      {officerProfileChecks.map((item) => (
-                        <div className="form-group" key={item.label}>
-                          <label>
-                            {item.label} {item.required && <span style={{ color: '#ef4444' }}>*</span>}
-                          </label>
-                          <input
-                            type="text"
-                            readOnly
-                            value={item.value || 'Not provided'}
-                            className={`profile-field-input ${item.value ? 'profile-field-input--filled' : 'profile-field-input--missing'}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              </div>
+              <ProfilePanel
+                profile={officer}
+                role={officer?.role || officer?.designation || 'FIELD_OFFICER'}
+                editable={false}
+                deletable={false}
+                subtitle="Review the officer account details that are already stored in the backend."
+              />
             </motion.div>
           )}
         </div>
@@ -772,7 +770,7 @@ export default function OfficerDashboard() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '850px', width: '90%', textAlign: 'left' }}
+              style={{ maxWidth: '1000px', width: '90%', textAlign: 'left' }}
             >
               {officer?.role === 'FIELD_OFFICER' ? (
                 // FIELD INSPECTOR DETAILED SCREEN (Image 3 & 4)
@@ -874,7 +872,7 @@ export default function OfficerDashboard() {
                     </div>
                   </div>
 
-                  {/* Site Evidence preview thumbnails block */}
+                  {/* Site Evidence — dynamic upload */}
                   <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px', marginBottom: '1.2rem' }}>
                     <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -883,17 +881,39 @@ export default function OfficerDashboard() {
                       </svg>
                       Site Evidence
                     </h4>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ width: '120px', height: '90px', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
-                        <img src="/farm_evidence_1.jpg" alt="Evidence 1" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ width: '120px', height: '90px', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
-                        <img src="/farm_evidence_2.jpg" alt="Evidence 2" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ width: '120px', height: '90px', border: '2px dashed var(--border)', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', cursor: 'pointer' }}>
-                        <span style={{ fontSize: '1.2rem' }}>+</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Add Photo</span>
-                      </div>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      {uploadedMediaIds.map((media, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '120px', height: '90px', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', background: '#f3f4f6' }}>
+                          {media.url
+                            ? <img src={media.url} alt={media.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: '0.65rem', color: 'var(--muted)', textAlign: 'center', padding: '4px' }}>{media.fileName}</div>
+                          }
+                          {media.uploading && (
+                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                                <path d="M12 2a10 10 0 0 1 10 10" />
+                              </svg>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setUploadedMediaIds(prev => prev.filter((_, i) => i !== idx))}
+                            style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', color: '#fff', cursor: 'pointer', fontSize: '10px', lineHeight: '18px', textAlign: 'center' }}
+                          >✕</button>
+                        </div>
+                      ))}
+                      <label htmlFor="evidence-upload" style={{ width: '120px', height: '90px', border: '2px dashed var(--border)', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>
+                        <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>+</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, marginTop: '2px' }}>Add Photo</span>
+                        <input
+                          id="evidence-upload"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={handleMediaUpload}
+                        />
+                      </label>
                     </div>
                   </div>
 
@@ -910,19 +930,20 @@ export default function OfficerDashboard() {
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <button className="button button--ghost" onClick={closeModal} style={{ padding: '0.55rem 1.25rem' }}>Cancel</button>
+                    <button className="button button--ghost" onClick={closeModal} disabled={submittingInspection} style={{ padding: '0.55rem 1.25rem' }}>Cancel</button>
                     <button 
                       className="button button--primary" 
-                      onClick={() => {
-                        if (!checklist.address || !checklist.business || !checklist.assets) {
-                          setToast({ type: 'error', message: 'All checklist items must be verified to submit the report.' });
-                          return;
-                        }
-                        handleApprove();
-                      }}
-                      style={{ padding: '0.55rem 1.25rem', background: 'var(--accent)', color: '#fff' }}
+                      onClick={handleInspectionSubmit}
+                      disabled={submittingInspection || uploadedMediaIds.some(m => m.uploading)}
+                      style={{ padding: '0.55rem 1.25rem', background: 'var(--accent)', color: '#fff', opacity: submittingInspection ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                     >
-                      Submit Inspection Report
+                      {submittingInspection && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+                          <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+                          <path d="M12 2a10 10 0 0 1 10 10" />
+                        </svg>
+                      )}
+                      {submittingInspection ? 'Submitting…' : 'Submit Inspection Report'}
                     </button>
                   </div>
                 </>
@@ -958,38 +979,73 @@ export default function OfficerDashboard() {
                     </div>
                   )}
 
+                  {/* User Details (Top) */}
+                  <div className="user-details-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px', marginBottom: '1.2rem' }}>
+                    <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      Applicant Details
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                      <div className="detail-field">
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Full Name</label>
+                        <input className="detail-field__input" type="text" readOnly value={selectedApp.applicant || selectedApp.applicantName || 'Not Available'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                      </div>
+                      <div className="detail-field">
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Scheme Name</label>
+                        <input className="detail-field__input" type="text" readOnly value={selectedApp.schemeName || selectedApp.schemeId || 'Not Available'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                      </div>
+                      <div className="detail-field">
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Phone Number</label>
+                        <input className="detail-field__input" type="text" readOnly value={selectedApp.phone || 'Not Available'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                      </div>
+                      <div className="detail-field">
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Location</label>
+                        <input className="detail-field__input" type="text" readOnly value={`${selectedApp.district || 'Not Available'}, ${selectedApp.state || 'Not Available'}`} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Two Column Grid */}
                   <div className="review-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.2rem', marginBottom: '1.5rem' }}>
-                    {/* Left Card: Applicant Details */}
+                    {/* Left Card: Field Details */}
                     <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px' }}>
                       <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                          <polyline points="10 9 9 9 8 9" />
                         </svg>
-                        Applicant Details
+                        Field Details
                       </h4>
                       <div className="detail-form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        <div className="detail-field">
-                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Full Name</label>
-                          <input className="detail-field__input" type="text" readOnly value={selectedApp.applicant || selectedApp.applicantName} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
-                        </div>
-                        <div className="detail-field">
-                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Date of Birth</label>
-                          <input className="detail-field__input" type="text" readOnly value={selectedApp.dob || '14 May 1985'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
-                        </div>
-                        <div className="detail-field">
-                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Aadhaar Number</label>
-                          <input className="detail-field__input" type="text" readOnly value={selectedApp.aadhaar || 'XXXX-XXXX-4921'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
-                        </div>
-                        <div className="detail-field">
-                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Annual Income</label>
-                          <input className="detail-field__input" type="text" readOnly value={`₹ ${Number(selectedApp.annualIncome || selectedApp.amount || 120000).toLocaleString('en-IN')}`} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
-                        </div>
-                        <div className="detail-field">
-                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Scheme Name</label>
-                          <input className="detail-field__input" type="text" readOnly value={selectedApp.schemeName || selectedApp.schemeId || 'National Rural Livelihood Mission (NRLM) Enterprise Subsidy'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
-                        </div>
+                        {selectedApp.fields && Object.entries(selectedApp.fields).map(([key, value]) => (
+                          <div className="detail-field" key={key}>
+                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>{key.replace(/_/g, ' ')}</label>
+                            <input className="detail-field__input" type="text" readOnly value={value} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                          </div>
+                        ))}
+                        {/* Fallbacks if fields are not present */}
+                        {(!selectedApp.fields || Object.keys(selectedApp.fields).length === 0) && (
+                          <>
+                            <div className="detail-field">
+                              <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Date of Birth</label>
+                              <input className="detail-field__input" type="text" readOnly value={selectedApp.dob || '14 May 1985'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                            </div>
+                            <div className="detail-field">
+                              <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Gender</label>
+                              <input className="detail-field__input" type="text" readOnly value={'Male'} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                            </div>
+                            <div className="detail-field">
+                              <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase' }}>Annual Income</label>
+                              <input className="detail-field__input" type="text" readOnly value={`₹ ${Number(selectedApp.annualIncome || selectedApp.amount || 120000).toLocaleString('en-IN')}`} style={{ width: '100%', padding: '0.5rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }} />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1004,42 +1060,53 @@ export default function OfficerDashboard() {
                       </h4>
 
                       {/* Doc tabs */}
-                      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.8rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>
-                        <button 
-                          className={`document-tab-btn ${activeDocTab === 'aadhaar' ? 'active' : ''}`}
-                          onClick={() => setActiveDocTab('aadhaar')}
-                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'aadhaar' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'aadhaar' ? '2px solid var(--accent)' : 'none' }}
-                        >
-                          Aadhaar
-                        </button>
-                        <button 
-                          className={`document-tab-btn ${activeDocTab === 'income' ? 'active' : ''}`}
-                          onClick={() => setActiveDocTab('income')}
-                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'income' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'income' ? '2px solid var(--accent)' : 'none' }}
-                        >
-                          Income Cert
-                        </button>
-                        <button 
-                          className={`document-tab-btn ${activeDocTab === 'passbook' ? 'active' : ''}`}
-                          onClick={() => setActiveDocTab('passbook')}
-                          style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'passbook' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'passbook' ? '2px solid var(--accent)' : 'none' }}
-                        >
-                          Bank Passbook
-                        </button>
+                      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.8rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem', overflowX: 'auto' }}>
+                        {selectedApp.documents && selectedApp.documents.length > 0 ? (
+                          selectedApp.documents.map((doc, idx) => (
+                            <button
+                              key={idx}
+                              className={`document-tab-btn ${activeDocTab === doc.type ? 'active' : ''}`}
+                              onClick={() => setActiveDocTab(doc.type)}
+                              style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === doc.type ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === doc.type ? '2px solid var(--accent)' : 'none', whiteSpace: 'nowrap' }}
+                            >
+                              {doc.type.replace(/_/g, ' ')}
+                            </button>
+                          ))
+                        ) : (
+                          <>
+                            <button 
+                              className={`document-tab-btn ${activeDocTab === 'aadhaar' ? 'active' : ''}`}
+                              onClick={() => setActiveDocTab('aadhaar')}
+                              style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'aadhaar' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'aadhaar' ? '2px solid var(--accent)' : 'none' }}
+                            >
+                              Aadhaar
+                            </button>
+                            <button 
+                              className={`document-tab-btn ${activeDocTab === 'income' ? 'active' : ''}`}
+                              onClick={() => setActiveDocTab('income')}
+                              style={{ border: 'none', background: 'transparent', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, color: activeDocTab === 'income' ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', borderBottom: activeDocTab === 'income' ? '2px solid var(--accent)' : 'none' }}
+                            >
+                              Income Cert
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       {/* Doc preview block */}
-                      <div className="doc-preview-pane" style={{ border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', background: '#fafaf9' }}>
+                      <div className="doc-preview-pane" style={{ border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', background: '#fafaf9', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <div className="doc-preview-pane__header" style={{ padding: '0.45rem 0.75rem', background: '#f5f4f0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: 'var(--text-soft)' }}>
                           <span>
-                            {activeDocTab === 'aadhaar' && 'Aadhaar_Card_Scan.jpg'}
-                            {activeDocTab === 'income' && 'Income_Certificate.pdf'}
-                            {activeDocTab === 'passbook' && 'Bank_Passbook_Copy.pdf'}
+                            {selectedApp.documents && selectedApp.documents.length > 0 
+                              ? selectedApp.documents.find(d => d.type === activeDocTab)?.url.split('/').pop() || 'Document'
+                              : activeDocTab === 'aadhaar' ? 'Aadhaar_Card_Scan.jpg' : 'Income_Certificate.pdf'
+                            }
                           </span>
                         </div>
-                        <div className="doc-preview-pane__body" style={{ minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {activeDocTab === 'aadhaar' ? (
-                            <img src="/aadhaar_mock.jpg" alt="Aadhaar Card Preview" style={{ width: '100%', height: 'auto', maxHeight: '180px', objectFit: 'contain' }} />
+                        <div className="doc-preview-pane__body" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                          {selectedApp.documents && selectedApp.documents.find(d => d.type === activeDocTab) ? (
+                            <img src={selectedApp.documents.find(d => d.type === activeDocTab).url} alt="Document Preview" style={{ width: '100%', height: 'auto', maxHeight: '350px', objectFit: 'contain' }} />
+                          ) : activeDocTab === 'aadhaar' ? (
+                            <img src="/aadhaar_mock.jpg" alt="Aadhaar Card Preview" style={{ width: '100%', height: 'auto', maxHeight: '350px', objectFit: 'contain' }} />
                           ) : (
                             <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem', padding: '1rem' }}>
                               <span>Document preview is not available in mock viewer</span>

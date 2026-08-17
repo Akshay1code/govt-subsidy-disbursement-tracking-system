@@ -13,6 +13,8 @@ public interface BeneficiaryRepo extends JpaRepository<Beneficiary, Long> {
 
     boolean existsByApplication_Id(Long applicationId);
 
+    Optional<Beneficiary> findByUser_Username(String username);
+
     // Find beneficiaries whose application has the given status and which have not yet been disbursed
     java.util.List<Beneficiary> findByApplication_StatusAndDisbursedAmountIsNull(com.example.gov_scheme_backend.enums.ApplicationStatus status);
 
