@@ -1,10 +1,17 @@
 package com.example.gov_scheme_backend.services.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.example.gov_scheme_backend.dto.request.application.ApplicationFieldValueRequestDTO;
-import com.example.gov_scheme_backend.dto.request.application.ApplicationRequestDTO;
 import com.example.gov_scheme_backend.dto.request.application.FieldValueRequestDTO;
-import com.example.gov_scheme_backend.dto.response.ApiResponse;
-import com.example.gov_scheme_backend.dto.response.application.ApplicationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.EligibilityEngineScoreDTO;
 import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.ApplicationDocument;
@@ -23,17 +30,9 @@ import com.example.gov_scheme_backend.services.ApplicationService;
 import com.example.gov_scheme_backend.services.CloudinaryService;
 import com.example.gov_scheme_backend.services.EligibilityEngineService;
 import com.example.gov_scheme_backend.services.WorkflowService;
+
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -138,26 +137,27 @@ public class ApplicationServiceImpl implements ApplicationService {
                         ? List.of()
                         : req.getFields();
 
-        List<ApplicationFieldValue> fieldValues =
-                new ArrayList<>();
+                // Preserve Hibernate-managed collection
+        if (app.getFieldValues() == null) {
+           app.setFieldValues(new ArrayList<>());
+        } else {
+           app.getFieldValues().clear();
+        }
 
         for (FieldValueRequestDTO dto : submittedFields) {
 
             if (dto == null || dto.getFieldName() == null) {
                 continue;
-            }
+             }
 
-            ApplicationFieldValue field =
-                    new ApplicationFieldValue();
+            ApplicationFieldValue field = new ApplicationFieldValue();
 
             field.setFieldName(dto.getFieldName());
             field.setFieldValue(dto.getValue());
             field.setApplication(app);
 
-            fieldValues.add(field);
+            app.getFieldValues().add(field);
         }
-
-        app.setFieldValues(fieldValues);
 
         Application saved = applicationRepo.save(app);
 
@@ -418,11 +418,19 @@ public class ApplicationServiceImpl implements ApplicationService {
             newDocuments.add(doc);
         }
 
-        // Replace existing documents on this application atomically
-        if (application.getDocuments() != null) {
-            application.getDocuments().clear();
+
+                // Preserve Hibernate-managed documents collection.
+        // Do NOT replace the collection reference because
+        // orphanRemoval = true on Application.documents.
+        if (application.getDocuments() == null) {
+                application.setDocuments(new ArrayList<>());
+        } else {
+                application.getDocuments().clear();
         }
-        application.setDocuments(newDocuments);
+
+        application.getDocuments().addAll(newDocuments);
+
         applicationRepo.save(application);
+        
     }
 }
