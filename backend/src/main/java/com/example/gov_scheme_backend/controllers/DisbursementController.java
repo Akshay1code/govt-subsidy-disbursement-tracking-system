@@ -115,4 +115,16 @@ public class DisbursementController {
                 )
         );
     }
+
+    @GetMapping("/plan/{planId}/suggest-stages")
+    public ResponseEntity<com.example.gov_scheme_backend.dto.response.disbursement.SuggestedStagesResponse> suggestStages(
+            @PathVariable Long planId) {
+        return ResponseEntity.ok(disbursementService.suggestStages(planId));
+    }
+
+    @GetMapping("/milestone/{milestoneId}/context")
+    public ResponseEntity<com.example.gov_scheme_backend.dto.response.disbursement.MilestoneContextResponse> getMilestoneContext(
+            @PathVariable Long milestoneId) {
+        return ResponseEntity.ok(disbursementService.getMilestoneContext(milestoneId));
+    }
 }

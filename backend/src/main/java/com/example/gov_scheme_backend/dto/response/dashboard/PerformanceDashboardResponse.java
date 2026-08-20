@@ -15,4 +15,10 @@ public class PerformanceDashboardResponse {
     private Long approvedApplications;
     private Long rejectedApplications;
     private Long underReviewApplications;
+    private Long disbursedApplications;
+    private Long awaitingDisbursementApplications;
+    private Long flaggedMilestones;
+    private Double avgApprovalDays;
+    private Double avgDisbursementDays;
+    private Double missingDocsPct;
 }

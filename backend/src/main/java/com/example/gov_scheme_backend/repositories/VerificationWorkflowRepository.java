@@ -15,4 +15,14 @@ public interface VerificationWorkflowRepository extends JpaRepository<Verificati
     List<VerificationWorkflow> findByCurrentStage(WorkflowStage currentStage);
 
     List<VerificationWorkflow> findByAssignedOfficer(Users assignedOfficer);
+
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT u.fullName, COUNT(vw)
+        FROM VerificationWorkflow vw
+        JOIN vw.assignedOfficer u
+        WHERE vw.currentStage <> com.example.gov_scheme_backend.enums.WorkflowStage.COMPLETED
+        GROUP BY u.fullName
+        ORDER BY COUNT(vw) DESC
+    """)
+    List<Object[]> countPendingByOfficer();
 }

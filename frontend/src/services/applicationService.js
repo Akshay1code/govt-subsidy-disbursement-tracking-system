@@ -12,6 +12,14 @@ export async function getApplications() {
   return response.data
 }
 
+export async function allocateApplication(applicationId, officerId) {
+  const response = await api.put('/gov/applications/allocation', {
+    applicationId,
+    officerId,
+  })
+  return response.data
+}
+
 export async function submitApplicationBySchemeCode(schemeCode) {
   const response = await api.post(`/gov/applications/submit/${schemeCode}`)
   return response.data

@@ -253,11 +253,11 @@ export default function SchemeDashboard() {
         showHomeLink
       />
 
-      <main className="dashboard-main">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <main className="dashboard-main dashboard-main--analytics">
+        <div className="scheme-dashboard-stack">
 
         {/* Hero */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-10 mb-10" style={{ borderBottom: `1px solid ${C.hair}` }}>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-8 xl:gap-12 items-start pb-10 mb-10" style={{ borderBottom: `1px solid ${C.hair}` }}>
           <div>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -285,6 +285,33 @@ export default function SchemeDashboard() {
               status across all active welfare schemes. Updated as of 12 August 2026.
             </motion.p>
           </div>
+
+          <div className="grid grid-cols-1 gap-4 self-stretch">
+            <Panel style={{ minHeight: 220, justifyContent: 'center', alignItems: 'center' }}>
+              <RegisterSeal percent={disbursedPct} />
+            </Panel>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Panel style={{ minHeight: 92, padding: '1rem 1.1rem' }}>
+                <ChartTitle>Total applications</ChartTitle>
+                <div style={{ fontFamily: MONO, fontSize: 24, color: C.text, fontWeight: 700, lineHeight: 1 }}>
+                  <AnimatedNumber value={kpis?.[0]?.value ?? 0} />
+                </div>
+              </Panel>
+              <Panel style={{ minHeight: 92, padding: '1rem 1.1rem' }}>
+                <ChartTitle>Pending review</ChartTitle>
+                <div style={{ fontFamily: MONO, fontSize: 24, color: C.gold, fontWeight: 700, lineHeight: 1 }}>
+                  <AnimatedNumber value={pendingCount} />
+                </div>
+              </Panel>
+              <Panel style={{ minHeight: 92, padding: '1rem 1.1rem' }}>
+                <ChartTitle>Approval rate</ChartTitle>
+                <div style={{ fontFamily: MONO, fontSize: 24, color: C.teal, fontWeight: 700, lineHeight: 1 }}>
+                  <AnimatedNumber value={approvalRate} suffix="%" />
+                </div>
+              </Panel>
+            </div>
+          </div>
+
           {loading && (
             <Panel style={{ padding: '0.6rem 1rem', alignSelf: 'center' }}>
               <span style={{ fontFamily: SANS, fontSize: 12, color: C.muted }}>Loading dashboard data…</span>
@@ -295,28 +322,35 @@ export default function SchemeDashboard() {
             <span style={{ fontFamily: SANS, fontSize: 12, color: C.brick }}>{error}</span>
           </Panel>
         )}
-        <RegisterSeal percent={disbursedPct} />
-      </div>
 
-        <Reveal>
-          <SectionHeader index="00" title="Officer Directory" note="PROFILE DETAILS" />
-        </Reveal>
-        <Reveal delay={0.05}>
-          <Panel>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <div>
-                <h3 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, color: C.text }}>Field officer profiles</h3>
-                <p style={{ margin: '0.35rem 0 0', fontFamily: SANS, color: C.muted, fontSize: 13 }}>
-                  Showing officer details only. Approval or rejection status is intentionally hidden here.
-                </p>
+        <section className="scheme-section scheme-section--profiles">
+          <Reveal>
+            <SectionHeader index="00" title="Officer Directory" note="PROFILE DETAILS" />
+          </Reveal>
+          <Reveal delay={0.05}>
+            <Panel style={{ zIndex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, color: C.text }}>Field officer profiles</h3>
+                  <p style={{ margin: '0.35rem 0 0', fontFamily: SANS, color: C.muted, fontSize: 13, maxWidth: 760 }}>
+                    Showing officer details only. Approvals and rejections are handled in the Application Management tab inside the officer dashboard.
+                  </p>
+                </div>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: C.teal, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  {officers.length.toLocaleString('en-IN')} records
+                </span>
               </div>
-              <span style={{ fontFamily: MONO, fontSize: 12, color: C.teal, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                {officers.length.toLocaleString('en-IN')} records
-              </span>
-            </div>
 
-            <div className="table-card" style={{ overflow: 'hidden' }}>
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div className="scheme-section-hint" style={{ marginBottom: '1rem' }}>
+                <div className="scheme-section-hint__icon">i</div>
+                <div className="scheme-section-hint__body">
+                  <strong>Need to approve or reject applications?</strong>
+                  <p>Use the Application Management tab in the officer dashboard. This directory is read-only and is meant for profile review only.</p>
+                </div>
+              </div>
+
+              <div className="table-card" style={{ overflow: 'hidden' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Full Name</th>
@@ -369,12 +403,14 @@ export default function SchemeDashboard() {
                 </tbody>
               </table>
             </div>
-          </Panel>
-        </Reveal>
+            </Panel>
+          </Reveal>
+        </section>
 
-        {/* KPI ledger row */}
-        <Reveal>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
+        <section className="scheme-section">
+          {/* KPI ledger row */}
+          <Reveal>
+            <div className="scheme-kpi-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
             {kpis.map((k) => (
               <motion.div
                 key={k.no}
@@ -395,8 +431,9 @@ export default function SchemeDashboard() {
                 <div style={{ fontFamily: SANS, color: C.muted, fontSize: 13, marginTop: 8, fontWeight: 500 }}>{k.label}</div>
               </motion.div>
             ))}
-          </div>
-        </Reveal>
+            </div>
+          </Reveal>
+        </section>
 
         {/* 1 & 2 — Status + Fund distribution */}
         <Reveal>
@@ -548,7 +585,7 @@ export default function SchemeDashboard() {
         </Reveal>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-14">
           <Reveal delay={0.05}>
-            <Panel style={{ gridColumn: "span 2" }}>
+            <Panel className="analytics-span-2">
               <ChartTitle>Applications vs disbursements over time</ChartTitle>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={monthly}>
@@ -616,7 +653,7 @@ export default function SchemeDashboard() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <Panel style={{ gridColumn: "span 2" }}>
+            <Panel className="analytics-span-2">
               <ChartTitle>Queue size by officer</ChartTitle>
               <ResponsiveContainer width="100%" height={230}>
                 <BarChart data={officerQueue} layout="vertical" margin={{ left: 0 }}>
@@ -659,7 +696,7 @@ export default function SchemeDashboard() {
         <Reveal>
           <SectionHeader index="06" title="Approval performance &amp; eligibility" />
         </Reveal>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-16">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '4rem' }}>
           <Reveal delay={0.05}>
             <Panel className="flex items-center gap-5">
               <div className="flex items-center gap-5">
@@ -699,7 +736,7 @@ export default function SchemeDashboard() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <Panel style={{ gridColumn: "span 2" }}>
+            <Panel className="analytics-span-2">
               <ChartTitle>Rejection reason categories</ChartTitle>
               <div className="flex flex-col gap-3">
                 {rejectionReasons.map((r) => (
@@ -749,6 +786,7 @@ export default function SchemeDashboard() {
           <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, letterSpacing: "0.08em" }}>
             PAGE 01 / 01
           </span>
+        </div>
         </div>
         </div>
       </main>

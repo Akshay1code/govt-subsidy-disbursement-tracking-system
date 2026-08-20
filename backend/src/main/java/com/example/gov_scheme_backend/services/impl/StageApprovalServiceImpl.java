@@ -59,10 +59,6 @@ public class StageApprovalServiceImpl implements StageApprovalService {
         switch (application.getStage()) {
 
             case FIELD:
-                application.setStage(ReviewStage.REGIONAL);
-                break;
-
-            case REGIONAL:
                 application.setStage(ReviewStage.DISTRICT);
                 break;
 

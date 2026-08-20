@@ -14,8 +14,11 @@ import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.security.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -39,13 +42,20 @@ public class AuthServiceImpl {
     private com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
 
     public String loginService(LoginRequest user){
-        Users dbUser = userRepo.findByUsername(user.getUsername()).orElseThrow();
-        System.out.println(passwordEncoder.matches(
-                user.getPassword(),
-                dbUser.getPassword()
-        ));
-        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
-        
+        Users dbUser = userRepo.findByUsername(user.getUsername())
+                .orElseThrow(() -> new UsernameNotFoundException("Username not found"));
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword())
+            );
+        } catch (BadCredentialsException ex) {
+            throw new BadCredentialsException("Password is incorrect");
+        } catch (AuthenticationException ex) {
+            throw ex;
+        }
+
         if (dbUser.getRole() != Role.BENEFICIARY) {
             com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
                     .auditId(UUID.randomUUID().toString())

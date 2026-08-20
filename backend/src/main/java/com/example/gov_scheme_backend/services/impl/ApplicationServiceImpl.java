@@ -196,16 +196,12 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         /*
          * Applicant passed the eligibility check.
+         * Keep the application pending until the beneficiary
+         * explicitly submits it.
          */
-        app.setStatus(ApplicationStatus.UNDER_REVIEW);
+        app.setStatus(ApplicationStatus.PENDING);
 
         applicationRepo.save(app);
-
-        /*
-         * Create workflow for the application after it
-         * successfully passes eligibility.
-         */
-        workflowService.createWorkflow(app);
 
         return new EligibilityEngineScoreDTO(
                 true,
@@ -288,10 +284,12 @@ public class ApplicationServiceImpl implements ApplicationService {
                     "Application has already been submitted");
         }
 
-        application.setStatus(
-                ApplicationStatus.SUBMITTED);
+        application.setStatus(ApplicationStatus.SUBMITTED);
 
         applicationRepo.save(application);
+
+        // Start the staged officer workflow only after the beneficiary submits.
+        workflowService.createWorkflow(application);
 
         com.example.gov_scheme_backend.entities.AuditLog audit = com.example.gov_scheme_backend.entities.AuditLog.builder()
                 .auditId(UUID.randomUUID().toString())
@@ -375,11 +373,14 @@ public class ApplicationServiceImpl implements ApplicationService {
                         "No application found for scheme '" + schemeCode +
                         "'. Please save your fields first."));
 
-        // Only allow document upload for applications in DRAFT or UNDER_REVIEW state
+        // Only allow document upload for applications that are still in draft,
+        // eligible-but-not-submitted, or already in the officer review flow.
         ApplicationStatus status = application.getStatus();
-        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.UNDER_REVIEW) {
+        if (status != ApplicationStatus.DRAFT
+                && status != ApplicationStatus.PENDING
+                && status != ApplicationStatus.UNDER_REVIEW) {
             throw new BadRequestException(
-                    "Documents can only be uploaded for applications in DRAFT or UNDER_REVIEW status. " +
+                    "Documents can only be uploaded for applications in DRAFT, PENDING or UNDER_REVIEW status. " +
                     "Current status: " + status);
         }
 

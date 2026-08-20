@@ -28,6 +28,11 @@ const STATUS_BADGE = {
   Approved: 'badge-status--eligible',
   Rejected: 'badge-status--ineligible',
   PENDING: 'badge-status--applied',
+  SUBMITTED: 'badge-status--applied',
+  UNDER_REVIEW: 'badge-status--applied',
+  FIELD_OFFICER: 'badge-status--applied',
+  DISTRICT_OFFICER: 'badge-status--applied',
+  FINANCE_OFFICER: 'badge-status--applied',
   APPROVED: 'badge-status--eligible',
   REJECTED: 'badge-status--ineligible',
 }
@@ -109,7 +114,15 @@ export default function OfficerDashboard() {
 
   // Statistics
   const total = applications.length
-  const pending = applications.filter(a => a.status === 'Pending' || a.status === 'PENDING').length
+  const pending = applications.filter(a => {
+    const status = String(a.status || '').toUpperCase()
+    return status === 'PENDING'
+      || status === 'SUBMITTED'
+      || status === 'UNDER_REVIEW'
+      || status === 'FIELD_OFFICER'
+      || status === 'DISTRICT_OFFICER'
+      || status === 'FINANCE_OFFICER'
+  }).length
   const approved = applications.filter(a => a.status === 'Approved' || a.status === 'APPROVED').length
   const rejected = applications.filter(a => a.status === 'Rejected' || a.status === 'REJECTED').length
   const approvalRate = total ? Math.round((approved / total) * 100) : 0
@@ -122,7 +135,14 @@ export default function OfficerDashboard() {
       (app.id || app.applicationId || '').toLowerCase().includes(term) ||
       app.schemeName?.toLowerCase().includes(term)
     const appStatus = app.status || ''
-    const matchesStatus = statusFilter === 'All' || appStatus.toLowerCase() === statusFilter.toLowerCase()
+    const normalizedFilter = statusFilter.toUpperCase()
+    const matchesStatus =
+      statusFilter === 'All' ||
+      (
+        normalizedFilter === 'PENDING'
+          ? ['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER'].includes(appStatus.toUpperCase())
+          : appStatus.toUpperCase() === normalizedFilter
+      )
     return matchesSearch && matchesStatus
   })
 
@@ -544,7 +564,14 @@ export default function OfficerDashboard() {
                           <td>{app.schemeName || app.schemeId || '—'}</td>
                           <td className="font-mono">{app.submittedDate || app.createdAt || '—'}</td>
                           <td>
-                            <span className={`badge-status ${STATUS_BADGE[app.status] || ''}`}>{app.status}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                              <span className={`badge-status ${STATUS_BADGE[app.status] || ''}`}>{app.status}</span>
+                              {app.currentStage && (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'capitalize' }}>
+                                  Stage: {String(app.currentStage).split('_').join(' ').toLowerCase()}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -641,7 +668,7 @@ export default function OfficerDashboard() {
           {activeTab === 'reports' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               
-              <div style={{ margin: '-2rem -2rem 2rem -2rem', overflow: 'hidden', borderRadius: '12px' }}>
+              <div className="reports-analytics-shell">
                 <SchemeDashboard />
               </div>
 

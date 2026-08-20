@@ -45,20 +45,13 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     @Override
     public void createWorkflow(Application application) {
-
-        Users fieldOfficer = userRepo.findByRole(Role.FIELD_OFFICER)
-                .stream()
-                .findFirst()
-                .orElseThrow(() ->
-                        new RuntimeException("No Field Officer found"));
-
         VerificationWorkflow workflow = new VerificationWorkflow();
 
         workflow.setApplication(application);
 
         workflow.setCurrentStage(WorkflowStage.FIELD_OFFICER);
 
-        workflow.setAssignedOfficer(fieldOfficer);
+        workflow.setAssignedOfficer(null);
 
         workflowRepository.save(workflow);
     }
@@ -118,18 +111,23 @@ public class WorkflowServiceImpl implements WorkflowService {
         }
     }
 
+
+
+
     private WorkflowResponse approveApplication(
             VerificationWorkflow workflow,
             Application application,
             Users officer,
             WorkflowActionRequest request) {
 
-        if (workflow.getCurrentStage() == WorkflowStage.FINANCE_OFFICER
-                && request.getApprovedAmount() == null) {
+        if (workflow.getCurrentStage() == WorkflowStage.FINANCE_OFFICER) {
 
-            throw new RuntimeException(
-                    "Approved amount is required"
-            );
+            if (request.getApprovedAmount() == null) {
+                throw new RuntimeException("Approved amount is required");
+            }
+            if (request.getNumberOfInstallments() == null || request.getNumberOfInstallments() < 1) {
+                throw new RuntimeException("Number of installments is required and must be at least 1");
+            }
         }
 
         WorkflowStage oldStage = workflow.getCurrentStage();
@@ -151,6 +149,7 @@ public class WorkflowServiceImpl implements WorkflowService {
 
                 createDisbursementPlan(
                         application,
+                        officer,
                         request
                 );
 
@@ -575,22 +574,26 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     private void createDisbursementPlan(
             Application application,
+            Users financeOfficer,
             WorkflowActionRequest request) {
 
         if (request.getApprovedAmount() == null || request.getApprovedAmount() <= 0) {
             throw new RuntimeException("Approved amount must be greater than zero");
         }
 
+        if (request.getNumberOfInstallments() == null || request.getNumberOfInstallments() < 1) {
+            throw new RuntimeException("Number of installments must be at least 1");
+        }
+
         if (disbursementPlanRepository.findByApplicationId(application.getId()).isPresent()) {
             return;
         }
 
-        // The current workflow request does not carry a stage count.
-        // The project currently defines the staged disbursement flow as 3 stages.
         DisbursementPlan plan = DisbursementPlan.builder()
                 .applicationId(application.getId())
                 .totalAmount(request.getApprovedAmount())
-                .totalStages(3)
+                .totalStages(request.getNumberOfInstallments())
+                .financeOfficerId(financeOfficer != null ? financeOfficer.getId() : null)
                 .build();
 
         disbursementPlanRepository.save(plan);
