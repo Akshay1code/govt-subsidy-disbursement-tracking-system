@@ -1,13 +1,19 @@
 package com.example.gov_scheme_backend.controllers;
 
 import com.example.gov_scheme_backend.dto.request.application.ApplicationFieldValueRequestDTO;
+import com.example.gov_scheme_backend.dto.request.application.ApplicationAllocationRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.ApiResponse;
 import com.example.gov_scheme_backend.dto.response.application.EligibilityEngineScoreDTO;
 import com.example.gov_scheme_backend.enums.DocumentType;
+import com.example.gov_scheme_backend.enums.ApplicationStatus;
+import com.example.gov_scheme_backend.enums.Role;
+import com.example.gov_scheme_backend.enums.WorkflowStage;
 import com.example.gov_scheme_backend.security.JwtService;
 import com.example.gov_scheme_backend.services.ApplicationService;
 import com.example.gov_scheme_backend.entities.Application;
-import com.example.gov_scheme_backend.enums.Role;
+import com.example.gov_scheme_backend.entities.Users;
+import com.example.gov_scheme_backend.entities.VerificationWorkflow;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -87,7 +93,7 @@ public class ApplicationController {
      *
      * <p>Request parameters:
      * <ul>
-     *   <li>{@code files} — one or more document files (PDF / PNG / JPG, max 5 MB each)</li>
+     *   <li>{@code files} — one or more document files (PDF / PNG / JPG, max 40 MB each)</li>
      *   <li>{@code types} — document type for each file, e.g. AADHAAR, PAN, INCOME_CERTIFICATE</li>
      * </ul>
      *
@@ -152,6 +158,12 @@ public class ApplicationController {
     @Autowired
     private com.example.gov_scheme_backend.repositories.ApplicationRepo applicationRepo;
 
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.VerificationWorkflowRepository workflowRepository;
+
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.UserRepo userRepo;
+
     @GetMapping
     public ResponseEntity<?> getAllApplications(HttpServletRequest req) {
         String token = jwtService.extractTokenFromCookie(req);
@@ -194,6 +206,14 @@ public class ApplicationController {
 
         List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
         for (Application app : apps) {
+            VerificationWorkflow workflow = workflowRepository.findByApplicationId(app.getId()).orElse(null);
+
+            if (viewerContext != null
+                    && isOfficerRole(viewerContext.role())
+                    && !isAssignedToCurrentOfficer(viewerContext.userId(), workflow)) {
+                continue;
+            }
+
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", app.getId());
             map.put("applicationId", app.getId());
@@ -208,6 +228,26 @@ public class ApplicationController {
             map.put("remarks", app.getRemarks());
             map.put("createdAt", app.getCreatedAt());
             map.put("updatedAt", app.getUpdatedAt());
+            map.put(
+                    "currentStage",
+                    workflow != null && workflow.getCurrentStage() != null
+                            ? workflow.getCurrentStage().name()
+                            : null);
+            map.put(
+                    "assignedOfficerId",
+                    workflow != null && workflow.getAssignedOfficer() != null
+                            ? workflow.getAssignedOfficer().getUniqueID()
+                            : null);
+            map.put(
+                    "assignedOfficerDbId",
+                    workflow != null && workflow.getAssignedOfficer() != null
+                            ? workflow.getAssignedOfficer().getId()
+                            : null);
+            map.put(
+                    "assignedOfficerName",
+                    workflow != null && workflow.getAssignedOfficer() != null
+                            ? workflow.getAssignedOfficer().getFullName()
+                            : null);
             map.put(
                     "submittedDate",
                     "DRAFT".equalsIgnoreCase(applicationStatus) || "PENDING".equalsIgnoreCase(applicationStatus)
@@ -257,6 +297,94 @@ public class ApplicationController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/allocation")
+    public ResponseEntity<?> allocateApplication(
+            @RequestBody ApplicationAllocationRequestDTO request,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can allocate applications"));
+        }
+
+        if (request == null || request.getApplicationId() == null || request.getOfficerId() == null || request.getOfficerId().isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Application ID and officer ID are required"));
+        }
+
+        Application application = applicationRepo.findById(request.getApplicationId())
+                .orElseThrow(() -> new com.example.gov_scheme_backend.exceptions.ResourceNotFoundException("Application not found"));
+
+        VerificationWorkflow workflow = workflowRepository.findByApplicationId(request.getApplicationId())
+                .orElseThrow(() -> new com.example.gov_scheme_backend.exceptions.ResourceNotFoundException("Workflow not found"));
+
+        if (ApplicationStatus.APPROVED.name().equalsIgnoreCase(String.valueOf(application.getStatus()))
+                || ApplicationStatus.REJECTED.name().equalsIgnoreCase(String.valueOf(application.getStatus()))) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Finalized applications cannot be reallocated"));
+        }
+
+        Users officer = resolveOfficer(request.getOfficerId());
+        if (officer == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse(false, "Officer not found"));
+        }
+
+        WorkflowStage currentStage = workflow.getCurrentStage();
+        if (currentStage != null && !isOfficerCompatible(officer, currentStage)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Selected officer does not match the current workflow stage"));
+        }
+
+        workflow.setAssignedOfficer(officer);
+        workflowRepository.save(workflow);
+
+        ApplicationAllocationResponseDTO response = new ApplicationAllocationResponseDTO(
+                true,
+                "Application allocated successfully",
+                application.getId(),
+                officer.getUniqueID(),
+                officer.getFullName(),
+                currentStage != null ? currentStage.name() : null,
+                application.getStatus() != null ? application.getStatus().name() : null
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    private Users resolveOfficer(String officerId) {
+        Users officer = userRepo.findByuniqueID(officerId).orElse(null);
+        if (officer != null) {
+            return officer;
+        }
+
+        try {
+            Long userId = Long.valueOf(officerId);
+            return userRepo.findById(userId).orElse(null);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private boolean isOfficerCompatible(Users officer, WorkflowStage stage) {
+        if (officer == null || officer.getRole() == null || stage == null) {
+            return false;
+        }
+
+        return switch (stage) {
+            case FIELD_OFFICER -> officer.getRole() == Role.FIELD_OFFICER;
+            case DISTRICT_OFFICER -> officer.getRole() == Role.DISTRICT_OFFICER;
+            case FINANCE_OFFICER -> officer.getRole() == Role.FINANCE_OFFICER;
+            default -> false;
+        };
+    }
+
     private boolean isPrivilegedRole(String role) {
         if (role == null) {
             return false;
@@ -264,7 +392,42 @@ public class ApplicationController {
 
         String normalized = role.toUpperCase();
         return normalized.equals(Role.ADMIN.name())
-                || normalized.contains("OFFICER");
+                || normalized.equals(Role.FIELD_OFFICER.name())
+                || normalized.equals(Role.DISTRICT_OFFICER.name())
+                || normalized.equals(Role.FINANCE_OFFICER.name());
+    }
+
+    private boolean isOfficerRole(String role) {
+        if (role == null) {
+            return false;
+        }
+
+        String normalized = role.toUpperCase();
+        return normalized.equals(Role.FIELD_OFFICER.name())
+                || normalized.equals(Role.DISTRICT_OFFICER.name())
+                || normalized.equals(Role.FINANCE_OFFICER.name());
+    }
+
+    private boolean isAssignedToCurrentOfficer(Long userId, VerificationWorkflow workflow) {
+        if (workflow == null || workflow.getAssignedOfficer() == null || userId == null) {
+            return false;
+        }
+
+        return userId.equals(workflow.getAssignedOfficer().getId());
+    }
+
+    private boolean matchesOfficerStage(String role, VerificationWorkflow workflow) {
+        if (workflow == null || workflow.getCurrentStage() == null || role == null) {
+            return false;
+        }
+
+        String normalized = role.toUpperCase();
+        return switch (workflow.getCurrentStage()) {
+            case FIELD_OFFICER -> normalized.equals(Role.FIELD_OFFICER.name());
+            case DISTRICT_OFFICER -> normalized.equals(Role.DISTRICT_OFFICER.name());
+            case FINANCE_OFFICER -> normalized.equals(Role.FINANCE_OFFICER.name());
+            default -> false;
+        };
     }
 
     private record ViewerContext(Long userId, String role) {}

@@ -8,7 +8,6 @@ import { FaUser, FaLandmark } from 'react-icons/fa'
 const OFFICER_ROLES = [
   { value: 'FIELD_OFFICER',    label: 'Field Officer' },
   { value: 'DISTRICT_OFFICER', label: 'District Officer' },
-  { value: 'REGIONAL_OFFICER', label: 'Regional Officer' },
   { value: 'FINANCE_OFFICER',  label: 'Finance Officer' },
 ]
 

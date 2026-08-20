@@ -19,6 +19,7 @@ public class DisbursementPlan {
     @Column(name = "plan_id")
     private Long planId;
 
+
     @Column(name = "application_id", nullable = false)
     private Long applicationId;
 
@@ -27,4 +28,7 @@ public class DisbursementPlan {
 
     @Column(name = "total_stages", nullable = false)
     private Integer totalStages;
+
+    @Column(name = "finance_officer_id")
+    private Long financeOfficerId;
 }

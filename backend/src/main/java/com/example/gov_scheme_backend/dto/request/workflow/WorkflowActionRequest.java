@@ -14,4 +14,7 @@ public class WorkflowActionRequest {
 
     // Used only when Finance Officer approves
     private Double approvedAmount;
+
+    // Used only when Finance Officer approves — how many installments to split the grant into
+    private Integer numberOfInstallments;
 }

@@ -33,7 +33,14 @@ public class Notification {
     private LocalDate sentDate;
 
     @Column(nullable = false)
+    @Builder.Default
     private boolean isRead = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_type")
+    @Builder.Default
+    private com.example.gov_scheme_backend.enums.NotificationType notificationType =
+            com.example.gov_scheme_backend.enums.NotificationType.GENERAL;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

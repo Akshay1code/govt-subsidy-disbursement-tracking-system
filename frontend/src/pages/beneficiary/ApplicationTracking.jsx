@@ -12,6 +12,10 @@ function getApplicationStatus(app) {
   return String(app?.applicationStatus || app?.status || '').toUpperCase()
 }
 
+function getWorkflowStage(app) {
+  return String(app?.currentStage || app?.workflowStage || '').toUpperCase()
+}
+
 function isDraftStatus(status) {
   return status === 'DRAFT' || status === 'PENDING'
 }
@@ -40,7 +44,13 @@ function getStatusLabel(status) {
     case 'PENDING':
       return 'Application started'
     case 'SUBMITTED':
-      return 'Application submitted'
+      return 'Submitted to Field Officer'
+    case 'FIELD_OFFICER':
+      return 'Field Officer review'
+    case 'DISTRICT_OFFICER':
+      return 'District Officer review'
+    case 'FINANCE_OFFICER':
+      return 'Finance Officer review'
     case 'UNDER_REVIEW':
       return 'Under review'
     case 'APPROVED':
@@ -60,7 +70,13 @@ function getStatusHint(status) {
     case 'PENDING':
       return 'Your application is saved, but it has not been submitted yet.'
     case 'SUBMITTED':
-      return 'The application has been submitted and is waiting for review.'
+      return 'The application has been submitted and is now with the Field Officer.'
+    case 'FIELD_OFFICER':
+      return 'The Field Officer is reviewing your application details.'
+    case 'DISTRICT_OFFICER':
+      return 'The District Officer is reviewing the field verification outcome.'
+    case 'FINANCE_OFFICER':
+      return 'The Finance Officer is completing the final sanction review.'
     case 'UNDER_REVIEW':
       return 'The officer team is checking your submission.'
     case 'APPROVED':
@@ -77,9 +93,14 @@ function getStatusHint(status) {
 function getLocationForStatus(status) {
   switch (String(status || '').toUpperCase()) {
     case 'SUBMITTED':
-      return 'District Nodal Officer / Desk 4'
+    case 'FIELD_OFFICER':
+      return 'Field Officer Review Desk'
     case 'UNDER_REVIEW':
+      return 'Officer Review Cell'
+    case 'DISTRICT_OFFICER':
       return 'District Review Cell'
+    case 'FINANCE_OFFICER':
+      return 'Finance Sanction Desk'
     case 'APPROVED':
       return 'Sanction & Approval Desk'
     case 'DISBURSED':
@@ -93,6 +114,7 @@ function getLocationForStatus(status) {
 
 function buildActivityLog(application) {
   const status = getApplicationStatus(application)
+  const trackingKey = getTrackingKey(application)
   const submittedOn = formatApplicationDate(application?.submittedDate || application?.createdAt)
   const items = []
 
@@ -112,10 +134,26 @@ function buildActivityLog(application) {
     })
   }
 
-  if (status === 'UNDER_REVIEW' || status === 'APPROVED' || status === 'DISBURSED') {
+  if (trackingKey === 'FIELD_OFFICER' || trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
     items.push({
       time: 'Now',
-      title: 'File forwarded to District Nodal Officer',
+      title: 'File forwarded to Field Officer',
+      note: 'Completed',
+    })
+  }
+
+  if (trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
+    items.push({
+      time: 'Now',
+      title: 'File forwarded to District Officer',
+      note: 'Completed',
+    })
+  }
+
+  if (trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
+    items.push({
+      time: 'Now',
+      title: 'File forwarded to Finance Officer',
       note: 'Completed',
     })
   }
@@ -154,11 +192,38 @@ function buildActivityLog(application) {
 }
 
 function getStepTone(step, currentIndex) {
-  const statusSteps = ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'DISBURSED']
+  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED', 'REJECTED']
   const stepIndex = statusSteps.indexOf(step)
   if (currentIndex > stepIndex) return 'done'
   if (currentIndex === stepIndex) return 'active'
   return 'pending'
+}
+
+function getTrackingKey(application) {
+  const status = getApplicationStatus(application)
+  const workflowStage = getWorkflowStage(application)
+
+  if (workflowStage === 'FIELD_OFFICER' || workflowStage === 'DISTRICT_OFFICER' || workflowStage === 'FINANCE_OFFICER') {
+    return workflowStage
+  }
+
+  if (status === 'APPROVED' || status === 'DISBURSED' || status === 'REJECTED') {
+    return status
+  }
+
+  if (status === 'SUBMITTED') {
+    return 'SUBMITTED'
+  }
+
+  if (status === 'UNDER_REVIEW') {
+    return workflowStage || 'FIELD_OFFICER'
+  }
+
+  if (status === 'PENDING') {
+    return 'PENDING'
+  }
+
+  return 'DRAFT'
 }
 
 export default function ApplicationTracking() {
@@ -197,15 +262,22 @@ export default function ApplicationTracking() {
   const scheme = schemes.find(item => item.schemeCode === schemeCode || item.id === schemeCode)
   const application = getApplicationForScheme(applications, schemeCode)
   const applicationStatus = getApplicationStatus(application)
+  const trackingKey = getTrackingKey(application)
   const hasTrackableApplication = Boolean(application && !isDraftStatus(applicationStatus))
   const activityLog = buildActivityLog(application)
-  const currentLocation = getLocationForStatus(applicationStatus)
+  const currentLocation = getLocationForStatus(trackingKey)
 
-  const statusSteps = ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'DISBURSED']
-  const currentIndex = statusSteps.indexOf(applicationStatus)
+  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED']
+  const currentIndex = statusSteps.indexOf(trackingKey)
   const progressCards = useMemo(() => statusSteps.map((step) => ({
     key: step,
-    label: step.split('_').join(' '),
+    label: step === 'FIELD_OFFICER'
+      ? 'Field Officer'
+      : step === 'DISTRICT_OFFICER'
+        ? 'District Officer'
+        : step === 'FINANCE_OFFICER'
+          ? 'Finance Officer'
+          : step.split('_').join(' '),
     tone: getStepTone(step, currentIndex),
   })), [currentIndex])
 
@@ -359,8 +431,8 @@ export default function ApplicationTracking() {
               </div>
             </div>
           </div>
-          <span className={`tracking-badge tracking-badge--${applicationStatus.toLowerCase()}`}>
-            {getStatusLabel(applicationStatus)}
+          <span className={`tracking-badge tracking-badge--${trackingKey.toLowerCase()}`}>
+            {getStatusLabel(trackingKey)}
           </span>
         </motion.div>
 
@@ -369,8 +441,8 @@ export default function ApplicationTracking() {
             <div className="tracking-card application-tracking-card">
               <div className="tracking-card__header application-tracking-card__header">
                 <h4>Application Progress</h4>
-                <span className={`tracking-badge tracking-badge--${applicationStatus.toLowerCase()}`}>
-                  {applicationStatus || 'DRAFT'}
+                <span className={`tracking-badge tracking-badge--${trackingKey.toLowerCase()}`}>
+                  {getStatusLabel(trackingKey)}
                 </span>
               </div>
 
@@ -383,10 +455,14 @@ export default function ApplicationTracking() {
                     <div className="application-tracking-step__label">{step.label}</div>
                     <div className="application-tracking-step__desc">
                       {step.key === 'DRAFT' && 'Saved'}
-                      {step.key === 'SUBMITTED' && 'Submitted'}
-                      {step.key === 'UNDER_REVIEW' && 'Officer review'}
+                      {step.key === 'PENDING' && 'Eligible'}
+                      {step.key === 'SUBMITTED' && 'Sent to Field Officer'}
+                      {step.key === 'FIELD_OFFICER' && 'Field verification'}
+                      {step.key === 'DISTRICT_OFFICER' && 'District review'}
+                      {step.key === 'FINANCE_OFFICER' && 'Finance sanction'}
                       {step.key === 'APPROVED' && 'Approved'}
                       {step.key === 'DISBURSED' && 'Funds released'}
+                      {step.key === 'REJECTED' && 'Rejected'}
                     </div>
                   </div>
                 ))}
@@ -396,8 +472,8 @@ export default function ApplicationTracking() {
             <div className="tracking-card application-tracking-card">
               <div className="tracking-card__header application-tracking-card__header">
                 <h4>Application Details</h4>
-                <span className={`tracking-badge tracking-badge--${applicationStatus.toLowerCase()}`}>
-                  {getStatusLabel(applicationStatus)}
+                <span className={`tracking-badge tracking-badge--${trackingKey.toLowerCase()}`}>
+                  {getStatusLabel(trackingKey)}
                 </span>
               </div>
 
@@ -433,8 +509,8 @@ export default function ApplicationTracking() {
             <div className="tracking-card application-tracking-card">
               <div className="tracking-card__header application-tracking-card__header">
                 <h4>Current Location</h4>
-                <span className={`tracking-badge tracking-badge--${applicationStatus.toLowerCase()}`}>
-                  {applicationStatus || 'DRAFT'}
+                <span className={`tracking-badge tracking-badge--${trackingKey.toLowerCase()}`}>
+                  {getStatusLabel(trackingKey)}
                 </span>
               </div>
               <div className="tracking-modal__status application-tracking-location">

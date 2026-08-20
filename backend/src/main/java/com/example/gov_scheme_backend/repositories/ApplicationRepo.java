@@ -47,7 +47,23 @@ public interface ApplicationRepo extends JpaRepository<Application, Long> {
     FROM Application a
 """)
     Object[] getApplicationPerformance();
+
+    Long countByStatus(com.example.gov_scheme_backend.enums.ApplicationStatus status);
+
+    Long countByDocumentsIsEmpty();
+
+    @Query("""
+        SELECT a.scheme.schemeCode, COUNT(a)
+        FROM Application a
+        GROUP BY a.scheme.schemeCode
+    """)
+    List<Object[]> countApplicationsByScheme();
+
+    @Query(value = """
+        SELECT FUNCTION('DATE_FORMAT', a.createdAt, '%Y-%m'), COUNT(a)
+        FROM Application a
+        GROUP BY FUNCTION('DATE_FORMAT', a.createdAt, '%Y-%m')
+        ORDER BY 1
+    """)
+    List<Object[]> countApplicationsByMonth();
 }
-
-
-

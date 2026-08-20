@@ -22,7 +22,7 @@ import java.util.Set;
  * <p><b>Validation rules applied before upload:</b>
  * <ul>
  *   <li>Allowed MIME types: PDF, PNG, JPG/JPEG</li>
- *   <li>Maximum file size: 5 MB</li>
+ *   <li>Maximum file size: 40 MB</li>
  *   <li>File must not be empty</li>
  * </ul>
  */
@@ -37,8 +37,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             "image/jpeg"
     );
 
-    // Maximum allowed file size: 5 MB
-    private static final long MAX_FILE_SIZE_BYTES = 5L * 1024 * 1024;
+    // Maximum allowed file size: 40 MB
+    private static final long MAX_FILE_SIZE_BYTES = 40L * 1024 * 1024;
 
     private final Cloudinary cloudinary;
 
@@ -156,7 +156,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new BadRequestException(
-                    "Document exceeds the maximum allowed size of 5 MB. " +
+                    "Document exceeds the maximum allowed size of 40 MB. " +
                     "Received size: " + (file.getSize() / (1024 * 1024)) + " MB");
         }
 
