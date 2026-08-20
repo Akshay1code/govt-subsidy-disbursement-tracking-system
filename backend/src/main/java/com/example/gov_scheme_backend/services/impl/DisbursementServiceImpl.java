@@ -14,6 +14,9 @@ import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.*;
 import com.example.gov_scheme_backend.services.DisbursementService;
+import com.example.gov_scheme_backend.dto.response.disbursement.MilestoneContextResponse;
+import com.example.gov_scheme_backend.dto.response.disbursement.SuggestedStagesResponse;
+import com.example.gov_scheme_backend.enums.NotificationType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -125,7 +128,16 @@ public class DisbursementServiceImpl implements DisbursementService {
             savedMilestones.add(milestoneRepo.save(milestone));
         }
 
-        return mapToPlanResponse(plan, savedMilestones);
+        // Stage 1 requires no prior compliance milestone — release it immediately
+        // so the beneficiary receives the first installment as soon as the
+        // Finance Officer finalizes the plan, with no extra manual step.
+        savedMilestones.stream()
+                .filter(m -> m.getStageNumber() == 1)
+                .findFirst()
+                .ifPresent(stage1 -> releaseMilestone(stage1.getMilestoneId()));
+
+        List<DisbursementMilestone> refreshed = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+        return mapToPlanResponse(plan, refreshed);
     }
 
     @Override
@@ -140,8 +152,11 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         milestone.setCompletionStatus(MilestoneStatus.COMPLETED);
         milestone.setCompletedDate(LocalDate.now());
+        DisbursementMilestone saved = milestoneRepo.save(milestone);
 
-        return mapToMilestoneResponse(milestoneRepo.save(milestone));
+        notifyFinanceOfficerMilestoneReady(saved);
+
+        return mapToMilestoneResponse(saved);
     }
 
     @Override
@@ -500,6 +515,118 @@ public class DisbursementServiceImpl implements DisbursementService {
                 milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
 
         return mapToPlanResponse(plan, milestones);
+    }
+
+    private void notifyFinanceOfficerMilestoneReady(DisbursementMilestone milestone) {
+
+        DisbursementPlan plan = milestone.getPlan();
+
+        Users financeOfficer = null;
+        if (plan.getFinanceOfficerId() != null) {
+            financeOfficer = userRepo.findById(plan.getFinanceOfficerId()).orElse(null);
+        }
+        if (financeOfficer == null) {
+            // Fallback for plans created before this field existed, or if the
+            // originally-assigned officer no longer exists.
+            financeOfficer = userRepo.findByRole(Role.FINANCE_OFFICER)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (financeOfficer == null) {
+            return; // nobody to notify — skip silently, don't block milestone completion
+        }
+
+        Application app = applicationRepo.findById(plan.getApplicationId()).orElse(null);
+        String beneficiaryName = (app != null && app.getUser() != null) ? app.getUser().getFullName() : "Unknown";
+        String applicationCode = (app != null) ? app.getApplicationCode() : "N/A";
+
+        String message = "Milestone '" + milestone.getMilestoneName() + "' (Stage "
+                + milestone.getStageNumber() + ") for " + beneficiaryName + "'s application "
+                + applicationCode + " is complete and ready for disbursement of ₹"
+                + milestone.getAmountToRelease() + ".";
+
+        Notification notification = Notification.builder()
+                .user(financeOfficer)
+                .milestoneId(milestone.getMilestoneId())
+                .message(message)
+                .sentDate(LocalDate.now())
+                .isRead(false)
+                .notificationType(NotificationType.MILESTONE_READY)
+                .build();
+
+        notificationRepo.save(notification);
+    }
+
+    @Override
+    public SuggestedStagesResponse suggestStages(Long planId) {
+
+        DisbursementPlan plan = planRepo.findById(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Disbursement plan not found with ID: " + planId));
+
+        int n = plan.getTotalStages();
+        double total = plan.getTotalAmount();
+
+        // Even split, rounded down to 2 decimals per stage; the last stage
+        // absorbs the rounding remainder so the sum always equals the total
+        // exactly (required by configurePlan's validation).
+        double baseAmount = Math.floor((total / n) * 100.0) / 100.0;
+        double allocatedToFirstStages = baseAmount * (n - 1);
+        double lastStageAmount = Math.round((total - allocatedToFirstStages) * 100.0) / 100.0;
+
+        List<StageDto> stages = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+
+        for (int i = 1; i <= n; i++) {
+            double amount = (i == n) ? lastStageAmount : baseAmount;
+            String name = (i == 1) ? "Initial Release" : (i == n) ? "Final Release" : "Stage " + i + " Release";
+            // Stage 1 is due today since it releases immediately on finalization;
+            // later stages are spaced 30 days apart as a starting suggestion —
+            // the officer can edit every due date before finalizing.
+            LocalDate dueDate = (i == 1) ? today : today.plusDays(30L * (i - 1));
+
+            stages.add(new StageDto(i, name, amount, dueDate));
+        }
+
+        return SuggestedStagesResponse.builder()
+                .planId(plan.getPlanId())
+                .totalAmount(total)
+                .totalStages(n)
+                .suggestedStages(stages)
+                .build();
+    }
+
+    @Override
+    public MilestoneContextResponse getMilestoneContext(Long milestoneId) {
+
+        DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
+
+        DisbursementPlan plan = milestone.getPlan();
+        Application app = applicationRepo.findById(plan.getApplicationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found for disbursement plan"));
+
+        List<DisbursementMilestoneResponse> allMilestones = milestoneRepo
+                .findByPlanOrderByStageNumberAsc(plan)
+                .stream()
+                .map(this::mapToMilestoneResponse)
+                .collect(Collectors.toList());
+
+        return MilestoneContextResponse.builder()
+                .milestoneId(milestone.getMilestoneId())
+                .stageNumber(milestone.getStageNumber())
+                .milestoneName(milestone.getMilestoneName())
+                .amountToRelease(milestone.getAmountToRelease())
+                .dueDate(milestone.getDueDate())
+                .completionStatus(milestone.getCompletionStatus())
+                .completedDate(milestone.getCompletedDate())
+                .planId(plan.getPlanId())
+                .applicationId(app.getId())
+                .applicationCode(app.getApplicationCode())
+                .beneficiaryName(app.getUser() != null ? app.getUser().getFullName() : "Unknown")
+                .schemeName(app.getScheme() != null ? app.getScheme().getSchemeName() : "Unknown")
+                .allMilestones(allMilestones)
+                .build();
     }
 
     private DisbursementPlanResponse mapToPlanResponse(DisbursementPlan plan, List<DisbursementMilestone> milestones) {

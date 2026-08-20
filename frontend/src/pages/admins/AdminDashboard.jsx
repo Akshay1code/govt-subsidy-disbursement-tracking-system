@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
 import DashboardTopbar from '../../components/DashboardTopbar'
 import { updateApprovalStatus, getOfficerRequests } from '../../services/adminService'
-import { getApplications } from '../../services/applicationService'
+import { getApplications, allocateApplication } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
 import { clearPortalSessionCaches } from '../../services/sessionCleanup'
 import ProfilePanel from '../../components/ProfilePanel'
 import api from '../../services/api'
-import { FaHistory, FaUserShield, FaTools, FaClipboardList, FaComments, FaHourglassHalf, FaTimesCircle, FaFileInvoice, FaCheck, FaUserCircle } from 'react-icons/fa'
+import { FaUserShield, FaTools, FaClipboardList, FaComments, FaHourglassHalf, FaTimesCircle, FaFileInvoice, FaCheck, FaUserCircle } from 'react-icons/fa'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -70,8 +70,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchOfficers() {
       try {
-        const data = await getProfilesByRole('FIELD_OFFICER')
-        setOfficers(Array.isArray(data) ? data : data?.data || [])
+        const roles = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER']
+        const results = await Promise.all(roles.map(role => getProfilesByRole(role)))
+        const merged = results.flatMap((data, index) => {
+          const items = Array.isArray(data) ? data : data?.data || []
+          return items.map(item => ({
+            ...item,
+            role: item.role || roles[index],
+          }))
+        })
+        setOfficers(merged)
       } catch {
         setOfficers([])
       }
@@ -127,7 +135,7 @@ export default function AdminDashboard() {
   const [queries, setQueries] = useState([])
 
   // View state (declared early so useEffects below can reference it)
-  const [activeTab, setActiveTab] = useState('history') // 'history' | 'officers' | 'schemes' | 'action-logs' | 'officer-requests' | 'queries' | 'profile'
+  const [activeTab, setActiveTab] = useState('allocation') // 'allocation' | 'officers' | 'schemes' | 'action-logs' | 'officer-requests' | 'queries' | 'profile'
 
   // Officer Requests from backend (GET /gov/auth/officer/get-request)
   const [officerRequests, setOfficerRequests] = useState([])
@@ -181,6 +189,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [officerFilter, setOfficerFilter] = useState('All')
+  const [stageFilter, setStageFilter] = useState('All')
   const [selectedApp, setSelectedApp] = useState(null)
   const [selectedOfficer, setSelectedOfficer] = useState(null)
   const [selectedQuery, setSelectedQuery] = useState(null)
@@ -189,9 +198,9 @@ export default function AdminDashboard() {
   const [targetOfficerId, setTargetOfficerId] = useState('')
   const [toast, setToast] = useState(null)
   const tabContentMeta = {
-    history: {
-      title: 'Application History',
-      subtitle: 'Review submitted applications, current statuses, and the latest review history.',
+    allocation: {
+      title: 'Application Allocation',
+      subtitle: 'Assign submitted applications to the correct officer before the review flow begins.',
     },
     officers: {
       title: 'Officer Work Tracker',
@@ -365,7 +374,7 @@ export default function AdminDashboard() {
     return matchesSearch && matchesAction && matchesOfficer
   })
 
-  // Filtered applications for History tab
+  // Filtered applications for allocation view
   const filteredApps = applications.filter(app => {
     const matchesSearch =
       app.applicant.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -374,35 +383,57 @@ export default function AdminDashboard() {
 
     const matchesStatus = statusFilter === 'All' || app.status === statusFilter
     const matchesOfficer = officerFilter === 'All' || app.assignedOfficerId === officerFilter
+    const matchesStage = stageFilter === 'All' || String(app.currentStage || '').toUpperCase() === stageFilter
 
-    return matchesSearch && matchesStatus && matchesOfficer
+    return matchesSearch && matchesStatus && matchesOfficer && matchesStage
   })
 
-  // Handle reassigning application to another officer
-  function handleReassignSubmit(e) {
+  const allocationApps = filteredApps.filter(app => {
+    const normalizedStatus = String(app.status || app.applicationStatus || '').toUpperCase()
+    return !['APPROVED', 'REJECTED', 'DISBURSED'].includes(normalizedStatus)
+  })
+
+  const stageBreakdown = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER'].map(stage => ({
+    stage,
+    count: allocationApps.filter(app => String(app.currentStage || '').toUpperCase() === stage).length,
+  }))
+
+  // Handle allocating application to another officer
+  async function handleReassignSubmit(e) {
     e.preventDefault()
     if (!targetOfficerId) {
       showToast('Please select a target officer', 'error')
       return
     }
 
-    const newOfficerObj = officers.find(o => o.officerId === targetOfficerId)
+    const newOfficerObj = officers.find(o => String(o.officerId || o.uniqueID || o.id) === String(targetOfficerId))
     if (!newOfficerObj) return
 
-    const updatedApps = applications.map(app => {
-      if (app.id === reassignApp.id) {
-        return {
-          ...app,
-          assignedOfficerId: newOfficerObj.officerId,
-          assignedOfficerName: newOfficerObj.fullName
-        }
+    try {
+      const res = await allocateApplication(reassignApp.id, String(newOfficerObj.officerId || newOfficerObj.uniqueID || newOfficerObj.id))
+      if (res?.status === false) {
+        showToast(res.message || 'Allocation failed', 'error')
+        return
       }
-      return app
-    })
 
-    setApplications(updatedApps)
-    showToast(`Application ${reassignApp.id} reassigned to ${newOfficerObj.fullName}`)
-    setReassignApp(null)
+      const updatedApps = applications.map(app => {
+        if (app.id === reassignApp.id) {
+          return {
+            ...app,
+            assignedOfficerId: newOfficerObj.officerId || newOfficerObj.uniqueID || newOfficerObj.id,
+            assignedOfficerName: newOfficerObj.fullName,
+          }
+        }
+        return app
+      })
+
+      setApplications(updatedApps)
+      showToast(`Application ${reassignApp.id} allocated to ${newOfficerObj.fullName}`)
+      setReassignApp(null)
+    } catch (err) {
+      console.error('Allocation failed:', err)
+      showToast(err.message || 'Allocation failed', 'error')
+    }
   }
 
   // Admin Quick Action: Approve / Reject application override
@@ -475,10 +506,10 @@ export default function AdminDashboard() {
           className="dashboard-tabs"
         >
           <button
-            className={`dashboard-tab ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => handleTabChange('history')}
+            className={`dashboard-tab ${activeTab === 'allocation' ? 'active' : ''}`}
+            onClick={() => handleTabChange('allocation')}
           >
-            <FaHistory /> Application History ({applications.length})
+            <FaFileInvoice /> Application Allocation ({allocationApps.length})
           </button>
           <button
             className={`dashboard-tab ${activeTab === 'officers' ? 'active' : ''}`}
@@ -526,9 +557,9 @@ export default function AdminDashboard() {
         {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
 
         {/* ── TAB 2: APPLICATION HISTORY & AUDIT ── */}
-        {activeTab === 'history' && (
+        {activeTab === 'allocation' && (
           <motion.div
-            key="history"
+            key="allocation"
             initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
             exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
@@ -537,7 +568,7 @@ export default function AdminDashboard() {
           >
 
             {/* Filters Row */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
               <input
                 type="text"
                 placeholder="Search applicant name, App ID, or Aadhaar..."
@@ -558,19 +589,36 @@ export default function AdminDashboard() {
               </select>
 
               <select
-                value={officerFilter}
-                onChange={e => setOfficerFilter(e.target.value)}
+                value={stageFilter}
+                onChange={e => {
+                  setStageFilter(e.target.value)
+                  setOfficerFilter('All')
+                }}
                 style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
               >
-                <option value="All">All Officers</option>
-                {officers.map(off => (
-                  <option key={off.officerId} value={off.officerId}>{off.fullName} ({off.officerId})</option>
-                ))}
+                <option value="All">All Stages</option>
+                <option value="FIELD_OFFICER">Field Officer</option>
+                <option value="DISTRICT_OFFICER">District Officer</option>
+                <option value="FINANCE_OFFICER">Finance Officer</option>
               </select>
+
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              {stageBreakdown.map(item => (
+                <div key={item.stage} style={{ padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.35rem', letterSpacing: '0.08em' }}>
+                    {item.stage.replaceAll('_', ' ')}
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text)' }}>
+                    {item.count}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* History Table */}
-            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
               <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
@@ -578,20 +626,21 @@ export default function AdminDashboard() {
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Applicant Name</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Current Stage</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Assigned Officer</th>
                     <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Action</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredApps.length === 0 ? (
+                  {allocationApps.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                      <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
                         No application records matching your criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredApps.map(app => {
+                    allocationApps.map(app => {
                       const scheme = schemes.find(s => s.id === app.schemeId)
                       const statusColor = app.status === 'Approved' ? '#22c55e' : app.status === 'Rejected' ? '#ef4444' : '#f59e0b'
                       return (
@@ -608,6 +657,11 @@ export default function AdminDashboard() {
                             {app.submittedDate}
                           </td>
                           <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', padding: '0.28rem 0.65rem', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, background: 'rgba(95, 143, 74, 0.16)', color: '#5f8f4a', border: '1px solid rgba(95, 143, 74, 0.35)' }}>
+                              {String(app.currentStage || 'FIELD_OFFICER').replaceAll('_', ' ')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>
                             <span style={{ fontWeight: 600 }}>{app.assignedOfficerName || '—'}</span>
                             <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {app.assignedOfficerId || '—'}</div>
                           </td>
@@ -616,7 +670,7 @@ export default function AdminDashboard() {
                               {app.status}
                             </span>
                           </td>
-                          <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
+                          <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                               <button
                                 className="button button--ghost"
@@ -630,7 +684,7 @@ export default function AdminDashboard() {
                                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', borderColor: 'rgba(217, 130, 43, 0.4)', color: '#ffc76a' }}
                                 onClick={() => { setReassignApp(app); setTargetOfficerId('') }}
                               >
-                                Reassign
+                                {app.assignedOfficerId ? 'Reassign' : 'Allocate'}
                               </button>
                             </div>
                           </td>
@@ -668,7 +722,8 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
               {officers.map(officer => {
                 // Applications assigned to this officer
-                const officerApps = applications.filter(a => a.assignedOfficerId === officer.officerId)
+                const officerKey = officer.officerId || officer.uniqueID || officer.id
+                const officerApps = applications.filter(a => String(a.assignedOfficerId) === String(officerKey))
                 const assignedCount = officerApps.length
                 const pendingCount = officerApps.filter(a => a.status === 'Pending').length
                 const approvedCount = officerApps.filter(a => a.status === 'Approved').length
@@ -680,7 +735,7 @@ export default function AdminDashboard() {
 
                 return (
                   <div
-                    key={officer.officerId}
+                    key={officer.officerId || officer.uniqueID || officer.id}
                     className="officer-progress-card"
                     style={{
                       background: 'var(--panel-strong)',
@@ -706,7 +761,7 @@ export default function AdminDashboard() {
 
                     {/* ID & Email Badge */}
                     <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--muted)' }}>
-                      <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontFamily: 'monospace' }}>ID: {officer.officerId}</span>
+                      <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontFamily: 'monospace' }}>ID: {officerKey}</span>
                       <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>{officer.email}</span>
                     </div>
 
@@ -771,7 +826,7 @@ export default function AdminDashboard() {
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Review messages submitted through the portal support desk and send officer responses.</p>
             </div>
 
-            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
               <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
@@ -865,7 +920,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
               <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
@@ -981,7 +1036,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
               <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
@@ -1217,11 +1272,11 @@ export default function AdminDashboard() {
               exit={{ opacity: 0, scale: 0.95 }}
               style={{ background: 'var(--panel-strong)', borderRadius: '16px', border: '1px solid var(--border)', maxWidth: '460px', width: '100%', padding: '1.75rem' }}
             >
-              <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text)' }}>Reassign Application {reassignApp.id}</h3>
+              <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text)' }}>Allocate Application {reassignApp.id}</h3>
                <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>Currently assigned to: <strong>{reassignApp.assignedOfficerName || '—'}</strong></p>
 
               <form onSubmit={handleReassignSubmit}>
-                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Select New Target Officer</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Select Field Officer</label>
                 <select
                   value={targetOfficerId}
                   onChange={e => setTargetOfficerId(e.target.value)}
@@ -1229,14 +1284,14 @@ export default function AdminDashboard() {
                 >
                   <option value="">-- Choose Officer --</option>
                   {officers.map(o => (
-                    <option key={o.officerId} value={o.officerId}>
-                      {o.fullName} ({o.officerId}) - {o.district || 'Jurisdiction'}
+                    <option key={o.officerId || o.uniqueID || o.id} value={o.officerId || o.uniqueID || o.id}>
+                      {o.fullName} ({o.officerId || o.uniqueID || o.id}) - {o.district || 'Jurisdiction'}
                     </option>
                   ))}
                 </select>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button type="submit" className="button button--primary" style={{ flex: 1 }}>Confirm Reassignment</button>
+                  <button type="submit" className="button button--primary" style={{ flex: 1 }}>Confirm Allocation</button>
                   <button type="button" className="button button--ghost" style={{ flex: 1 }} onClick={() => setReassignApp(null)}>Cancel</button>
                 </div>
               </form>
@@ -1259,7 +1314,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text)' }}>Activity Audit: {selectedOfficer.officer.fullName}</h3>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Officer ID: {selectedOfficer.officer.officerId}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Officer ID: {selectedOfficer.officer.officerId || selectedOfficer.officer.uniqueID || selectedOfficer.officer.id}</span>
                 </div>
                 <button onClick={() => setSelectedOfficer(null)} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: '1rem', cursor: 'cursor', display: 'flex', alignItems: 'center' }}><FaTimesCircle /></button>
               </div>

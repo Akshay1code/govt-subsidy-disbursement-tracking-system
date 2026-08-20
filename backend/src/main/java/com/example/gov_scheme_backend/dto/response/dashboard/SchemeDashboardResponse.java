@@ -18,4 +18,5 @@ public class SchemeDashboardResponse {
     private Double budgetUsed;
     private Double remainingFunds;
     private Double utilizationPercentage;
+    private Long totalApplications;
 }

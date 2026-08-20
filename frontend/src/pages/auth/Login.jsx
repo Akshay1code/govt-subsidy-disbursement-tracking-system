@@ -76,7 +76,16 @@ export default function Login() {
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError('Unable to connect. Please check your internet connection and try again.')
+      const message = String(err?.message || '').toLowerCase()
+      if (message.includes('username not found')) {
+        setError('Username not found')
+      } else if (message.includes('password is incorrect') || message.includes('bad credentials')) {
+        setError('Password is incorrect')
+      } else if (message.includes('network error') || message.includes('failed to fetch') || message.includes('service unavailable') || message.includes('server is down')) {
+        setError('Server is down')
+      } else {
+        setError('Server is down')
+      }
     } finally {
       setLoading(false)
     }

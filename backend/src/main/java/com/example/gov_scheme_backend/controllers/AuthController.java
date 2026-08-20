@@ -12,7 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 @CrossOrigin(origins = "*")
@@ -29,17 +33,29 @@ public class AuthController {
     }
     @PostMapping("/signin")
     public ResponseEntity<?> login(@RequestBody LoginRequest user , HttpServletResponse response) {
-        String token = authService.loginService(user);
-        if (token == null) {
-            return null;
+        try {
+            String token = authService.loginService(user);
+            if (token == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(new ApiResponse(false, "Server is down"));
+            }
+            Cookie cookie = new Cookie("token", token);
+            cookie.setHttpOnly(true);
+            cookie.setSecure(false);
+            cookie.setPath("/");
+            cookie.setMaxAge(JWT_COOKIE_MAX_AGE_SECONDS);
+            response.addCookie(cookie);
+            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse(true, "Login Successfull"));
+        } catch (UsernameNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "Username not found"));
+        } catch (BadCredentialsException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "Password is incorrect"));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse(false, "Server is down"));
         }
-        Cookie cookie = new Cookie("token", token);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/");
-        cookie.setMaxAge(JWT_COOKIE_MAX_AGE_SECONDS);
-        response.addCookie(cookie);
-        return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse(true, "Login Successfull"));
     }
 
     @PostMapping("/signup")
@@ -59,6 +75,33 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse(false,"Couldn't Fetch Details"));
         }
         return ResponseEntity.status(HttpStatus.OK).body(res);
+    }
+
+    @GetMapping("/profile/{role}")
+    public ResponseEntity<?> getProfilesByRole(@PathVariable String role) {
+        try {
+            Role parsedRole = Role.valueOf(role.toUpperCase());
+            List<Users> users = authService.profileService(parsedRole);
+            List<java.util.Map<String, Object>> response = new ArrayList<>();
+            for (Users user : users) {
+                java.util.Map<String, Object> item = new HashMap<>();
+                item.put("id", user.getId());
+                item.put("officerId", user.getUniqueID());
+                item.put("uniqueID", user.getUniqueID());
+                item.put("fullName", user.getFullName());
+                item.put("role", user.getRole() != null ? user.getRole().name() : null);
+                item.put("region", user.getRegion());
+                item.put("district", user.getDistrict());
+                item.put("state", user.getState());
+                item.put("mobileNo", user.getMobileNo());
+                item.put("username", user.getUsername());
+                response.add(item);
+            }
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Invalid role provided"));
+        }
     }
 
     @PatchMapping("/approval/{uniqueId}/{status}")
