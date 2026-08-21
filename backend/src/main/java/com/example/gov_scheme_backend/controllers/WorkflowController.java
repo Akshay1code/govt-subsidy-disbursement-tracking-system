@@ -17,7 +17,7 @@ public class WorkflowController {
 
     private final WorkflowService workflowService;
 
-    @PreAuthorize("hasAnyRole('FIELD_OFFICER','DISTRICT_OFFICER','FINANCE_OFFICER')")
+    @PreAuthorize("hasAnyRole('FIELD_OFFICER','DISTRICT_OFFICER','REGIONAL_OFFICER','FINANCE_OFFICER')")
     @PostMapping("/{applicationId}/action")
     public WorkflowResponse processAction(
             @PathVariable Long applicationId,

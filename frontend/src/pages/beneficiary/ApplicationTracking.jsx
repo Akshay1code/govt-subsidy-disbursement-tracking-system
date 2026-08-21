@@ -49,6 +49,8 @@ function getStatusLabel(status) {
       return 'Field Officer review'
     case 'DISTRICT_OFFICER':
       return 'District Officer review'
+    case 'REGIONAL_OFFICER':
+      return 'Regional Officer review'
     case 'FINANCE_OFFICER':
       return 'Finance Officer review'
     case 'UNDER_REVIEW':
@@ -75,6 +77,8 @@ function getStatusHint(status) {
       return 'The Field Officer is reviewing your application details.'
     case 'DISTRICT_OFFICER':
       return 'The District Officer is reviewing the field verification outcome.'
+    case 'REGIONAL_OFFICER':
+      return 'The Regional Officer is reviewing the district recommendation.'
     case 'FINANCE_OFFICER':
       return 'The Finance Officer is completing the final sanction review.'
     case 'UNDER_REVIEW':
@@ -99,6 +103,8 @@ function getLocationForStatus(status) {
       return 'Officer Review Cell'
     case 'DISTRICT_OFFICER':
       return 'District Review Cell'
+    case 'REGIONAL_OFFICER':
+      return 'Regional Review Cell'
     case 'FINANCE_OFFICER':
       return 'Finance Sanction Desk'
     case 'APPROVED':
@@ -134,7 +140,7 @@ function buildActivityLog(application) {
     })
   }
 
-  if (trackingKey === 'FIELD_OFFICER' || trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
+  if (trackingKey === 'FIELD_OFFICER' || trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'REGIONAL_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
     items.push({
       time: 'Now',
       title: 'File forwarded to Field Officer',
@@ -142,10 +148,18 @@ function buildActivityLog(application) {
     })
   }
 
-  if (trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
+  if (trackingKey === 'DISTRICT_OFFICER' || trackingKey === 'REGIONAL_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
     items.push({
       time: 'Now',
       title: 'File forwarded to District Officer',
+      note: 'Completed',
+    })
+  }
+
+  if (trackingKey === 'REGIONAL_OFFICER' || trackingKey === 'FINANCE_OFFICER' || status === 'APPROVED' || status === 'DISBURSED') {
+    items.push({
+      time: 'Now',
+      title: 'File forwarded to Regional Officer',
       note: 'Completed',
     })
   }
@@ -192,7 +206,7 @@ function buildActivityLog(application) {
 }
 
 function getStepTone(step, currentIndex) {
-  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED', 'REJECTED']
+  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED', 'REJECTED']
   const stepIndex = statusSteps.indexOf(step)
   if (currentIndex > stepIndex) return 'done'
   if (currentIndex === stepIndex) return 'active'
@@ -203,7 +217,7 @@ function getTrackingKey(application) {
   const status = getApplicationStatus(application)
   const workflowStage = getWorkflowStage(application)
 
-  if (workflowStage === 'FIELD_OFFICER' || workflowStage === 'DISTRICT_OFFICER' || workflowStage === 'FINANCE_OFFICER') {
+  if (workflowStage === 'FIELD_OFFICER' || workflowStage === 'DISTRICT_OFFICER' || workflowStage === 'REGIONAL_OFFICER' || workflowStage === 'FINANCE_OFFICER') {
     return workflowStage
   }
 
@@ -267,7 +281,7 @@ export default function ApplicationTracking() {
   const activityLog = buildActivityLog(application)
   const currentLocation = getLocationForStatus(trackingKey)
 
-  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED']
+  const statusSteps = ['DRAFT', 'PENDING', 'SUBMITTED', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER', 'APPROVED', 'DISBURSED']
   const currentIndex = statusSteps.indexOf(trackingKey)
   const progressCards = useMemo(() => statusSteps.map((step) => ({
     key: step,
@@ -275,9 +289,11 @@ export default function ApplicationTracking() {
       ? 'Field Officer'
       : step === 'DISTRICT_OFFICER'
         ? 'District Officer'
-        : step === 'FINANCE_OFFICER'
-          ? 'Finance Officer'
-          : step.split('_').join(' '),
+        : step === 'REGIONAL_OFFICER'
+          ? 'Regional Officer'
+          : step === 'FINANCE_OFFICER'
+            ? 'Finance Officer'
+            : step.split('_').join(' '),
     tone: getStepTone(step, currentIndex),
   })), [currentIndex])
 
@@ -459,6 +475,7 @@ export default function ApplicationTracking() {
                       {step.key === 'SUBMITTED' && 'Sent to Field Officer'}
                       {step.key === 'FIELD_OFFICER' && 'Field verification'}
                       {step.key === 'DISTRICT_OFFICER' && 'District review'}
+                      {step.key === 'REGIONAL_OFFICER' && 'Regional review'}
                       {step.key === 'FINANCE_OFFICER' && 'Finance sanction'}
                       {step.key === 'APPROVED' && 'Approved'}
                       {step.key === 'DISBURSED' && 'Funds released'}

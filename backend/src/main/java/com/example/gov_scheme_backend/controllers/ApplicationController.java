@@ -380,6 +380,7 @@ public class ApplicationController {
         return switch (stage) {
             case FIELD_OFFICER -> officer.getRole() == Role.FIELD_OFFICER;
             case DISTRICT_OFFICER -> officer.getRole() == Role.DISTRICT_OFFICER;
+            case REGIONAL_OFFICER -> officer.getRole() == Role.REGIONAL_OFFICER;
             case FINANCE_OFFICER -> officer.getRole() == Role.FINANCE_OFFICER;
             default -> false;
         };
@@ -394,6 +395,7 @@ public class ApplicationController {
         return normalized.equals(Role.ADMIN.name())
                 || normalized.equals(Role.FIELD_OFFICER.name())
                 || normalized.equals(Role.DISTRICT_OFFICER.name())
+                || normalized.equals(Role.REGIONAL_OFFICER.name())
                 || normalized.equals(Role.FINANCE_OFFICER.name());
     }
 
@@ -405,6 +407,7 @@ public class ApplicationController {
         String normalized = role.toUpperCase();
         return normalized.equals(Role.FIELD_OFFICER.name())
                 || normalized.equals(Role.DISTRICT_OFFICER.name())
+                || normalized.equals(Role.REGIONAL_OFFICER.name())
                 || normalized.equals(Role.FINANCE_OFFICER.name());
     }
 
@@ -425,10 +428,203 @@ public class ApplicationController {
         return switch (workflow.getCurrentStage()) {
             case FIELD_OFFICER -> normalized.equals(Role.FIELD_OFFICER.name());
             case DISTRICT_OFFICER -> normalized.equals(Role.DISTRICT_OFFICER.name());
+            case REGIONAL_OFFICER -> normalized.equals(Role.REGIONAL_OFFICER.name());
             case FINANCE_OFFICER -> normalized.equals(Role.FINANCE_OFFICER.name());
             default -> false;
         };
     }
 
     private record ViewerContext(Long userId, String role) {}
+
+    @GetMapping("/allocation/summary")
+    public ResponseEntity<?> getAllocationSummary(HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can view allocation summary"));
+        }
+
+        java.util.List<com.example.gov_scheme_backend.dto.response.application.AllocationStageSummaryResponse> response =
+                new java.util.ArrayList<>();
+
+        for (WorkflowStage stage : new WorkflowStage[]{
+                WorkflowStage.FIELD_OFFICER, WorkflowStage.DISTRICT_OFFICER, WorkflowStage.REGIONAL_OFFICER, WorkflowStage.FINANCE_OFFICER}) {
+            long count = workflowRepository.countByCurrentStageAndAssignedOfficerIsNull(stage);
+            response.add(new com.example.gov_scheme_backend.dto.response.application.AllocationStageSummaryResponse(
+                    stage.name(), count));
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/allocation/officers")
+    public ResponseEntity<?> getOfficersForAllocation(
+            @RequestParam WorkflowStage stage,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can view officer capacity"));
+        }
+
+        Role targetRole = roleForStage(stage);
+        if (targetRole == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Invalid stage: " + stage));
+        }
+
+        java.util.List<Users> officers = userRepo.findByRole(targetRole);
+
+        java.util.List<com.example.gov_scheme_backend.dto.response.application.OfficerCapacityResponse> officerResponse =
+                officers.stream().map(o -> {
+                    long current = workflowRepository.countByAssignedOfficer(o);
+                    int limit = o.getAllocationLimit() != null ? o.getAllocationLimit() : 0;
+                    int remaining = Math.max(0, limit - (int) current);
+                    return new com.example.gov_scheme_backend.dto.response.application.OfficerCapacityResponse(
+                            o.getId(), o.getUniqueID(), o.getFullName(), targetRole.name(),
+                            limit, current, remaining);
+                }).collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(officerResponse);
+    }
+
+    @PostMapping("/allocation/bulk")
+    public ResponseEntity<?> bulkAllocate(
+            @RequestBody com.example.gov_scheme_backend.dto.request.application.BulkAllocationRequest request,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can allocate applications"));
+        }
+
+        if (request == null || request.getOfficerId() == null || request.getStage() == null
+                || request.getCount() == null || request.getCount() < 1) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "officerId, stage, and a positive count are required"));
+        }
+
+        Users officer = resolveOfficer(request.getOfficerId());
+        if (officer == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse(false, "Officer not found"));
+        }
+
+        if (!isOfficerCompatible(officer, request.getStage())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "Selected officer's role does not match the requested stage"));
+        }
+
+        int limit = officer.getAllocationLimit() != null ? officer.getAllocationLimit() : 0;
+        long currentCount = workflowRepository.countByAssignedOfficer(officer);
+        long remaining = limit - currentCount;
+
+        if (remaining <= 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false,
+                            officer.getFullName() + " has reached their allocation limit of " + limit + "."));
+        }
+
+        if (request.getCount() > remaining) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false,
+                            officer.getFullName() + " only has " + remaining + " slot(s) remaining (limit " + limit + ")."));
+        }
+
+        org.springframework.data.domain.Pageable pageable =
+                org.springframework.data.domain.PageRequest.of(0, request.getCount());
+
+        java.util.List<VerificationWorkflow> queue = workflowRepository
+                .findByCurrentStageAndAssignedOfficerIsNullOrderByApplication_CreatedAtAsc(request.getStage(), pageable);
+
+        if (queue.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "No unassigned applications are waiting at this stage"));
+        }
+
+        for (VerificationWorkflow wf : queue) {
+            wf.setAssignedOfficer(officer);
+        }
+        workflowRepository.saveAll(queue);
+
+        int allocated = queue.size();
+        int remainingAfter = (int) (remaining - allocated);
+
+        com.example.gov_scheme_backend.dto.response.application.BulkAllocationResponse bulkResponse =
+                new com.example.gov_scheme_backend.dto.response.application.BulkAllocationResponse(
+                        true,
+                        "Allocated " + allocated + " application(s) to " + officer.getFullName(),
+                        allocated,
+                        officer.getFullName(),
+                        request.getStage().name(),
+                        remainingAfter
+                );
+
+        return ResponseEntity.ok(bulkResponse);
+    }
+
+    @PutMapping("/allocation/officers/{officerId}/limit")
+    public ResponseEntity<?> updateOfficerAllocationLimit(
+            @PathVariable String officerId,
+            @RequestBody java.util.Map<String, Integer> body,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can update allocation limits"));
+        }
+
+        Integer newLimit = body != null ? body.get("limit") : null;
+        if (newLimit == null || newLimit < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "A non-negative 'limit' value is required"));
+        }
+
+        Users officer = resolveOfficer(officerId);
+        if (officer == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse(false, "Officer not found"));
+        }
+
+        officer.setAllocationLimit(newLimit);
+        userRepo.save(officer);
+
+        return ResponseEntity.ok(new ApiResponse(true,
+                "Updated " + officer.getFullName() + "'s allocation limit to " + newLimit));
+    }
+
+    private Role roleForStage(WorkflowStage stage) {
+        if (stage == null) return null;
+        return switch (stage) {
+            case FIELD_OFFICER -> Role.FIELD_OFFICER;
+            case DISTRICT_OFFICER -> Role.DISTRICT_OFFICER;
+            case REGIONAL_OFFICER -> Role.REGIONAL_OFFICER;
+            case FINANCE_OFFICER -> Role.FINANCE_OFFICER;
+            default -> null;
+        };
+    }
 }

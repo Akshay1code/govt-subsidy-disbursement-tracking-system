@@ -43,10 +43,15 @@ public class Users implements UserDetails {
     String state;
     @Column(length = 10)
     String mobileNo;
+    @Column
+    Integer allocationLimit = 100;
     @CreationTimestamp
     LocalDateTime createdAt;
     @UpdateTimestamp
     LocalDateTime updatedAt;
+    
+    @Column(name = "allocation_capacity")
+    private Integer allocationCapacity = 10;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
