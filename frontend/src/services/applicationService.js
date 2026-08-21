@@ -1,3 +1,6 @@
+
+
+
 import api from './api'
 
 // TODO: wire up as backend application endpoints are built out
@@ -47,5 +50,15 @@ export async function uploadApplicationDocuments(schemeCode, files, types) {
 
 export async function cancelApplicationById(applicationId) {
   const response = await api.delete(`/gov/applications/${applicationId}`)
+  return response.data
+}
+
+export async function getAvailableOfficersWorkload(stage) {
+  const response = await api.get(`/api/v1/allocation/officers/available?stage=${stage}`)
+  return response.data
+}
+
+export async function batchAllocateApplications(stage, count) {
+  const response = await api.post('/api/v1/allocation/batch', { stage, count })
   return response.data
 }

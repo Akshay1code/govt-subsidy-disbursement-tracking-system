@@ -140,6 +140,10 @@ public class WorkflowServiceImpl implements WorkflowService {
                 break;
 
             case DISTRICT_OFFICER:
+                moveToRegionalOfficer(workflow, application);
+                break;
+
+            case REGIONAL_OFFICER:
                 moveToFinanceOfficer(workflow, application);
                 break;
 
@@ -177,21 +181,21 @@ public class WorkflowServiceImpl implements WorkflowService {
 
         saveAuditLog(officer, request.getAction());
 
-        if (workflow.getAssignedOfficer() != null) {
+        if (newStage == WorkflowStage.COMPLETED) {
 
-            createNotification(
-                    workflow.getAssignedOfficer(),
-                    "New application assigned for verification. Application ID: "
-                            + application.getId()
-            );
-
-        } else {
-
+            // Only the terminal transition (Finance Officer's approval)
+            // means the application is actually, fully approved.
             createNotification(
                     application.getUser(),
                     "Your application has been approved."
             );
+
         }
+        // Intermediate stage moves (FIELD_OFFICER -> DISTRICT_OFFICER ->
+        // REGIONAL_OFFICER -> FINANCE_OFFICER) intentionally send no
+        // notification here — assignedOfficer is null until Admin
+        // allocates it, and the beneficiary hasn't received a final
+        // decision yet.
 
         return new WorkflowResponse(
                 application.getId(),
@@ -205,14 +209,23 @@ public class WorkflowServiceImpl implements WorkflowService {
             VerificationWorkflow workflow,
             Application application) {
 
-        Users districtOfficer = userRepo.findByRole(Role.DISTRICT_OFFICER)
-                .stream()
-                .findFirst()
-                .orElseThrow(() ->
-                        new RuntimeException("No District Officer found"));
-
+        // No auto-pick anymore — the case returns to the unassigned pool at
+        // its new stage. Admin allocates it to a District Officer via the
+        // bulk allocation endpoints, respecting that officer's capacity.
         workflow.setCurrentStage(WorkflowStage.DISTRICT_OFFICER);
-        workflow.setAssignedOfficer(districtOfficer);
+        workflow.setAssignedOfficer(null);
+
+        application.setStatus(ApplicationStatus.UNDER_REVIEW);
+    }
+
+    private void moveToRegionalOfficer(
+            VerificationWorkflow workflow,
+            Application application) {
+
+        // Same as above — reappears unassigned for admin to allocate to a
+        // Regional Officer.
+        workflow.setCurrentStage(WorkflowStage.REGIONAL_OFFICER);
+        workflow.setAssignedOfficer(null);
 
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
     }
@@ -221,14 +234,10 @@ public class WorkflowServiceImpl implements WorkflowService {
             VerificationWorkflow workflow,
             Application application) {
 
-        Users financeOfficer = userRepo.findByRole(Role.FINANCE_OFFICER)
-                .stream()
-                .findFirst()
-                .orElseThrow(() ->
-                        new RuntimeException("No Finance Officer found"));
-
+        // Same as above — reappears unassigned for admin to allocate to a
+        // Finance Officer.
         workflow.setCurrentStage(WorkflowStage.FINANCE_OFFICER);
-        workflow.setAssignedOfficer(financeOfficer);
+        workflow.setAssignedOfficer(null);
 
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
     }
@@ -305,6 +314,10 @@ public class WorkflowServiceImpl implements WorkflowService {
                 break;
 
             case DISTRICT_OFFICER:
+                moveToRegionalOfficer(workflow, application);
+                break;
+
+            case REGIONAL_OFFICER:
                 moveToFinanceOfficer(workflow, application);
                 break;
 
@@ -384,16 +397,31 @@ public class WorkflowServiceImpl implements WorkflowService {
 
                 break;
 
-            case FINANCE_OFFICER:
+            case REGIONAL_OFFICER:
 
-                Users districtOfficer = userRepo.findByRole(Role.DISTRICT_OFFICER)
+                Users districtOfficerForRegional = userRepo.findByRole(Role.DISTRICT_OFFICER)
                         .stream()
                         .findFirst()
                         .orElseThrow(() ->
                                 new RuntimeException("No District Officer found"));
 
                 workflow.setCurrentStage(WorkflowStage.DISTRICT_OFFICER);
-                workflow.setAssignedOfficer(districtOfficer);
+                workflow.setAssignedOfficer(districtOfficerForRegional);
+
+                application.setStatus(ApplicationStatus.UNDER_REVIEW);
+
+                break;
+
+            case FINANCE_OFFICER:
+
+                Users regionalOfficer = userRepo.findByRole(Role.REGIONAL_OFFICER)
+                        .stream()
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new RuntimeException("No Regional Officer found"));
+
+                workflow.setCurrentStage(WorkflowStage.REGIONAL_OFFICER);
+                workflow.setAssignedOfficer(regionalOfficer);
 
                 application.setStatus(ApplicationStatus.UNDER_REVIEW);
 
@@ -538,6 +566,16 @@ public class WorkflowServiceImpl implements WorkflowService {
                 if (currentUser.getRole() != Role.DISTRICT_OFFICER) {
                     throw new org.springframework.security.access.AccessDeniedException(
                             "Only District Officer can perform this action"
+                    );
+                }
+
+                break;
+
+            case REGIONAL_OFFICER:
+
+                if (currentUser.getRole() != Role.REGIONAL_OFFICER) {
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "Only Regional Officer can perform this action"
                     );
                 }
 
