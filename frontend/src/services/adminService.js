@@ -42,3 +42,23 @@ export async function deleteAdminProfile() {
   const response = await api.delete('/gov/auth/delete')
   return response.data
 }
+
+export async function getAllocationSummary() {
+  const response = await api.get('/gov/applications/allocation/summary')
+  return response.data?.data || response.data || []
+}
+
+export async function getOfficersForAllocation(stage) {
+  const response = await api.get(`/gov/applications/allocation/officers?stage=${stage}`)
+  return response.data?.data || response.data || []
+}
+
+export async function bulkAllocateApplications(officerId, stage, count) {
+  const response = await api.post('/gov/applications/allocation/bulk', { officerId, stage, count })
+  return response.data
+}
+
+export async function updateOfficerAllocationLimit(officerId, limit) {
+  const response = await api.put(`/gov/applications/allocation/officers/${officerId}/limit`, { limit })
+  return response.data
+}

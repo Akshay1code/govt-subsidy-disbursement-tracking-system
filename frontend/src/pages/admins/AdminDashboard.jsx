@@ -4,8 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
 import DashboardTopbar from '../../components/DashboardTopbar'
-import { updateApprovalStatus, getOfficerRequests } from '../../services/adminService'
-import { getApplications, allocateApplication } from '../../services/applicationService'
+import { updateApprovalStatus, getOfficerRequests, getAllocationSummary, getOfficersForAllocation, bulkAllocateApplications } from '../../services/adminService'
+import { getApplications, allocateApplication, getAvailableOfficersWorkload, batchAllocateApplications } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
 import { clearPortalSessionCaches } from '../../services/sessionCleanup'
 import ProfilePanel from '../../components/ProfilePanel'
@@ -70,7 +70,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchOfficers() {
       try {
-        const roles = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER']
+        const roles = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER']
         const results = await Promise.all(roles.map(role => getProfilesByRole(role)))
         const merged = results.flatMap((data, index) => {
           const items = Array.isArray(data) ? data : data?.data || []
@@ -197,6 +197,20 @@ export default function AdminDashboard() {
   const [reassignApp, setReassignApp] = useState(null)
   const [targetOfficerId, setTargetOfficerId] = useState('')
   const [toast, setToast] = useState(null)
+
+  // FCFS Batch Allocation State
+  const [fcfsStage, setFcfsStage] = useState('FIELD_OFFICER')
+  const [fcfsCount, setFcfsCount] = useState(10)
+  const [officerWorkloads, setOfficerWorkloads] = useState([])
+  const [workloadsLoading, setWorkloadsLoading] = useState(false)
+  const [fcfsAllocating, setFcfsAllocating] = useState(false)
+
+  // New capacity-based allocation state
+  const [allocationSummary, setAllocationSummary] = useState([]) // [{stage, unassignedCount}]
+  const [allocationStageTab, setAllocationStageTab] = useState('FIELD_OFFICER')
+  const [stageOfficers, setStageOfficers] = useState([])           // [{officerId, uniqueId, fullName, role, allocationLimit, currentAssignedCount, remainingCapacity}]
+  const [allocationCounts, setAllocationCounts] = useState({})     // { [officerId]: countToAllocate }
+  const [allocatingOfficerId, setAllocatingOfficerId] = useState(null)
   const tabContentMeta = {
     allocation: {
       title: 'Application Allocation',
@@ -393,7 +407,7 @@ export default function AdminDashboard() {
     return !['APPROVED', 'REJECTED', 'DISBURSED'].includes(normalizedStatus)
   })
 
-  const stageBreakdown = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER'].map(stage => ({
+  const stageBreakdown = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => ({
     stage,
     count: allocationApps.filter(app => String(app.currentStage || '').toUpperCase() === stage).length,
   }))
@@ -463,6 +477,55 @@ export default function AdminDashboard() {
     } catch (err) {
       console.warn('Backend sync failed, local update preserved:', err.message)
       showToast(`Application ${appId} marked as ${newStatus} (offline mode)`)
+    }
+  }
+
+  async function refreshAllocationSummary() {
+    try {
+      const data = await getAllocationSummary()
+      setAllocationSummary(Array.isArray(data) ? data : [])
+    } catch {
+      setAllocationSummary([])
+    }
+  }
+
+  async function refreshStageOfficers(stage) {
+    try {
+      const data = await getOfficersForAllocation(stage)
+      setStageOfficers(Array.isArray(data) ? data : [])
+    } catch {
+      setStageOfficers([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'allocation') {
+      refreshAllocationSummary()
+      refreshStageOfficers(allocationStageTab)
+    }
+  }, [activeTab, allocationStageTab])
+
+  async function handleBulkAllocate(officer) {
+    const count = Number(allocationCounts[officer.officerId] || 0)
+    if (!count || count < 1) {
+      showToast('Enter a valid number of applications to allocate', 'error')
+      return
+    }
+    setAllocatingOfficerId(officer.officerId)
+    try {
+      const res = await bulkAllocateApplications(officer.uniqueId, allocationStageTab, count)
+      if (res?.success === false) {
+        showToast(res.message || 'Allocation failed', 'error')
+      } else {
+        showToast(res.message || `Allocated ${count} application(s) to ${officer.fullName}`)
+        setAllocationCounts(prev => ({ ...prev, [officer.officerId]: '' }))
+        await refreshAllocationSummary()
+        await refreshStageOfficers(allocationStageTab)
+      }
+    } catch (err) {
+      showToast(err?.response?.data?.message || 'Allocation failed', 'error')
+    } finally {
+      setAllocatingOfficerId(null)
     }
   }
 
@@ -556,7 +619,6 @@ export default function AdminDashboard() {
           </div>
         {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
 
-        {/* ── TAB 2: APPLICATION HISTORY & AUDIT ── */}
         {activeTab === 'allocation' && (
           <motion.div
             key="allocation"
@@ -566,134 +628,88 @@ export default function AdminDashboard() {
             transition={{ duration: 0.45, ease: 'easeOut' }}
             style={{ transformOrigin: 'top center' }}
           >
-
-            {/* Filters Row */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
-              <input
-                type="text"
-                placeholder="Search applicant name, App ID, or Aadhaar..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                style={{ flex: 1, minWidth: '240px', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-              />
-
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-              >
-                <option value="All">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-
-              <select
-                value={stageFilter}
-                onChange={e => {
-                  setStageFilter(e.target.value)
-                  setOfficerFilter('All')
-                }}
-                style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-              >
-                <option value="All">All Stages</option>
-                <option value="FIELD_OFFICER">Field Officer</option>
-                <option value="DISTRICT_OFFICER">District Officer</option>
-                <option value="FINANCE_OFFICER">Finance Officer</option>
-              </select>
-
+            {/* Stage summary cards — counts only, no application detail */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              {['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => {
+                const entry = allocationSummary.find(s => s.stage === stage)
+                const count = entry ? entry.unassignedCount : 0
+                const active = allocationStageTab === stage
+                return (
+                  <button
+                    key={stage}
+                    onClick={() => setAllocationStageTab(stage)}
+                    className="officer-stat-card"
+                    style={{
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      border: active ? '2px solid var(--accent)' : '1px solid var(--border)',
+                      background: 'var(--panel-strong)',
+                      borderRadius: '14px',
+                      padding: '1.2rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      {stage.replace('_', ' ')}
+                    </div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)', marginTop: '0.3rem' }}>
+                      {count}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                      application{count === 1 ? '' : 's'} awaiting allocation
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              {stageBreakdown.map(item => (
-                <div key={item.stage} style={{ padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: '0.35rem', letterSpacing: '0.08em' }}>
-                    {item.stage.replaceAll('_', ' ')}
+            {/* Officer roster for the selected stage */}
+            <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.8rem 0', color: 'var(--text)' }}>
+              {allocationStageTab.replace(/_/g, ' ')} officers
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+              {stageOfficers.length === 0 && (
+                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No officers found for this stage.</p>
+              )}
+              {stageOfficers.map(officer => (
+                <div
+                  key={officer.officerId}
+                  style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--text)' }}>{officer.fullName}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {officer.uniqueId}</div>
                   </div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text)' }}>
-                    {item.count}
+
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
+                    <strong>{officer.currentAssignedCount}</strong> / {officer.allocationLimit} assigned
+                    {' · '}
+                    <span style={{ color: officer.remainingCapacity > 0 ? '#22c55e' : '#ef4444' }}>
+                      {officer.remainingCapacity} slot{officer.remainingCapacity === 1 ? '' : 's'} remaining
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max={officer.remainingCapacity}
+                      placeholder="Count"
+                      value={allocationCounts[officer.officerId] || ''}
+                      onChange={(e) => setAllocationCounts(prev => ({ ...prev, [officer.officerId]: e.target.value }))}
+                      style={{ width: '90px', padding: '0.45rem', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--panel-strong)', color: 'var(--text)' }}
+                      disabled={officer.remainingCapacity <= 0}
+                    />
+                    <button
+                      className="button button--primary"
+                      onClick={() => handleBulkAllocate(officer)}
+                      disabled={officer.remainingCapacity <= 0 || allocatingOfficerId === officer.officerId}
+                      style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', flex: 1 }}
+                    >
+                      {allocatingOfficerId === officer.officerId ? 'Allocating…' : 'Allocate'}
+                    </button>
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* History Table */}
-            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>App ID</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Applicant Name</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Current Stage</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Assigned Officer</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
-                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allocationApps.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                        No application records matching your criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    allocationApps.map(app => {
-                      const scheme = schemes.find(s => s.id === app.schemeId)
-                      const statusColor = app.status === 'Approved' ? '#22c55e' : app.status === 'Rejected' ? '#ef4444' : '#f59e0b'
-                      return (
-                        <tr key={app.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, fontFamily: 'monospace' }}>{app.id}</td>
-                          <td style={{ padding: '0.9rem 1.2rem' }}>
-                            <div style={{ fontWeight: 600 }}>{app.applicant}</div>
-                            <small style={{ color: 'var(--muted)' }}>Aadhaar: {app.aadhaar}</small>
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.88rem' }}>
-                            {scheme ? (scheme.name || scheme.title) : app.schemeId}
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.84rem', color: 'var(--muted)' }}>
-                            {app.submittedDate}
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', padding: '0.28rem 0.65rem', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, background: 'rgba(95, 143, 74, 0.16)', color: '#5f8f4a', border: '1px solid rgba(95, 143, 74, 0.35)' }}>
-                              {String(app.currentStage || 'FIELD_OFFICER').replaceAll('_', ' ')}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>
-                            <span style={{ fontWeight: 600 }}>{app.assignedOfficerName || '—'}</span>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {app.assignedOfficerId || '—'}</div>
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem' }}>
-                            <span style={{ padding: '0.3rem 0.7rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}40` }}>
-                              {app.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              <button
-                                className="button button--ghost"
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                                onClick={() => setSelectedApp(app)}
-                              >
-                                View Details
-                              </button>
-                              <button
-                                className="button button--ghost"
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', borderColor: 'rgba(217, 130, 43, 0.4)', color: '#ffc76a' }}
-                                onClick={() => { setReassignApp(app); setTargetOfficerId('') }}
-                              >
-                                {app.assignedOfficerId ? 'Reassign' : 'Allocate'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
             </div>
           </motion.div>
         )}

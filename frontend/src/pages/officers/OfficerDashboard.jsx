@@ -32,6 +32,7 @@ const STATUS_BADGE = {
   UNDER_REVIEW: 'badge-status--applied',
   FIELD_OFFICER: 'badge-status--applied',
   DISTRICT_OFFICER: 'badge-status--applied',
+  REGIONAL_OFFICER: 'badge-status--applied',
   FINANCE_OFFICER: 'badge-status--applied',
   APPROVED: 'badge-status--eligible',
   REJECTED: 'badge-status--ineligible',
@@ -59,7 +60,7 @@ export default function OfficerDashboard() {
   const [uploadedMediaIds, setUploadedMediaIds] = useState([])          // [{ mediaId, url, fileName, uploading }]
   const [, setInspectionLoading] = useState(false)      // pre-fill fetch
   const [submittingInspection, setSubmittingInspection] = useState(false) // submit in flight
-  const [, setInspectionContext] = useState(null)        // context from backend
+  const [inspectionContext, setInspectionContext] = useState(null)        // context from backend
 
   // Disbursement states
   const [disbursementPlan, setDisbursementPlan] = useState(null)
@@ -121,6 +122,7 @@ export default function OfficerDashboard() {
       || status === 'UNDER_REVIEW'
       || status === 'FIELD_OFFICER'
       || status === 'DISTRICT_OFFICER'
+      || status === 'REGIONAL_OFFICER'
       || status === 'FINANCE_OFFICER'
   }).length
   const approved = applications.filter(a => a.status === 'Approved' || a.status === 'APPROVED').length
@@ -140,7 +142,7 @@ export default function OfficerDashboard() {
       statusFilter === 'All' ||
       (
         normalizedFilter === 'PENDING'
-          ? ['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'FINANCE_OFFICER'].includes(appStatus.toUpperCase())
+          ? ['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].includes(appStatus.toUpperCase())
           : appStatus.toUpperCase() === normalizedFilter
       )
     return matchesSearch && matchesStatus
@@ -156,26 +158,30 @@ export default function OfficerDashboard() {
     setUploadedMediaIds([])
     setInspectionContext(null)
 
-    // Pre-fill from backend if this is a field officer
-    if (officer?.role === 'FIELD_OFFICER') {
+    // Field Officer: pre-fill their own editable inspection form.
+    // District/Regional/Finance Officer: fetch the same data read-only, to review
+    // what the Field Officer found before approving/rejecting.
+    if (officer?.role === 'FIELD_OFFICER' || officer?.role === 'DISTRICT_OFFICER' || officer?.role === 'REGIONAL_OFFICER') {
       const appId = app.id || app.applicationId
       setInspectionLoading(true)
       try {
         const ctx = await getInspectionContext(appId)
         setInspectionContext(ctx)
-        if (ctx.addressVerified != null) {
-          setChecklist({
-            address: Boolean(ctx.addressVerified),
-            business: Boolean(ctx.businessActivityConfirmed),
-            assets: Boolean(ctx.assetsInspected),
-          })
-        }
-        if (ctx.notes) setFieldNotes(ctx.notes)
-        if (ctx.evidenceMediaIds?.length) {
-          setUploadedMediaIds(ctx.evidenceMediaIds.map(id => ({ mediaId: id, url: null, fileName: id, uploading: false })))
+        if (officer?.role === 'FIELD_OFFICER') {
+          if (ctx.addressVerified != null) {
+            setChecklist({
+              address: Boolean(ctx.addressVerified),
+              business: Boolean(ctx.businessActivityConfirmed),
+              assets: Boolean(ctx.assetsInspected),
+            })
+          }
+          if (ctx.notes) setFieldNotes(ctx.notes)
+          if (ctx.evidenceMediaIds?.length) {
+            setUploadedMediaIds(ctx.evidenceMediaIds.map(id => ({ mediaId: id, url: null, fileName: id, uploading: false })))
+          }
         }
       } catch {
-        console.warn('Could not pre-fill inspection context')
+        console.warn('Could not load inspection context')
       } finally {
         setInspectionLoading(false)
       }
@@ -975,7 +981,7 @@ export default function OfficerDashboard() {
                   </div>
                 </>
               ) : (
-                // DISTRICT OFFICER REVIEW STAGE (Image 2)
+                // GENERIC OFFICER REVIEW STAGE — used by District, Regional and Finance Officers (Image 2)
                 <>
                   <div className="applicant-review-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.8rem' }}>
                     <div className="applicant-review-header__title">
@@ -1142,6 +1148,76 @@ export default function OfficerDashboard() {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Field Inspection Report — submitted by the Field Officer, for District/Regional/Finance Officer review */}
+                  <div className="review-card" style={{ background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                    <h4 style={{ margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-soft)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                      </svg>
+                      Field Inspection Report
+                    </h4>
+
+                    {inspectionContext && inspectionContext.lastSubmittedAt ? (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem', marginBottom: '0.8rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                            <span style={{ color: inspectionContext.addressVerified ? '#22c55e' : '#ef4444' }}>
+                              {inspectionContext.addressVerified ? '✓' : '✕'}
+                            </span>
+                            Address Verified
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                            <span style={{ color: inspectionContext.businessActivityConfirmed ? '#22c55e' : '#ef4444' }}>
+                              {inspectionContext.businessActivityConfirmed ? '✓' : '✕'}
+                            </span>
+                            Business Activity Confirmed
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                            <span style={{ color: inspectionContext.assetsInspected ? '#22c55e' : '#ef4444' }}>
+                              {inspectionContext.assetsInspected ? '✓' : '✕'}
+                            </span>
+                            Assets Inspected
+                          </div>
+                        </div>
+
+                        {inspectionContext.notes && (
+                          <div style={{ marginBottom: '0.8rem' }}>
+                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                              Inspector Notes
+                            </label>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text)', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.6rem' }}>
+                              {inspectionContext.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {inspectionContext.evidenceMediaIds?.length > 0 && (
+                          <div>
+                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                              Evidence ({inspectionContext.evidenceMediaIds.length})
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              {inspectionContext.evidenceMediaIds.map((id, idx) => (
+                                <span key={idx} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', background: '#f5f4f0', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--muted)' }}>
+                                  {id}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <p style={{ margin: '0.8rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>
+                          Submitted {new Date(inspectionContext.lastSubmittedAt).toLocaleString()}
+                        </p>
+                      </>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>
+                        No field inspection report has been submitted for this application yet.
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions buttons */}

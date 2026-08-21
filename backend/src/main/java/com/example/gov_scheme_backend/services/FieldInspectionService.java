@@ -12,7 +12,12 @@ public interface FieldInspectionService {
     InspectionContextResponse getInspectionContext(Long applicationId);
 
     /**
-     * Submits a field inspection report for an application, setting the status to INSPECTION_COMPLETED.
+     * Submits a field inspection report for an application. Persists the
+     * inspection record, then advances the verification workflow from
+     * FIELD_OFFICER to DISTRICT_OFFICER stage, in the same transaction.
+     * The Field Officer's role is to inspect and forward — the
+     * approve/reject decision is made later by the District Officer, who
+     * reviews this inspection report as part of that decision.
      */
     void submitInspectionReport(InspectionSubmitRequest request, Users officer);
 }

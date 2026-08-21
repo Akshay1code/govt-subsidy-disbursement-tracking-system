@@ -2,13 +2,16 @@ package com.example.gov_scheme_backend.services.impl;
 
 import com.example.gov_scheme_backend.dto.request.inspection.InspectionSubmitRequest;
 import com.example.gov_scheme_backend.dto.response.inspection.InspectionContextResponse;
+import com.example.gov_scheme_backend.dto.request.workflow.WorkflowActionRequest;
 import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.FieldInspection;
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
+import com.example.gov_scheme_backend.enums.WorkflowAction;
 import com.example.gov_scheme_backend.repositories.ApplicationRepo;
 import com.example.gov_scheme_backend.repositories.FieldInspectionRepo;
 import com.example.gov_scheme_backend.services.FieldInspectionService;
+import com.example.gov_scheme_backend.services.WorkflowService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ public class FieldInspectionServiceImpl implements FieldInspectionService {
 
     private final ApplicationRepo applicationRepo;
     private final FieldInspectionRepo fieldInspectionRepo;
+    private final WorkflowService workflowService;
 
     @Override
     public InspectionContextResponse getInspectionContext(Long applicationId) {
@@ -68,9 +72,19 @@ public class FieldInspectionServiceImpl implements FieldInspectionService {
 
         fieldInspectionRepo.save(inspection);
 
-        // Update application status
-        app.setStatus(ApplicationStatus.INSPECTION_COMPLETED);
-        applicationRepo.save(app);
+        // The Field Officer's job ends at "inspect and forward" — they do not
+        // approve or reject. This call advances the real workflow from
+        // FIELD_OFFICER to DISTRICT_OFFICER in the same transaction, so the
+        // case never stalls. The District Officer makes the actual
+        // approve/reject decision later, after reviewing this report via
+        // getInspectionContext(). INSPECTION_COMPLETED is intentionally not
+        // persisted as a standalone status — processAction() below sets the
+        // application's real next status (UNDER_REVIEW).
+        WorkflowActionRequest workflowRequest = new WorkflowActionRequest();
+        workflowRequest.setAction(WorkflowAction.APPROVE);
+        workflowRequest.setRemarks("Field inspection completed. Forwarded to District Officer for review.");
+
+        workflowService.processAction(request.getApplicationId(), workflowRequest, officer);
     }
 
     private String buildLocation(Application app) {

@@ -16,6 +16,8 @@ const ROLE_LABELS = {
   BENEFICIARY_ACCOUNT: "Beneficiary's account",
   FIELD_OFFICER: "Field Officer's account",
   OFFICER: "Field Officer's account",
+  DISTRICT_OFFICER: "District Officer's account",
+  REGIONAL_OFFICER: "Regional Officer's account",
   FINANCE_OFFICER: "Finance Officer's account",
   ADMIN: "Admin's account",
 }
