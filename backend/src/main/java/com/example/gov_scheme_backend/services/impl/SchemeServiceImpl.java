@@ -83,6 +83,7 @@ public class SchemeServiceImpl {
 
         scheme.setSchemeName(req.getSchemeName());
         scheme.setDescription(req.getDescription());
+        scheme.setBenefit(req.getBenefit());
         scheme.setAllocatedFunds(req.getAllocatedFunds());
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
@@ -145,6 +146,7 @@ public class SchemeServiceImpl {
 
         scheme.setSchemeName(req.getSchemeName());
         scheme.setDescription(req.getDescription());
+        scheme.setBenefit(req.getBenefit());
         scheme.setAllocatedFunds(req.getAllocatedFunds());
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
@@ -300,7 +302,12 @@ public class SchemeServiceImpl {
         dto.setSchemeCode(scheme.getSchemeCode());
         dto.setSchemeName(scheme.getSchemeName());
         dto.setDescription(scheme.getDescription());
+        dto.setBenefit(scheme.getBenefit());
         dto.setAllocatedFunds(scheme.getAllocatedFunds());
+        double allocatedForDto = scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds() : 0.0;
+        double usedForDto = scheme.getBudgetUsed() != null ? scheme.getBudgetUsed() : 0.0;
+        dto.setBudgetUsed(usedForDto);
+        dto.setRemainingFunds(allocatedForDto - usedForDto);
         dto.setMinimumEligibleScore(scheme.getMinimumEligibleScore());
         dto.setActive(scheme.getActive());
         dto.setCategoryName(scheme.getCategory() != null ? scheme.getCategory().getCategoryName() : null);

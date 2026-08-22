@@ -17,6 +17,8 @@ public class SchemesDto {
 
     private String description;
 
+    private java.math.BigDecimal benefit;
+
     private Double allocatedFunds;
 
     private Double minimumEligibleScore;

@@ -74,6 +74,16 @@ public class DisbursementServiceImpl implements DisbursementService {
                     + ") must match the plan's total stages (" + plan.getTotalStages() + ")");
         }
 
+        // Guard null stage fields before any arithmetic (auto-unboxing would NPE otherwise)
+        for (StageDto stage : request.getStages()) {
+            if (stage.getStageNumber() == null) {
+                throw new BadRequestException("Stage number is required for every stage");
+            }
+            if (stage.getAmountToRelease() == null) {
+                throw new BadRequestException("Stage amount is required for stage " + stage.getStageNumber());
+            }
+        }
+
         // Validate sum of amounts
         double totalConfiguredAmount = request.getStages().stream()
                 .mapToDouble(StageDto::getAmountToRelease)
@@ -190,6 +200,12 @@ public class DisbursementServiceImpl implements DisbursementService {
                     throw new BadRequestException("Stage " + milestone.getStageNumber() 
                             + " cannot be released unless Stage " + m.getStageNumber() + " milestone is COMPLETE.");
                 }
+                // Strict sequential release: a prior stage that is COMPLETED but not yet
+                // RELEASED must be released first, so funds always flow in stage order.
+                if (m.getCompletionStatus() == MilestoneStatus.COMPLETED) {
+                    throw new BadRequestException("Stage " + milestone.getStageNumber()
+                            + " cannot be released until Stage " + m.getStageNumber() + " has been released.");
+                }
             }
         }
 
@@ -199,12 +215,19 @@ public class DisbursementServiceImpl implements DisbursementService {
         milestone.setReleaseDate(LocalDate.now());
         milestoneRepo.save(milestone);
 
-        // 2. Update scheme budget
+        // 2. Update scheme budget (guard against over-disbursing beyond allocated funds)
         Application application = applicationRepo.findById(milestone.getPlan().getApplicationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found for disbursement plan"));
         Schemes scheme = application.getScheme();
         double currentBudgetUsed = scheme.getBudgetUsed();
-        scheme.setBudgetUsed(currentBudgetUsed + milestone.getAmountToRelease());
+        double releaseAmount = milestone.getAmountToRelease();
+        Double allocatedFunds = scheme.getAllocatedFunds();
+        if (allocatedFunds != null && (currentBudgetUsed + releaseAmount) > allocatedFunds + 0.01) {
+            throw new BadRequestException("Releasing ₹" + releaseAmount
+                    + " would exceed the scheme's allocated funds (already used ₹" + currentBudgetUsed
+                    + " of ₹" + allocatedFunds + ").");
+        }
+        scheme.setBudgetUsed(currentBudgetUsed + releaseAmount);
         schemeRepo.save(scheme);
 
         // 3. Write Audit Log
@@ -223,6 +246,21 @@ public class DisbursementServiceImpl implements DisbursementService {
                         + ", Amount: ₹" + milestone.getAmountToRelease() + ") for Application ID: " + application.getId())
                 .build();
         auditLogRepo.save(audit);
+
+        // 4. Notify the beneficiary that funds have been disbursed for this milestone
+        if (application.getUser() != null) {
+            Notification beneficiaryNotification = Notification.builder()
+                    .user(application.getUser())
+                    .milestoneId(milestone.getMilestoneId())
+                    .message("₹" + milestone.getAmountToRelease() + " has been disbursed for milestone '"
+                            + milestone.getMilestoneName() + "' (Stage " + milestone.getStageNumber()
+                            + ") of your subsidy application " + application.getApplicationCode() + ".")
+                    .sentDate(LocalDate.now())
+                    .isRead(false)
+                    .notificationType(NotificationType.GENERAL)
+                    .build();
+            notificationRepo.save(beneficiaryNotification);
+        }
 
         return mapToMilestoneResponse(milestone);
     }

@@ -74,15 +74,15 @@ public class FieldInspectionServiceImpl implements FieldInspectionService {
 
         // The Field Officer's job ends at "inspect and forward" — they do not
         // approve or reject. This call advances the real workflow from
-        // FIELD_OFFICER to DISTRICT_OFFICER in the same transaction, so the
-        // case never stalls. The District Officer makes the actual
+        // FIELD_OFFICER to REGIONAL_OFFICER in the same transaction, so the
+        // case never stalls. The Regional Officer makes the actual
         // approve/reject decision later, after reviewing this report via
         // getInspectionContext(). INSPECTION_COMPLETED is intentionally not
         // persisted as a standalone status — processAction() below sets the
         // application's real next status (UNDER_REVIEW).
         WorkflowActionRequest workflowRequest = new WorkflowActionRequest();
         workflowRequest.setAction(WorkflowAction.APPROVE);
-        workflowRequest.setRemarks("Field inspection completed. Forwarded to District Officer for review.");
+        workflowRequest.setRemarks("Field inspection completed. Forwarded to Regional Officer for review.");
 
         workflowService.processAction(request.getApplicationId(), workflowRequest, officer);
     }

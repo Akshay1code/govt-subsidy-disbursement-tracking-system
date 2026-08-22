@@ -35,7 +35,7 @@ public interface VerificationWorkflowRepository extends JpaRepository<Verificati
     long countActiveAssignmentsByOfficer(Long officerId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT v FROM VerificationWorkflow v WHERE v.assignedOfficer IS NULL AND v.currentStage = :stage ORDER BY v.application.createdAt ASC")
+    @Query("SELECT v FROM VerificationWorkflow v WHERE v.assignedOfficer IS NULL AND v.currentStage = :stage ORDER BY v.application.createdAt ASC, v.application.id ASC")
     Page<VerificationWorkflow> findOldestUnassignedWorkflowsByStageWithLock(WorkflowStage stage, Pageable pageable);
 
     long countByCurrentStageAndAssignedOfficerIsNull(WorkflowStage stage);
