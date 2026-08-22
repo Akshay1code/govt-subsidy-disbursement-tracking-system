@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
 import DashboardTopbar from '../../components/DashboardTopbar'
-import { updateApprovalStatus, getOfficerRequests, getAllocationSummary, getOfficersForAllocation, bulkAllocateApplications } from '../../services/adminService'
+import { updateApprovalStatus, getOfficerRequests, getAllocationSummary } from '../../services/adminService'
 import { getApplications, allocateApplication, getAvailableOfficersWorkload, batchAllocateApplications } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
 import { clearPortalSessionCaches } from '../../services/sessionCleanup'
@@ -92,6 +92,7 @@ export default function AdminDashboard() {
     schemeCode: '',
     schemeName: '',
     description: '',
+    benefit: '',
     allocatedFunds: '',
     minimumEligibleScore: 50,
     active: true,
@@ -198,19 +199,15 @@ export default function AdminDashboard() {
   const [targetOfficerId, setTargetOfficerId] = useState('')
   const [toast, setToast] = useState(null)
 
-  // FCFS Batch Allocation State
-  const [fcfsStage, setFcfsStage] = useState('FIELD_OFFICER')
+  // Batch allocation state (workload engine). The admin enters a single count
+  // for the selected stage; the backend picks applications (FCFS) and officers
+  // (by workload). officerWorkloads is a read-only roster for that stage.
   const [fcfsCount, setFcfsCount] = useState(10)
   const [officerWorkloads, setOfficerWorkloads] = useState([])
   const [workloadsLoading, setWorkloadsLoading] = useState(false)
   const [fcfsAllocating, setFcfsAllocating] = useState(false)
-
-  // New capacity-based allocation state
   const [allocationSummary, setAllocationSummary] = useState([]) // [{stage, unassignedCount}]
   const [allocationStageTab, setAllocationStageTab] = useState('FIELD_OFFICER')
-  const [stageOfficers, setStageOfficers] = useState([])           // [{officerId, uniqueId, fullName, role, allocationLimit, currentAssignedCount, remainingCapacity}]
-  const [allocationCounts, setAllocationCounts] = useState({})     // { [officerId]: countToAllocate }
-  const [allocatingOfficerId, setAllocatingOfficerId] = useState(null)
   const tabContentMeta = {
     allocation: {
       title: 'Application Allocation',
@@ -289,6 +286,7 @@ export default function AdminDashboard() {
       schemeCode: '',
       schemeName: '',
       description: '',
+      benefit: '',
       allocatedFunds: '',
       minimumEligibleScore: 50,
       active: true,
@@ -306,6 +304,7 @@ export default function AdminDashboard() {
       schemeCode: scheme.schemeCode || '',
       schemeName: scheme.schemeName || scheme.name || '',
       description: scheme.description || '',
+      benefit: scheme.benefit || '',
       allocatedFunds: scheme.allocatedFunds || 0,
       minimumEligibleScore: scheme.minimumEligibleScore || 50,
       active: scheme.active ?? true,
@@ -341,6 +340,7 @@ export default function AdminDashboard() {
       schemeCode: schemeForm.schemeCode,
       schemeName: schemeForm.schemeName,
       description: schemeForm.description,
+      benefit: schemeForm.benefit,
       allocatedFunds: Number(schemeForm.allocatedFunds),
       minimumEligibleScore: Number(schemeForm.minimumEligibleScore),
       active: schemeForm.active,
@@ -489,43 +489,54 @@ export default function AdminDashboard() {
     }
   }
 
-  async function refreshStageOfficers(stage) {
+  async function refreshOfficerWorkloads(stage) {
+    setWorkloadsLoading(true)
     try {
-      const data = await getOfficersForAllocation(stage)
-      setStageOfficers(Array.isArray(data) ? data : [])
+      const data = await getAvailableOfficersWorkload(stage)
+      setOfficerWorkloads(Array.isArray(data) ? data : [])
     } catch {
-      setStageOfficers([])
+      setOfficerWorkloads([])
+    } finally {
+      setWorkloadsLoading(false)
     }
   }
 
   useEffect(() => {
     if (activeTab === 'allocation') {
       refreshAllocationSummary()
-      refreshStageOfficers(allocationStageTab)
+      refreshOfficerWorkloads(allocationStageTab)
     }
   }, [activeTab, allocationStageTab])
 
-  async function handleBulkAllocate(officer) {
-    const count = Number(allocationCounts[officer.officerId] || 0)
+  // Batch allocation (workload engine). The admin enters ONE count for the
+  // selected stage; the backend picks the oldest unassigned applications (FCFS,
+  // id tie-break) AND the officer for each (lowest active workload first, id
+  // tie-break). The admin never chooses the officer — that decision is the
+  // engine's, so this replaces the old per-officer manual bulk path.
+  async function handleBatchAllocate() {
+    const count = Number(fcfsCount || 0)
     if (!count || count < 1) {
       showToast('Enter a valid number of applications to allocate', 'error')
       return
     }
-    setAllocatingOfficerId(officer.officerId)
+    setFcfsAllocating(true)
     try {
-      const res = await bulkAllocateApplications(officer.uniqueId, allocationStageTab, count)
-      if (res?.success === false) {
-        showToast(res.message || 'Allocation failed', 'error')
+      const res = await batchAllocateApplications(allocationStageTab, count)
+      const allocated = res?.allocatedCount ?? 0
+      const requested = res?.requestedCount ?? count
+      if (allocated === 0) {
+        showToast(res?.message || 'No applications could be allocated', 'error')
+      } else if (allocated < requested) {
+        showToast(res?.message || `Partially allocated ${allocated} of ${requested} application(s)`, 'error')
       } else {
-        showToast(res.message || `Allocated ${count} application(s) to ${officer.fullName}`)
-        setAllocationCounts(prev => ({ ...prev, [officer.officerId]: '' }))
-        await refreshAllocationSummary()
-        await refreshStageOfficers(allocationStageTab)
+        showToast(res?.message || `Allocated ${allocated} application(s)`)
       }
+      await refreshAllocationSummary()
+      await refreshOfficerWorkloads(allocationStageTab)
     } catch (err) {
       showToast(err?.response?.data?.message || 'Allocation failed', 'error')
     } finally {
-      setAllocatingOfficerId(null)
+      setFcfsAllocating(false)
     }
   }
 
@@ -662,54 +673,103 @@ export default function AdminDashboard() {
               })}
             </div>
 
-            {/* Officer roster for the selected stage */}
-            <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.8rem 0', color: 'var(--text)' }}>
-              {allocationStageTab.replace(/_/g, ' ')} officers
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-              {stageOfficers.length === 0 && (
-                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No officers found for this stage.</p>
-              )}
-              {stageOfficers.map(officer => (
-                <div
-                  key={officer.officerId}
-                  style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--text)' }}>{officer.fullName}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>ID: {officer.uniqueId}</div>
+            {/* Batch allocation control — one count for the whole stage. The
+                backend picks the oldest unassigned applications (FCFS) and
+                spreads them across the least-loaded officers. The admin does
+                not choose the officer. */}
+            {(() => {
+              const totalRemaining = officerWorkloads.reduce((sum, o) => sum + (o.remainingCapacity || 0), 0)
+              const queueEntry = allocationSummary.find(s => s.stage === allocationStageTab)
+              const queueCount = queueEntry ? queueEntry.unassignedCount : 0
+              const suggestedMax = Math.min(queueCount, totalRemaining)
+              return (
+                <div style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '14px', padding: '1.3rem', marginBottom: '1.6rem' }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.35rem' }}>
+                    Allocate applications — {allocationStageTab.replace(/_/g, ' ')}
                   </div>
-
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
-                    <strong>{officer.currentAssignedCount}</strong> / {officer.allocationLimit} assigned
-                    {' · '}
-                    <span style={{ color: officer.remainingCapacity > 0 ? '#22c55e' : '#ef4444' }}>
-                      {officer.remainingCapacity} slot{officer.remainingCapacity === 1 ? '' : 's'} remaining
-                    </span>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 0.9rem 0' }}>
+                    Enter how many applications to assign. The system takes the oldest unassigned applications first and distributes them to the least-loaded officers automatically.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)' }}>{queueCount}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>awaiting allocation</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: totalRemaining > 0 ? '#22c55e' : '#ef4444' }}>{totalRemaining}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>officer capacity free</div>
+                    </div>
                   </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       type="number"
                       min="1"
-                      max={officer.remainingCapacity}
+                      value={fcfsCount}
+                      onChange={(e) => setFcfsCount(e.target.value)}
                       placeholder="Count"
-                      value={allocationCounts[officer.officerId] || ''}
-                      onChange={(e) => setAllocationCounts(prev => ({ ...prev, [officer.officerId]: e.target.value }))}
-                      style={{ width: '90px', padding: '0.45rem', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--panel-strong)', color: 'var(--text)' }}
-                      disabled={officer.remainingCapacity <= 0}
+                      style={{ width: '120px', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.9rem', background: 'var(--panel)', color: 'var(--text)' }}
+                      disabled={fcfsAllocating}
                     />
                     <button
                       className="button button--primary"
-                      onClick={() => handleBulkAllocate(officer)}
-                      disabled={officer.remainingCapacity <= 0 || allocatingOfficerId === officer.officerId}
-                      style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', flex: 1 }}
+                      onClick={handleBatchAllocate}
+                      disabled={fcfsAllocating || suggestedMax <= 0}
+                      style={{ padding: '0.55rem 1.3rem', fontSize: '0.9rem' }}
                     >
-                      {allocatingOfficerId === officer.officerId ? 'Allocating…' : 'Allocate'}
+                      {fcfsAllocating ? 'Allocating…' : 'Allocate'}
                     </button>
+                    {suggestedMax > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFcfsCount(suggestedMax)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}
+                      >
+                        Fill {suggestedMax}
+                      </button>
+                    )}
                   </div>
+                  {suggestedMax <= 0 && (
+                    <p style={{ fontSize: '0.78rem', color: '#ef4444', margin: '0.8rem 0 0 0' }}>
+                      {queueCount === 0 ? 'No applications are awaiting allocation at this stage.' : 'No officer has free capacity at this stage.'}
+                    </p>
+                  )}
                 </div>
-              ))}
+              )
+            })()}
+
+            {/* Officer workload roster (read-only). The engine assigns officers;
+                this is a live view of who is carrying how much. */}
+            <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.8rem 0', color: 'var(--text)' }}>
+              {allocationStageTab.replace(/_/g, ' ')} officer workload
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+              {workloadsLoading && (
+                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Loading workloads…</p>
+              )}
+              {!workloadsLoading && officerWorkloads.length === 0 && (
+                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No officers found for this stage.</p>
+              )}
+              {officerWorkloads.map(officer => {
+                const pct = officer.capacity > 0 ? Math.min(100, Math.round((officer.allocatedCount / officer.capacity) * 100)) : 0
+                return (
+                  <div
+                    key={officer.officerId}
+                    style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}
+                  >
+                    <div style={{ fontWeight: 700, color: 'var(--text)' }}>{officer.officerName}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
+                      <strong>{officer.allocatedCount}</strong> / {officer.capacity} assigned
+                      {' · '}
+                      <span style={{ color: officer.remainingCapacity > 0 ? '#22c55e' : '#ef4444' }}>
+                        {officer.remainingCapacity} slot{officer.remainingCapacity === 1 ? '' : 's'} free
+                      </span>
+                    </div>
+                    <div style={{ height: '6px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: pct >= 100 ? '#ef4444' : 'var(--accent)' }} />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </motion.div>
         )}
@@ -1529,6 +1589,19 @@ export default function AdminDashboard() {
                   />
                 </div>
 
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.25rem', color: 'var(--text-soft)', fontWeight: 600 }}>Benefit Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 6000.00"
+                    value={schemeForm.benefit}
+                    onChange={e => setSchemeForm(prev => ({ ...prev, benefit: e.target.value ? parseFloat(e.target.value) : '' }))}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.88rem' }}
+                  />
+                </div>
+
                 <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <label style={{ fontSize: '0.88rem', color: 'var(--text)', fontWeight: 600 }}>Eligibility Rules</label>
@@ -1539,8 +1612,9 @@ export default function AdminDashboard() {
                     <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 110px 80px 40px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                       <select value={rule.fieldName} onChange={e => updateRule(i, 'fieldName', e.target.value)} style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem' }}>
                         <option value="AGE">Age</option>
-                        <option value="INCOME">Income</option>
-                        <option value="CGPA">CGPA</option>
+                        <option value="ANNUAL_INCOME">Annual Income</option>
+                        <option value="LAND_AREA">Land Area</option>
+                        <option value="OCCUPATION">Occupation</option>
                         <option value="CASTE">Caste</option>
                         <option value="STATE">State</option>
                         <option value="GENDER">Gender</option>

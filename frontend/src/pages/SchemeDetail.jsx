@@ -365,6 +365,13 @@ export default function SchemeDetail() {
               <h1 className="scheme-title">{scheme.name}</h1>
               <p className="scheme-desc-long">{scheme.description}</p>
 
+              {scheme.benefit !== null && scheme.benefit !== undefined && scheme.benefit !== '' && (
+                <div className="scheme-benefit-block">
+                  <h3 className="section-subtitle-detail">Benefit Amount</h3>
+                  <p className="scheme-desc-long">₹{Number(scheme.benefit).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+              )}
+
               {/* Dynamic Nature-specific info details */}
               <h3 className="section-subtitle-detail">Scheme Specific Specifications</h3>
               <div className="nature-detail-grid">

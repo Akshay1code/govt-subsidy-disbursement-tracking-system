@@ -77,10 +77,13 @@ public class AllocationServiceImpl implements AllocationService {
         int actuallyAllocated = 0;
 
         for (VerificationWorkflow workflow : workflowsToAssign.getContent()) {
-            // Find officer with the lowest allocated count who still has remaining capacity
+            // Find officer with the lowest allocated count who still has remaining capacity.
+            // Tie-break on officerId so the choice is deterministic when two officers
+            // are carrying the same load (mirrors the FCFS id tie-breaker on the queue).
             OfficerWorkloadDTO selectedOfficerInfo = availableOfficers.stream()
                     .filter(o -> o.getRemainingCapacity() > 0)
-                    .min(Comparator.comparingLong(OfficerWorkloadDTO::getAllocatedCount))
+                    .min(Comparator.comparingLong(OfficerWorkloadDTO::getAllocatedCount)
+                            .thenComparing(OfficerWorkloadDTO::getOfficerId))
                     .orElse(null);
 
             if (selectedOfficerInfo == null) {
@@ -101,7 +104,7 @@ public class AllocationServiceImpl implements AllocationService {
             AuditLog log = AuditLog.builder()
                     .auditId("AUD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                     .user(currentUser)
-                    .action(AuditAction.UPDATE) // Assuming UPDATE since ALLOCATE isn't standard, or just UPDATE
+                    .action(AuditAction.ALLOCATE)
                     .description("Application #" + workflow.getApplication().getId() + " allocated to Officer #" + selectedOfficer.getId() + " via Batch FCFS")
                     .build();
             auditLogRepository.save(log);
