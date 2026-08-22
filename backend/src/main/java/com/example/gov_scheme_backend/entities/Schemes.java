@@ -32,6 +32,9 @@ public class Schemes {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "benefit", precision = 15, scale = 2)
+    private java.math.BigDecimal benefit;
+
     @Column(nullable = false)
     private Double allocatedFunds;
 

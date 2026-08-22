@@ -67,6 +67,7 @@ function mapScheme(scheme) {
     name: scheme.schemeName,
     category: scheme.categoryName || 'General',
     description: scheme.description || '',
+    benefit: scheme.benefit || '',
     allocatedFunds: scheme.allocatedFunds,
     amount: formatAmount(scheme.allocatedFunds),
     processingTime: scheme.active ? 'Open for applications' : 'Currently inactive',

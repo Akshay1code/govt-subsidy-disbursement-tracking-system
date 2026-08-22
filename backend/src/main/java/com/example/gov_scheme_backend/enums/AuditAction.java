@@ -10,5 +10,6 @@ public enum AuditAction {
     REJECT,
     ESCALATE,
     RE_VERIFY,
-    DISBURSE
+    DISBURSE,
+    ALLOCATE
 }

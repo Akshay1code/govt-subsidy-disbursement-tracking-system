@@ -10,7 +10,10 @@ public class SchemeResponseDTO {
     private String schemeCode;
     private String schemeName;
     private String description;
+    private java.math.BigDecimal benefit;
     private Double allocatedFunds;
+    private Double budgetUsed;
+    private Double remainingFunds;
     private Double minimumEligibleScore;
     private Boolean active;
     private String categoryName;
