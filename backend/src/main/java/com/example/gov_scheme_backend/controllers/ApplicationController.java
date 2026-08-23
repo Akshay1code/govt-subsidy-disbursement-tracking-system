@@ -207,13 +207,19 @@ public class ApplicationController {
         List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
         for (Application app : apps) {
             VerificationWorkflow workflow = workflowRepository.findByApplicationId(app.getId()).orElse(null);
+            if (viewerContext != null && isOfficerRole(viewerContext.role())) {
+                boolean assignedToCurrentOfficer =
+                        isAssignedToCurrentOfficer(viewerContext.userId(), app);
+                boolean financeApprovedApplication =
+                        "FINANCE_OFFICER".equalsIgnoreCase(viewerContext.role())
+                        && workflow != null
+                        && workflow.getCurrentStage() == WorkflowStage.COMPLETED
+                        && app.getStatus() == ApplicationStatus.APPROVED;
 
-            if (viewerContext != null
-                    && isOfficerRole(viewerContext.role())
-                    && !isAssignedToCurrentOfficer(viewerContext.userId(), app)) {
-                continue;
+                if (!assignedToCurrentOfficer && !financeApprovedApplication) {
+                    continue;
+                }
             }
-
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", app.getId());
             map.put("applicationId", app.getId());

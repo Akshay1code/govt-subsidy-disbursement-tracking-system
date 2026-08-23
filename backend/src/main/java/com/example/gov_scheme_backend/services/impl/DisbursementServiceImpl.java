@@ -76,7 +76,7 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         // Validate number of stages
         if (request.getStages().size() != plan.getTotalStages()) {
-            throw new BadRequestException("Stage configuration count (" + request.getStages().size() 
+            throw new BadRequestException("Stage configuration count (" + request.getStages().size()
                     + ") must match the plan's total stages (" + plan.getTotalStages() + ")");
         }
 
@@ -96,14 +96,14 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (totalConfiguredAmount.compareTo(plan.getTotalAmount()) != 0) {
-            throw new BadRequestException("The sum of stage amounts (₹" + totalConfiguredAmount 
+            throw new BadRequestException("The sum of stage amounts (₹" + totalConfiguredAmount
                     + ") does not equal the total approved grant (₹" + plan.getTotalAmount() + ")");
         }
 
         // Fetch existing milestones
         List<DisbursementMilestone> existingMilestones = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
         boolean hasCompletedOrReleased = existingMilestones.stream()
-                .anyMatch(m -> m.getCompletionStatus() == MilestoneStatus.COMPLETED 
+                .anyMatch(m -> m.getCompletionStatus() == MilestoneStatus.COMPLETED
                             || m.getCompletionStatus() == MilestoneStatus.RELEASED
                             || m.getCompletionStatus() == MilestoneStatus.OVERDUE);
 
@@ -144,13 +144,23 @@ public class DisbursementServiceImpl implements DisbursementService {
             savedMilestones.add(milestoneRepo.save(milestone));
         }
 
-        // Stage 1 requires no prior compliance milestone — release it immediately
-        // so the beneficiary receives the first installment as soon as the
-        // Finance Officer finalizes the plan, with no extra manual step.
+
+        // Automatically release Stage 1 after the Finance Officer finalizes the plan.
         savedMilestones.stream()
-                .filter(m -> m.getStageNumber() == 1)
-                .findFirst()
-                .ifPresent(stage1 -> releaseMilestone(stage1.getMilestoneId()));
+            .filter(m -> m.getStageNumber() == 1)
+            .findFirst()
+            .ifPresent(stage1 -> {
+                System.out.println(">>> AUTO RELEASE START: milestone=" + stage1.getMilestoneId());
+
+                try {
+                    releaseMilestone(stage1.getMilestoneId());
+                    System.out.println(">>> AUTO RELEASE SUCCESS");
+                } catch (Exception e) {
+                    System.out.println(">>> AUTO RELEASE FAILED: " + e.getMessage());
+                    e.printStackTrace();
+                throw e;
+                }
+            });
 
         List<DisbursementMilestone> refreshed = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
         return mapToPlanResponse(plan, refreshed);
@@ -199,11 +209,11 @@ public class DisbursementServiceImpl implements DisbursementService {
         for (DisbursementMilestone m : allMilestones) {
             if (m.getStageNumber() < milestone.getStageNumber()) {
                 if (m.getCompletionStatus() == MilestoneStatus.OVERDUE) {
-                    throw new BadRequestException("Stage " + milestone.getStageNumber() 
+                    throw new BadRequestException("Stage " + milestone.getStageNumber()
                             + " release is blocked because Stage " + m.getStageNumber() + " is OVERDUE.");
                 }
                 if (m.getCompletionStatus() == MilestoneStatus.PENDING) {
-                    throw new BadRequestException("Stage " + milestone.getStageNumber() 
+                    throw new BadRequestException("Stage " + milestone.getStageNumber()
                             + " cannot be released unless Stage " + m.getStageNumber() + " milestone is COMPLETE.");
                 }
                 // Strict sequential release: a prior stage that is COMPLETED but not yet
@@ -228,7 +238,7 @@ public class DisbursementServiceImpl implements DisbursementService {
         BigDecimal currentBudgetUsed = scheme.getBudgetUsed();
         BigDecimal releaseAmount = milestone.getAmountToRelease();
         BigDecimal allocatedFunds = scheme.getAllocatedFunds();
-        
+
         if (allocatedFunds != null && currentBudgetUsed.add(releaseAmount).compareTo(allocatedFunds) > 0) {
             throw new BadRequestException("Releasing ₹" + releaseAmount
                     + " would exceed the scheme's allocated funds (already used ₹" + currentBudgetUsed
@@ -249,7 +259,7 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .auditId(UUID.randomUUID().toString())
                 .user(performer)
                 .action(AuditAction.DISBURSE)
-                .description("Released milestone: " + milestone.getMilestoneName() + " (Stage " + milestone.getStageNumber() 
+                .description("Released milestone: " + milestone.getMilestoneName() + " (Stage " + milestone.getStageNumber()
                         + ", Amount: ₹" + milestone.getAmountToRelease() + ") for Application ID: " + application.getId())
                 .build();
         auditLogRepo.save(audit);
@@ -306,8 +316,8 @@ public class DisbursementServiceImpl implements DisbursementService {
             Application app = applicationRepo.findById(m.getPlan().getApplicationId()).orElse(null);
             if (app != null && app.getUser() != null) {
                 Users beneficiary = app.getUser();
-                String messageText = "Reminder: Your subsidy milestone '" + m.getMilestoneName() 
-                        + "' (Stage " + m.getStageNumber() + ") is due on " + m.getDueDate() 
+                String messageText = "Reminder: Your subsidy milestone '" + m.getMilestoneName()
+                        + "' (Stage " + m.getStageNumber() + ") is due on " + m.getDueDate()
                         + ". Please submit utilization/documents to avoid blockages.";
 
                 notificationService.createAndPublishNotification(
@@ -374,7 +384,7 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
 
         if (milestone.getCompletionStatus() != MilestoneStatus.OVERDUE) {
-            throw new BadRequestException("Milestone status is " + milestone.getCompletionStatus() 
+            throw new BadRequestException("Milestone status is " + milestone.getCompletionStatus()
                     + ", only OVERDUE milestones can be resolved by admin override.");
         }
 
@@ -397,7 +407,7 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .auditId(UUID.randomUUID().toString())
                 .user(performer)
                 .action(AuditAction.UPDATE)
-                .description("Admin Override Resolution: OVERDUE milestone ID " + milestoneId 
+                .description("Admin Override Resolution: OVERDUE milestone ID " + milestoneId
                         + " resolved. Reason: " + reason)
                 .build();
         auditLogRepo.save(audit);
@@ -486,7 +496,7 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         // Seed Application
         Optional<Application> existingAppOpt = applicationRepo.findAll().stream()
-                .filter(a -> a.getUser().getId().equals(userRepo.findByUsername("farmer1").get().getId()) 
+                .filter(a -> a.getUser().getId().equals(userRepo.findByUsername("farmer1").get().getId())
                           && a.getScheme().getSchemeCode().equals("SCH-TEST"))
                 .findFirst();
 
