@@ -44,21 +44,21 @@ export async function deleteAdminProfile() {
 }
 
 export async function getAllocationSummary() {
-  const response = await api.get('/gov/applications/allocation/summary')
+  const response = await api.get('/api/v1/allocation/summary')
   return response.data?.data || response.data || []
 }
 
 export async function getOfficersForAllocation(stage) {
-  const response = await api.get(`/gov/applications/allocation/officers?stage=${stage}`)
+  const response = await api.get(`/api/v1/allocation/officers/available?stage=${stage}`)
   return response.data?.data || response.data || []
 }
 
 export async function bulkAllocateApplications(officerId, stage, count) {
-  const response = await api.post('/gov/applications/allocation/bulk', { officerId, stage, count })
+  const response = await api.post('/api/v1/allocation/batch', { officerId, stage, count })
   return response.data
 }
 
 export async function updateOfficerAllocationLimit(officerId, limit) {
-  const response = await api.put(`/gov/applications/allocation/officers/${officerId}/limit`, { limit })
+  const response = await api.put(`/api/v1/allocation/officers/${officerId}/capacity`, { limit })
   return response.data
 }

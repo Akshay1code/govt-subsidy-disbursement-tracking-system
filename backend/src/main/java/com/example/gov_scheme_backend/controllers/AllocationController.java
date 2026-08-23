@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/allocation")
@@ -69,6 +70,43 @@ public class AllocationController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiResponse(false, "Allocation failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<?> getAllocationSummary(HttpServletRequest req) {
+        if (!isAdmin(req)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(false, "Only admins can view allocation summary"));
+        }
+        return ResponseEntity.ok(allocationService.getAllocationStageSummary());
+    }
+
+    @GetMapping("/officers/capacity")
+    public ResponseEntity<?> getOfficersForAllocation(@RequestParam WorkflowStage stage, HttpServletRequest req) {
+        if (!isAdmin(req)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(false, "Only admins can view officer capacity"));
+        }
+        try {
+            return ResponseEntity.ok(allocationService.getOfficerCapacities(stage));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponse(false, "Invalid stage: " + stage));
+        }
+    }
+
+    @PutMapping("/officers/{officerId}/capacity")
+    public ResponseEntity<?> updateOfficerCapacity(@PathVariable Long officerId, @RequestBody Map<String, Integer> body, HttpServletRequest req) {
+        if (!isAdmin(req)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiResponse(false, "Only admins can update allocation limits"));
+        }
+        Integer limit = body != null ? body.get("limit") : null;
+        if (limit == null || limit < 0) {
+            return ResponseEntity.badRequest().body(new ApiResponse(false, "A non-negative 'limit' value is required"));
+        }
+        try {
+            allocationService.updateOfficerCapacity(officerId, limit);
+            return ResponseEntity.ok(new ApiResponse(true, "Capacity updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(false, e.getMessage()));
         }
     }
 

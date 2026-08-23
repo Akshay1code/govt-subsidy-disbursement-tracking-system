@@ -48,8 +48,8 @@ public class DashboardServiceImpl implements DashboardService {
         return schemes.stream()
                 .map(scheme -> {
 
-                    double allocated = scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds() : 0.0;
-                    double used = scheme.getBudgetUsed() != null ? scheme.getBudgetUsed() : 0.0;
+                    double allocated = scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds().doubleValue() : 0.0;
+                    double used = scheme.getBudgetUsed() != null ? scheme.getBudgetUsed().doubleValue() : 0.0;
                     double remaining = allocated - used;
                     double utilization = allocated > 0 ? (used / allocated) * 100 : 0.0;
 

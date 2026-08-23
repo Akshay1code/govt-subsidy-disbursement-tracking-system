@@ -3,5 +3,11 @@ package com.example.gov_scheme_backend.enums;
 public enum NotificationType {
     GENERAL,
     REMINDER,
-    MILESTONE_READY
+    MILESTONE_READY,
+    APPLICATION_ASSIGNED,
+    APPLICATION_APPROVED,
+    APPLICATION_REJECTED,
+    APPLICATION_RE_VERIFY,
+    DISBURSEMENT_RELEASED,
+    MILESTONE_OVERDUE
 }

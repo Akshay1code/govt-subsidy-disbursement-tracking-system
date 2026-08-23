@@ -31,23 +31,23 @@ public class WorkflowHistory {
     private Users performedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private WorkflowAction action;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private WorkflowStage oldStage;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private WorkflowStage newStage;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "old_status", nullable = false)
+    @Column(name = "old_status", nullable = false, length = 50)
     private ApplicationStatus oldStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "new_status", nullable = false)
+    @Column(name = "new_status", nullable = false, length = 50)
     private ApplicationStatus newStatus;
 
     @Column(length = 1000)

@@ -27,6 +27,17 @@ public interface DisbursementMilestoneRepo
             MilestoneStatus completionStatus
     );
 
+    List<DisbursementMilestone> findByCompletionStatusAndDueDateBetween(
+            MilestoneStatus status, 
+            java.time.LocalDate startDate, 
+            java.time.LocalDate endDate
+    );
+
+    List<DisbursementMilestone> findByCompletionStatusAndDueDateBefore(
+            MilestoneStatus status, 
+            java.time.LocalDate date
+    );
+
     List<DisbursementMilestone> findByPlan_PlanId(
             Long planId
     );

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "disbursement_plan")
 @Data
@@ -23,8 +25,8 @@ public class DisbursementPlan {
     @Column(name = "application_id", nullable = false)
     private Long applicationId;
 
-    @Column(name = "total_amount", nullable = false)
-    private Double totalAmount;
+    @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal totalAmount;
 
     @Column(name = "total_stages", nullable = false)
     private Integer totalStages;

@@ -9,6 +9,7 @@ import org.hibernate.annotations.NotFound;
 import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -35,14 +36,14 @@ public class Schemes {
     @Column(name = "benefit", precision = 15, scale = 2)
     private java.math.BigDecimal benefit;
 
-    @Column(nullable = false)
-    private Double allocatedFunds;
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal allocatedFunds;
 
-    @Column(name = "budget_used", nullable = false)
-    private Double budgetUsed = 0.0;
+    @Column(name = "budget_used", nullable = false, precision = 15, scale = 2)
+    private BigDecimal budgetUsed = BigDecimal.ZERO;
 
-    public Double getBudgetUsed() {
-        return budgetUsed != null ? budgetUsed : 0.0;
+    public BigDecimal getBudgetUsed() {
+        return budgetUsed != null ? budgetUsed : BigDecimal.ZERO;
     }
 
     @Column(nullable = false)

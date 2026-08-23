@@ -43,8 +43,6 @@ public class Users implements UserDetails {
     String state;
     @Column(length = 10)
     String mobileNo;
-    @Column
-    Integer allocationLimit = 100;
     @CreationTimestamp
     LocalDateTime createdAt;
     @UpdateTimestamp

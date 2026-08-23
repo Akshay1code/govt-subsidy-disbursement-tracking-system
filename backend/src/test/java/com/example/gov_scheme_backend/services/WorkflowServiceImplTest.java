@@ -16,6 +16,7 @@ import com.example.gov_scheme_backend.repositories.NotificationRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.repositories.VerificationWorkflowRepository;
 import com.example.gov_scheme_backend.repositories.WorkflowHistoryRepository;
+import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.services.impl.WorkflowServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,9 @@ class WorkflowServiceImplTest {
     @Mock private AuditLogRepo auditLogRepository;
     @Mock private NotificationRepo notificationRepository;
     @Mock private DisbursementPlanRepo disbursementPlanRepository;
+    // WorkflowServiceImpl publishes approval/rejection/re-verify notifications via
+    // this collaborator; mock it so constructor injection does not leave it null.
+    @Mock private NotificationService notificationService;
 
     @InjectMocks
     private WorkflowServiceImpl workflowService;
@@ -133,7 +137,7 @@ class WorkflowServiceImplTest {
         when(disbursementPlanRepository.findByApplicationId(400L)).thenReturn(Optional.empty());
 
         WorkflowActionRequest req = action(WorkflowAction.APPROVE);
-        req.setApprovedAmount(50000.0);
+        req.setApprovedAmount(new java.math.BigDecimal("50000.00"));
         req.setNumberOfInstallments(3);
 
         workflowService.processAction(400L, req, fin);
@@ -147,11 +151,9 @@ class WorkflowServiceImplTest {
     @Test
     void reVerify_fromRegionalOfficer_sendsBackToFieldOfficer() {
         Users ro = officer(2L, Role.REGIONAL_OFFICER);
-        Users fo = officer(1L, Role.FIELD_OFFICER);
         Application app = application(500L);
         VerificationWorkflow wf = workflowAt(WorkflowStage.REGIONAL_OFFICER, ro, app);
         when(workflowRepository.findByApplicationId(500L)).thenReturn(Optional.of(wf));
-        when(userRepo.findByRole(Role.FIELD_OFFICER)).thenReturn(List.of(fo));
 
         WorkflowActionRequest req = action(WorkflowAction.RE_VERIFY);
         req.setRemarks("Please re-check the land documents");
@@ -159,7 +161,10 @@ class WorkflowServiceImplTest {
         workflowService.processAction(500L, req, ro);
 
         assertEquals(WorkflowStage.FIELD_OFFICER, wf.getCurrentStage());
-        assertSame(fo, wf.getAssignedOfficer());
+        // Under the FCFS model, re-verification returns the case to the
+        // unassigned pool at the Field Officer stage; the Admin re-allocates it.
+        // (No auto-assignment back to a specific officer.)
+        assertNull(wf.getAssignedOfficer());
         assertEquals(ApplicationStatus.UNDER_REVIEW, app.getStatus());
     }
 }

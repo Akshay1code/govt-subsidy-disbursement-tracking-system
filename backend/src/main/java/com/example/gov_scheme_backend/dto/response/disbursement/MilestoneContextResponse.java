@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -17,7 +18,7 @@ public class MilestoneContextResponse {
     private Long milestoneId;
     private Integer stageNumber;
     private String milestoneName;
-    private Double amountToRelease;
+    private BigDecimal amountToRelease;
     private LocalDate dueDate;
     private MilestoneStatus completionStatus;
     private LocalDate completedDate;
