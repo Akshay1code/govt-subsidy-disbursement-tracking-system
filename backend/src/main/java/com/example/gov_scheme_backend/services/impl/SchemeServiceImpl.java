@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.example.gov_scheme_backend.repositories.SchemeCategoryRepository;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -84,11 +85,11 @@ public class SchemeServiceImpl {
         scheme.setSchemeName(req.getSchemeName());
         scheme.setDescription(req.getDescription());
         scheme.setBenefit(req.getBenefit());
-        scheme.setAllocatedFunds(req.getAllocatedFunds());
+        scheme.setAllocatedFunds(req.getAllocatedFunds() != null ? BigDecimal.valueOf(req.getAllocatedFunds()) : null);
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
         scheme.setCategory(category);
-        scheme.setBudgetUsed(0.0);
+        scheme.setBudgetUsed(BigDecimal.ZERO);
 
         List<SchemeEligibilityRule> rules = buildRules(req.getRules(), scheme);
         List<SchemeRequiredDocument> documents = buildDocuments(req.getDocuments(), scheme);
@@ -147,7 +148,7 @@ public class SchemeServiceImpl {
         scheme.setSchemeName(req.getSchemeName());
         scheme.setDescription(req.getDescription());
         scheme.setBenefit(req.getBenefit());
-        scheme.setAllocatedFunds(req.getAllocatedFunds());
+        scheme.setAllocatedFunds(req.getAllocatedFunds() != null ? BigDecimal.valueOf(req.getAllocatedFunds()) : null);
         scheme.setMinimumEligibleScore(req.getMinimumEligibleScore());
         scheme.setActive(req.getActive() == null ? true : req.getActive());
         scheme.setCategory(category);
@@ -303,9 +304,9 @@ public class SchemeServiceImpl {
         dto.setSchemeName(scheme.getSchemeName());
         dto.setDescription(scheme.getDescription());
         dto.setBenefit(scheme.getBenefit());
-        dto.setAllocatedFunds(scheme.getAllocatedFunds());
-        double allocatedForDto = scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds() : 0.0;
-        double usedForDto = scheme.getBudgetUsed() != null ? scheme.getBudgetUsed() : 0.0;
+        dto.setAllocatedFunds(scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds().doubleValue() : null);
+        double allocatedForDto = scheme.getAllocatedFunds() != null ? scheme.getAllocatedFunds().doubleValue() : 0.0;
+        double usedForDto = scheme.getBudgetUsed() != null ? scheme.getBudgetUsed().doubleValue() : 0.0;
         dto.setBudgetUsed(usedForDto);
         dto.setRemainingFunds(allocatedForDto - usedForDto);
         dto.setMinimumEligibleScore(scheme.getMinimumEligibleScore());

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,7 +15,7 @@ import java.util.List;
 public class DisbursementPlanResponse {
     private Long planId;
     private Long applicationId;
-    private Double totalAmount;
+    private BigDecimal totalAmount;
     private Integer totalStages;
     private List<DisbursementMilestoneResponse> milestones;
 }

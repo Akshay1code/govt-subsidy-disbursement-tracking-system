@@ -12,6 +12,7 @@ import com.example.gov_scheme_backend.enums.WorkflowStage;
 import com.example.gov_scheme_backend.repositories.AuditLogRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.repositories.VerificationWorkflowRepository;
+import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.services.impl.AllocationServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,11 @@ class AllocationServiceImplTest {
     private VerificationWorkflowRepository workflowRepository;
     @Mock
     private AuditLogRepo auditLogRepository;
+    // AllocationServiceImpl now publishes an APPLICATION_ASSIGNED notification on
+    // each allocation, so the collaborator must be mocked or the constructor
+    // injection leaves it null (NPE at allocation time).
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private AllocationServiceImpl allocationService;

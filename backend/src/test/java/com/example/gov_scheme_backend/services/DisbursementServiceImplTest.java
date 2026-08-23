@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -59,14 +60,14 @@ class DisbursementServiceImplTest {
     @Test
     void releaseMilestone_blockedWhenPriorStageCompletedButNotReleased() {
         DisbursementPlan plan = DisbursementPlan.builder()
-                .planId(1L).applicationId(10L).totalAmount(1000.0).totalStages(2).build();
+                .planId(1L).applicationId(10L).totalAmount(new BigDecimal("1000.00")).totalStages(2).build();
 
         DisbursementMilestone stage1 = DisbursementMilestone.builder()
                 .milestoneId(11L).plan(plan).stageNumber(1).milestoneName("Initial")
-                .amountToRelease(500.0).completionStatus(MilestoneStatus.COMPLETED).build();
+                .amountToRelease(new BigDecimal("500.00")).completionStatus(MilestoneStatus.COMPLETED).build();
         DisbursementMilestone stage2 = DisbursementMilestone.builder()
                 .milestoneId(12L).plan(plan).stageNumber(2).milestoneName("Final")
-                .amountToRelease(500.0).completionStatus(MilestoneStatus.COMPLETED).build();
+                .amountToRelease(new BigDecimal("500.00")).completionStatus(MilestoneStatus.COMPLETED).build();
 
         when(milestoneRepo.findById(12L)).thenReturn(Optional.of(stage2));
         when(milestoneRepo.findByPlanOrderByStageNumberAsc(plan)).thenReturn(List.of(stage1, stage2));
@@ -84,18 +85,18 @@ class DisbursementServiceImplTest {
     @Test
     void releaseMilestone_blockedWhenReleaseExceedsAllocatedFunds() {
         DisbursementPlan plan = DisbursementPlan.builder()
-                .planId(2L).applicationId(20L).totalAmount(100000.0).totalStages(1).build();
+                .planId(2L).applicationId(20L).totalAmount(new BigDecimal("100000.00")).totalStages(1).build();
 
         DisbursementMilestone stage1 = DisbursementMilestone.builder()
                 .milestoneId(21L).plan(plan).stageNumber(1).milestoneName("Initial")
-                .amountToRelease(60000.0).completionStatus(MilestoneStatus.COMPLETED).build();
+                .amountToRelease(new BigDecimal("60000.00")).completionStatus(MilestoneStatus.COMPLETED).build();
 
         when(milestoneRepo.findById(21L)).thenReturn(Optional.of(stage1));
         when(milestoneRepo.findByPlanOrderByStageNumberAsc(plan)).thenReturn(List.of(stage1));
 
         Schemes scheme = new Schemes();
-        scheme.setAllocatedFunds(50000.0); // less than the 60000 release
-        scheme.setBudgetUsed(0.0);
+        scheme.setAllocatedFunds(new BigDecimal("50000.00")); // less than the 60000 release
+        scheme.setBudgetUsed(BigDecimal.ZERO);
         Application app = new Application();
         app.setId(20L);
         app.setScheme(scheme);
@@ -113,10 +114,10 @@ class DisbursementServiceImplTest {
     @Test
     void configurePlan_rejectsNullStageNumber() {
         DisbursementPlan plan = DisbursementPlan.builder()
-                .planId(3L).applicationId(30L).totalAmount(1000.0).totalStages(1).build();
+                .planId(3L).applicationId(30L).totalAmount(new BigDecimal("1000.00")).totalStages(1).build();
         when(planRepo.findById(3L)).thenReturn(Optional.of(plan));
 
-        StageDto bad = new StageDto(null, "Stage X", 1000.0, LocalDate.now().plusDays(10));
+        StageDto bad = new StageDto(null, "Stage X", new BigDecimal("1000.00"), LocalDate.now().plusDays(10));
         StageConfigurationRequest req = new StageConfigurationRequest(List.of(bad));
 
         BadRequestException ex = assertThrows(BadRequestException.class,

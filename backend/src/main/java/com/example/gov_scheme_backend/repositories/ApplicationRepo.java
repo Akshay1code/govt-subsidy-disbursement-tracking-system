@@ -5,11 +5,14 @@ import com.example.gov_scheme_backend.enums.ApplicationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
+import com.example.gov_scheme_backend.enums.ReviewStage;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ApplicationRepo extends JpaRepository<Application, Long> {
+
+    long countByStageAndAllocatedOfficerIsNull(ReviewStage stage);
 
     Optional<Application> findByApplicationCode(String applicationCode);
 

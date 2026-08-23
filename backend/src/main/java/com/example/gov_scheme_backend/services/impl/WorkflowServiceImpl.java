@@ -8,24 +8,27 @@ import com.example.gov_scheme_backend.entities.VerificationWorkflow;
 import com.example.gov_scheme_backend.entities.AuditLog;
 import com.example.gov_scheme_backend.entities.WorkflowHistory;
 import com.example.gov_scheme_backend.entities.Notification;
+import com.example.gov_scheme_backend.entities.DisbursementPlan;
 import com.example.gov_scheme_backend.enums.ApplicationStatus;
 import com.example.gov_scheme_backend.enums.Role;
 import com.example.gov_scheme_backend.enums.AuditAction;
 import com.example.gov_scheme_backend.enums.WorkflowAction;
 import com.example.gov_scheme_backend.enums.WorkflowStage;
+import com.example.gov_scheme_backend.enums.NotificationType;
 import com.example.gov_scheme_backend.repositories.ApplicationRepo;
 import com.example.gov_scheme_backend.repositories.AuditLogRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.repositories.VerificationWorkflowRepository;
 import com.example.gov_scheme_backend.repositories.WorkflowHistoryRepository;
 import com.example.gov_scheme_backend.repositories.NotificationRepo;
-import com.example.gov_scheme_backend.entities.DisbursementPlan;
 import com.example.gov_scheme_backend.repositories.DisbursementPlanRepo;
 import com.example.gov_scheme_backend.services.WorkflowService;
+import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.math.BigDecimal;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,7 +42,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private final UserRepo userRepo;
     private final ApplicationRepo applicationRepo;
     private final AuditLogRepo auditLogRepository;
-    private final NotificationRepo notificationRepository;
+    private final NotificationService notificationService;
     private final DisbursementPlanRepo disbursementPlanRepository;
 
 
@@ -187,7 +190,9 @@ public class WorkflowServiceImpl implements WorkflowService {
             // means the application is actually, fully approved.
             createNotification(
                     application.getUser(),
-                    "Your application has been approved."
+                    "Your application has been approved.",
+                    NotificationType.APPLICATION_APPROVED,
+                    application.getId()
             );
 
         }
@@ -215,6 +220,8 @@ public class WorkflowServiceImpl implements WorkflowService {
         workflow.setCurrentStage(WorkflowStage.DISTRICT_OFFICER);
         workflow.setAssignedOfficer(null);
 
+        application.setAllocatedOfficer(null);
+        application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.DISTRICT);
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
     }
 
@@ -227,6 +234,8 @@ public class WorkflowServiceImpl implements WorkflowService {
         workflow.setCurrentStage(WorkflowStage.REGIONAL_OFFICER);
         workflow.setAssignedOfficer(null);
 
+        application.setAllocatedOfficer(null);
+        application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.REGIONAL);
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
     }
 
@@ -239,6 +248,8 @@ public class WorkflowServiceImpl implements WorkflowService {
         workflow.setCurrentStage(WorkflowStage.FINANCE_OFFICER);
         workflow.setAssignedOfficer(null);
 
+        application.setAllocatedOfficer(null);
+        application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.FINANCE);
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
     }
 
@@ -249,6 +260,8 @@ public class WorkflowServiceImpl implements WorkflowService {
         workflow.setCurrentStage(WorkflowStage.COMPLETED);
         workflow.setAssignedOfficer(null);
 
+        application.setAllocatedOfficer(null);
+        application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.COMPLETED);
         application.setStatus(ApplicationStatus.APPROVED);
     }
 
@@ -264,6 +277,8 @@ public class WorkflowServiceImpl implements WorkflowService {
         workflow.setCurrentStage(WorkflowStage.COMPLETED);
         workflow.setAssignedOfficer(null);
 
+        application.setAllocatedOfficer(null);
+        application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.COMPLETED);
         application.setStatus(ApplicationStatus.REJECTED);
 
         workflowRepository.save(workflow);
@@ -287,7 +302,9 @@ public class WorkflowServiceImpl implements WorkflowService {
         createNotification(
                 application.getUser(),
                 "Your application has been rejected. Remarks: "
-                        + request.getRemarks()
+                        + request.getRemarks(),
+                NotificationType.APPLICATION_REJECTED,
+                application.getId()
         );
 
         return new WorkflowResponse(
@@ -346,11 +363,15 @@ public class WorkflowServiceImpl implements WorkflowService {
 
         saveAuditLog(officer, request.getAction());
 
-        createNotification(
-                workflow.getAssignedOfficer(),
-                "Application escalated to you for review. Application ID: "
-                        + application.getId()
-        );
+        if (workflow.getAssignedOfficer() != null) {
+            createNotification(
+                    workflow.getAssignedOfficer(),
+                    "Application escalated to you for review. Application ID: "
+                            + application.getId(),
+                    NotificationType.APPLICATION_ASSIGNED,
+                    application.getId()
+            );
+        }
 
         return new WorkflowResponse(
                 application.getId(),
@@ -376,55 +397,33 @@ public class WorkflowServiceImpl implements WorkflowService {
         switch (workflow.getCurrentStage()) {
 
             case FIELD_OFFICER:
-
                 workflow.setAssignedOfficer(null);
+                application.setAllocatedOfficer(null);
                 application.setStatus(ApplicationStatus.PENDING);
-
                 break;
 
             case REGIONAL_OFFICER:
-
-                Users fieldOfficerForRegional = userRepo.findByRole(Role.FIELD_OFFICER)
-                        .stream()
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException("No Field Officer found"));
-
                 workflow.setCurrentStage(WorkflowStage.FIELD_OFFICER);
-                workflow.setAssignedOfficer(fieldOfficerForRegional);
-
+                workflow.setAssignedOfficer(null);
+                application.setAllocatedOfficer(null);
+                application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.FIELD);
                 application.setStatus(ApplicationStatus.UNDER_REVIEW);
-
                 break;
 
             case DISTRICT_OFFICER:
-
-                Users regionalOfficerForDistrict = userRepo.findByRole(Role.REGIONAL_OFFICER)
-                        .stream()
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException("No Regional Officer found"));
-
                 workflow.setCurrentStage(WorkflowStage.REGIONAL_OFFICER);
-                workflow.setAssignedOfficer(regionalOfficerForDistrict);
-
+                workflow.setAssignedOfficer(null);
+                application.setAllocatedOfficer(null);
+                application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.REGIONAL);
                 application.setStatus(ApplicationStatus.UNDER_REVIEW);
-
                 break;
 
             case FINANCE_OFFICER:
-
-                Users districtOfficerForFinance = userRepo.findByRole(Role.DISTRICT_OFFICER)
-                        .stream()
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException("No District Officer found"));
-
                 workflow.setCurrentStage(WorkflowStage.DISTRICT_OFFICER);
-                workflow.setAssignedOfficer(districtOfficerForFinance);
-
+                workflow.setAssignedOfficer(null);
+                application.setAllocatedOfficer(null);
+                application.setStage(com.example.gov_scheme_backend.enums.ReviewStage.DISTRICT);
                 application.setStatus(ApplicationStatus.UNDER_REVIEW);
-
                 break;
 
             default:
@@ -454,7 +453,9 @@ public class WorkflowServiceImpl implements WorkflowService {
             createNotification(
                     workflow.getAssignedOfficer(),
                     "Application returned for re-verification. Application ID: "
-                            + application.getId()
+                            + application.getId(),
+                    NotificationType.APPLICATION_RE_VERIFY,
+                    application.getId()
             );
 
         } else {
@@ -462,7 +463,9 @@ public class WorkflowServiceImpl implements WorkflowService {
             createNotification(
                     application.getUser(),
                     "Additional information is required for your application. Remarks: "
-                            + request.getRemarks()
+                            + request.getRemarks(),
+                    NotificationType.APPLICATION_RE_VERIFY,
+                    application.getId()
             );
         }
 
@@ -598,16 +601,17 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     private void createNotification(
             Users recipient,
-            String message) {
+            String message,
+            NotificationType type,
+            Long applicationId) {
 
-        Notification notification = Notification.builder()
-                .user(recipient)
-                .message(message)
-                .sentDate(LocalDate.now())
-                .isRead(false)
-                .build();
-
-        notificationRepository.save(notification);
+        notificationService.createAndPublishNotification(
+                recipient,
+                message,
+                type,
+                null,
+                applicationId
+        );
     }
 
     private void createDisbursementPlan(
@@ -618,11 +622,11 @@ public class WorkflowServiceImpl implements WorkflowService {
         // Determine the amount to disburse. If the finance officer did not supply an
         // explicit approved amount, fall back to the scheme's standard benefit amount
         // so the payout is tracked against the scheme's funds.
-        Double approvedAmount = request.getApprovedAmount();
-        if ((approvedAmount == null || approvedAmount <= 0) && application.getScheme() != null && application.getScheme().getBenefit() != null) {
-            approvedAmount = application.getScheme().getBenefit().doubleValue();
+        BigDecimal approvedAmount = request.getApprovedAmount();
+        if ((approvedAmount == null || approvedAmount.compareTo(BigDecimal.ZERO) <= 0) && application.getScheme() != null && application.getScheme().getBenefit() != null) {
+            approvedAmount = application.getScheme().getBenefit();
         }
-        if (approvedAmount == null || approvedAmount <= 0) {
+        if (approvedAmount == null || approvedAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Approved amount must be greater than zero");
         }
 

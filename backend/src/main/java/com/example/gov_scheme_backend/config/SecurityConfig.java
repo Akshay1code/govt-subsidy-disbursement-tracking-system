@@ -2,6 +2,7 @@ package com.example.gov_scheme_backend.config;
 
 import com.example.gov_scheme_backend.security.CustomUserDetailsService;
 import com.example.gov_scheme_backend.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -75,7 +76,18 @@ public class SecurityConfig {
 
                         // Everything else
                         .anyRequest().authenticated()
-                );
+                )
+
+                // Unauthenticated requests (missing/expired/invalid JWT cookie) get a
+                // clean 401 with a JSON body instead of Spring Security's default bare
+                // 403. This lets the frontend distinguish "session expired / not logged
+                // in" (401) from "logged in but not permitted" (403, returned by the
+                // controllers themselves).
+                .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Session expired or not authenticated. Please log in again.\"}");
+                }));
 
         return http.build();
     }

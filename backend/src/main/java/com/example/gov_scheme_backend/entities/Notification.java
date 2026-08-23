@@ -26,6 +26,12 @@ public class Notification {
     @Column(name = "milestone_id")
     private Long milestoneId;
 
+    // Optional link to the originating application so the frontend can deep-link
+    // the notification to the relevant application. Nullable: not every
+    // notification is tied to an application (e.g. milestone reminders).
+    @Column(name = "application_id")
+    private Long applicationId;
+
     @Column(nullable = false, length = 500)
     private String message;
 
