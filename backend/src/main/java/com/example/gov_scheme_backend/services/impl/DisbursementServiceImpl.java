@@ -14,6 +14,7 @@ import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.*;
 import com.example.gov_scheme_backend.services.DisbursementService;
+import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.dto.response.disbursement.MilestoneContextResponse;
 import com.example.gov_scheme_backend.dto.response.disbursement.SuggestedStagesResponse;
 import com.example.gov_scheme_backend.enums.NotificationType;
@@ -23,6 +24,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -58,6 +61,9 @@ public class DisbursementServiceImpl implements DisbursementService {
     @Autowired
     private NotificationRepo notificationRepo;
 
+    @Autowired
+    private NotificationService notificationService;
+
     @Override
     @Transactional
     public DisbursementPlanResponse configurePlan(Long planId, StageConfigurationRequest request) {
@@ -85,11 +91,11 @@ public class DisbursementServiceImpl implements DisbursementService {
         }
 
         // Validate sum of amounts
-        double totalConfiguredAmount = request.getStages().stream()
-                .mapToDouble(StageDto::getAmountToRelease)
-                .sum();
+        BigDecimal totalConfiguredAmount = request.getStages().stream()
+                .map(StageDto::getAmountToRelease)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (Math.abs(totalConfiguredAmount - plan.getTotalAmount()) > 0.01) {
+        if (totalConfiguredAmount.compareTo(plan.getTotalAmount()) != 0) {
             throw new BadRequestException("The sum of stage amounts (₹" + totalConfiguredAmount 
                     + ") does not equal the total approved grant (₹" + plan.getTotalAmount() + ")");
         }
@@ -113,7 +119,7 @@ public class DisbursementServiceImpl implements DisbursementService {
         // Save new milestones
         List<DisbursementMilestone> savedMilestones = new ArrayList<>();
         for (StageDto stage : request.getStages()) {
-            if (stage.getAmountToRelease() <= 0) {
+            if (stage.getAmountToRelease().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BadRequestException("Stage amount must be greater than zero");
             }
             if (stage.getStageNumber() <= 0) {
@@ -219,15 +225,16 @@ public class DisbursementServiceImpl implements DisbursementService {
         Application application = applicationRepo.findById(milestone.getPlan().getApplicationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found for disbursement plan"));
         Schemes scheme = application.getScheme();
-        double currentBudgetUsed = scheme.getBudgetUsed();
-        double releaseAmount = milestone.getAmountToRelease();
-        Double allocatedFunds = scheme.getAllocatedFunds();
-        if (allocatedFunds != null && (currentBudgetUsed + releaseAmount) > allocatedFunds + 0.01) {
+        BigDecimal currentBudgetUsed = scheme.getBudgetUsed();
+        BigDecimal releaseAmount = milestone.getAmountToRelease();
+        BigDecimal allocatedFunds = scheme.getAllocatedFunds();
+        
+        if (allocatedFunds != null && currentBudgetUsed.add(releaseAmount).compareTo(allocatedFunds) > 0) {
             throw new BadRequestException("Releasing ₹" + releaseAmount
                     + " would exceed the scheme's allocated funds (already used ₹" + currentBudgetUsed
                     + " of ₹" + allocatedFunds + ").");
         }
-        scheme.setBudgetUsed(currentBudgetUsed + releaseAmount);
+        scheme.setBudgetUsed(currentBudgetUsed.add(releaseAmount));
         schemeRepo.save(scheme);
 
         // 3. Write Audit Log
@@ -249,17 +256,15 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         // 4. Notify the beneficiary that funds have been disbursed for this milestone
         if (application.getUser() != null) {
-            Notification beneficiaryNotification = Notification.builder()
-                    .user(application.getUser())
-                    .milestoneId(milestone.getMilestoneId())
-                    .message("₹" + milestone.getAmountToRelease() + " has been disbursed for milestone '"
+            notificationService.createAndPublishNotification(
+                    application.getUser(),
+                    "₹" + milestone.getAmountToRelease() + " has been disbursed for milestone '"
                             + milestone.getMilestoneName() + "' (Stage " + milestone.getStageNumber()
-                            + ") of your subsidy application " + application.getApplicationCode() + ".")
-                    .sentDate(LocalDate.now())
-                    .isRead(false)
-                    .notificationType(NotificationType.GENERAL)
-                    .build();
-            notificationRepo.save(beneficiaryNotification);
+                            + ") of your subsidy application " + application.getApplicationCode() + ".",
+                    NotificationType.DISBURSEMENT_RELEASED,
+                    milestone.getMilestoneId(),
+                    application.getId()
+            );
         }
 
         return mapToMilestoneResponse(milestone);
@@ -289,10 +294,8 @@ public class DisbursementServiceImpl implements DisbursementService {
         LocalDate today = LocalDate.now();
         LocalDate threeDaysLater = today.plusDays(3);
 
-        List<DisbursementMilestone> upcomingPending = milestoneRepo.findAll().stream()
-                .filter(m -> m.getCompletionStatus() == MilestoneStatus.PENDING)
-                .filter(m -> m.getDueDate() != null && !m.getDueDate().isBefore(today) && !m.getDueDate().isAfter(threeDaysLater))
-                .toList();
+        List<DisbursementMilestone> upcomingPending = milestoneRepo.findByCompletionStatusAndDueDateBetween(
+                MilestoneStatus.PENDING, today, threeDaysLater);
 
         for (DisbursementMilestone m : upcomingPending) {
             // Idempotency check: if reminder sent today, skip
@@ -307,15 +310,13 @@ public class DisbursementServiceImpl implements DisbursementService {
                         + "' (Stage " + m.getStageNumber() + ") is due on " + m.getDueDate() 
                         + ". Please submit utilization/documents to avoid blockages.";
 
-                Notification notification = Notification.builder()
-                        .user(beneficiary)
-                        .milestoneId(m.getMilestoneId())
-                        .message(messageText)
-                        .sentDate(today)
-                        .isRead(false)
-                        .build();
-
-                notificationRepo.save(notification);
+                notificationService.createAndPublishNotification(
+                        beneficiary,
+                        messageText,
+                        NotificationType.REMINDER,
+                        m.getMilestoneId(),
+                        app.getId()
+                );
             }
         }
     }
@@ -325,10 +326,8 @@ public class DisbursementServiceImpl implements DisbursementService {
     public void flagOverdueMilestones() {
         LocalDate today = LocalDate.now();
 
-        List<DisbursementMilestone> overduePending = milestoneRepo.findAll().stream()
-                .filter(m -> m.getCompletionStatus() == MilestoneStatus.PENDING)
-                .filter(m -> m.getDueDate() != null && m.getDueDate().isBefore(today))
-                .toList();
+        List<DisbursementMilestone> overduePending = milestoneRepo.findByCompletionStatusAndDueDateBefore(
+                MilestoneStatus.PENDING, today);
 
         for (DisbursementMilestone m : overduePending) {
             // Update status to OVERDUE
@@ -339,10 +338,28 @@ public class DisbursementServiceImpl implements DisbursementService {
             AuditLog audit = AuditLog.builder()
                     .auditId(UUID.randomUUID().toString())
                     .action(AuditAction.UPDATE)
-                    .description("Milestone marked as OVERDUE: " + m.getMilestoneName() 
+                    .description("Milestone marked as OVERDUE: " + m.getMilestoneName()
                             + " (Stage " + m.getStageNumber() + ", Due Date: " + m.getDueDate() + ")")
                     .build();
             auditLogRepo.save(audit);
+
+            // Notify the beneficiary that this milestone is now overdue. This is
+            // naturally idempotent: a milestone transitions PENDING -> OVERDUE
+            // exactly once (the query only selects PENDING rows), so the
+            // notification fires at most once per milestone — no duplicate guard
+            // needed.
+            Application overdueApp = applicationRepo.findById(m.getPlan().getApplicationId()).orElse(null);
+            if (overdueApp != null && overdueApp.getUser() != null) {
+                notificationService.createAndPublishNotification(
+                        overdueApp.getUser(),
+                        "Your subsidy milestone '" + m.getMilestoneName() + "' (Stage "
+                                + m.getStageNumber() + ") is overdue (was due on " + m.getDueDate()
+                                + "). Please submit the required documents as soon as possible.",
+                        NotificationType.MILESTONE_OVERDUE,
+                        m.getMilestoneId(),
+                        overdueApp.getId()
+                );
+            }
         }
     }
 
@@ -390,9 +407,7 @@ public class DisbursementServiceImpl implements DisbursementService {
 
     @Override
     public List<OverdueMilestoneResponse> getOverdueMilestonesReport() {
-        List<DisbursementMilestone> overdueMilestones = milestoneRepo.findAll().stream()
-                .filter(m -> m.getCompletionStatus() == MilestoneStatus.OVERDUE)
-                .toList();
+        List<DisbursementMilestone> overdueMilestones = milestoneRepo.findByCompletionStatus(MilestoneStatus.OVERDUE);
 
         List<OverdueMilestoneResponse> responses = new ArrayList<>();
         LocalDate today = LocalDate.now();
@@ -444,11 +459,11 @@ public class DisbursementServiceImpl implements DisbursementService {
                     s.setSchemeCode("SCH-TEST");
                     s.setSchemeName("Prime Minister Agriculture Grant");
                     s.setDescription("Assistance for modern agricultural tools.");
-                    s.setAllocatedFunds(250000.0);
+                    s.setAllocatedFunds(new BigDecimal("250000.00"));
                     s.setMinimumEligibleScore(50.0);
                     s.setActive(true);
                     s.setCategory(category);
-                    s.setBudgetUsed(0.0);
+                    s.setBudgetUsed(BigDecimal.ZERO);
                     return schemeRepo.save(s);
                 });
 
@@ -504,7 +519,7 @@ public class DisbursementServiceImpl implements DisbursementService {
         } else {
             plan = DisbursementPlan.builder()
                     .applicationId(appId)
-                    .totalAmount(50000.0)
+                    .totalAmount(new BigDecimal("50000.00"))
                     .totalStages(3)
                     .build();
 
@@ -518,11 +533,11 @@ public class DisbursementServiceImpl implements DisbursementService {
                         .plan(plan)
                         .stageNumber(1)
                         .milestoneName("Initial Release")
-                        .amountToRelease(20000.0)
+                        .amountToRelease(new BigDecimal("20000.00"))
                         .dueDate(LocalDate.now())
                         .completionStatus(MilestoneStatus.COMPLETED)
                         .completedDate(LocalDate.now())
-                        .amountReleased(20000.0)
+                        .amountReleased(new BigDecimal("20000.00"))
                         .releaseDate(LocalDate.now())
                         .build(),
 
@@ -530,20 +545,20 @@ public class DisbursementServiceImpl implements DisbursementService {
                         .plan(plan)
                         .stageNumber(2)
                         .milestoneName("Second Stage")
-                        .amountToRelease(15000.0)
+                        .amountToRelease(new BigDecimal("15000.00"))
                         .dueDate(LocalDate.now().plusDays(30))
                         .completionStatus(MilestoneStatus.PENDING)
-                        .amountReleased(0.0)
+                        .amountReleased(BigDecimal.ZERO)
                         .build(),
 
                 DisbursementMilestone.builder()
                         .plan(plan)
                         .stageNumber(3)
                         .milestoneName("Final Release")
-                        .amountToRelease(15000.0)
+                        .amountToRelease(new BigDecimal("15000.00"))
                         .dueDate(LocalDate.now().plusDays(60))
                         .completionStatus(MilestoneStatus.PENDING)
-                        .amountReleased(0.0)
+                        .amountReleased(BigDecimal.ZERO)
                         .build()
         );
 
@@ -584,16 +599,13 @@ public class DisbursementServiceImpl implements DisbursementService {
                 + applicationCode + " is complete and ready for disbursement of ₹"
                 + milestone.getAmountToRelease() + ".";
 
-        Notification notification = Notification.builder()
-                .user(financeOfficer)
-                .milestoneId(milestone.getMilestoneId())
-                .message(message)
-                .sentDate(LocalDate.now())
-                .isRead(false)
-                .notificationType(NotificationType.MILESTONE_READY)
-                .build();
-
-        notificationRepo.save(notification);
+        notificationService.createAndPublishNotification(
+                financeOfficer,
+                message,
+                NotificationType.MILESTONE_READY,
+                milestone.getMilestoneId(),
+                plan.getApplicationId()
+        );
     }
 
     @Override
@@ -603,20 +615,21 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Disbursement plan not found with ID: " + planId));
 
         int n = plan.getTotalStages();
-        double total = plan.getTotalAmount();
+        BigDecimal total = plan.getTotalAmount();
 
         // Even split, rounded down to 2 decimals per stage; the last stage
         // absorbs the rounding remainder so the sum always equals the total
         // exactly (required by configurePlan's validation).
-        double baseAmount = Math.floor((total / n) * 100.0) / 100.0;
-        double allocatedToFirstStages = baseAmount * (n - 1);
-        double lastStageAmount = Math.round((total - allocatedToFirstStages) * 100.0) / 100.0;
+        BigDecimal nDec = new BigDecimal(n);
+        BigDecimal baseAmount = total.divide(nDec, 2, RoundingMode.FLOOR);
+        BigDecimal allocatedToFirstStages = baseAmount.multiply(new BigDecimal(n - 1));
+        BigDecimal lastStageAmount = total.subtract(allocatedToFirstStages);
 
         List<StageDto> stages = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
         for (int i = 1; i <= n; i++) {
-            double amount = (i == n) ? lastStageAmount : baseAmount;
+            BigDecimal amount = (i == n) ? lastStageAmount : baseAmount;
             String name = (i == 1) ? "Initial Release" : (i == n) ? "Final Release" : "Stage " + i + " Release";
             // Stage 1 is due today since it releases immediately on finalization;
             // later stages are spaced 30 days apart as a starting suggestion —

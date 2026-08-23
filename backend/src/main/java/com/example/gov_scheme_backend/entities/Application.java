@@ -35,6 +35,10 @@ public class Application {
     @JoinColumn(name = "scheme_code", referencedColumnName = "scheme_code", nullable = false)
     private Schemes scheme;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "allocated_officer_id")
+    private Users allocatedOfficer;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ApplicationStatus status;

@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -32,8 +33,8 @@ public class DisbursementMilestone {
     @Column(name = "milestone_name", nullable = false)
     private String milestoneName;
 
-    @Column(name = "amount_to_release", nullable = false)
-    private Double amountToRelease;
+    @Column(name = "amount_to_release", nullable = false, precision = 15, scale = 2)
+    private BigDecimal amountToRelease;
 
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;
@@ -45,8 +46,8 @@ public class DisbursementMilestone {
     @Column(name = "completed_date")
     private LocalDate completedDate;
 
-    @Column(name = "amount_released")
-    private Double amountReleased;
+    @Column(name = "amount_released", precision = 15, scale = 2)
+    private BigDecimal amountReleased;
 
     @Column(name = "release_date")
     private LocalDate releaseDate;

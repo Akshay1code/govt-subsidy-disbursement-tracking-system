@@ -187,10 +187,10 @@ export default function AdminDashboard() {
   }
 
   // View state (activeTab declared above near line 97 to avoid temporal dead zone)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [officerFilter, setOfficerFilter] = useState('All')
-  const [stageFilter, setStageFilter] = useState('All')
+  const [searchTerm] = useState('')
+  const [statusFilter] = useState('All')
+  const [officerFilter] = useState('All')
+  const [stageFilter] = useState('All')
   const [selectedApp, setSelectedApp] = useState(null)
   const [selectedOfficer, setSelectedOfficer] = useState(null)
   const [selectedQuery, setSelectedQuery] = useState(null)
@@ -407,11 +407,6 @@ export default function AdminDashboard() {
     return !['APPROVED', 'REJECTED', 'DISBURSED'].includes(normalizedStatus)
   })
 
-  const stageBreakdown = ['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => ({
-    stage,
-    count: allocationApps.filter(app => String(app.currentStage || '').toUpperCase() === stage).length,
-  }))
-
   // Handle allocating application to another officer
   async function handleReassignSubmit(e) {
     e.preventDefault()
@@ -534,7 +529,7 @@ export default function AdminDashboard() {
       await refreshAllocationSummary()
       await refreshOfficerWorkloads(allocationStageTab)
     } catch (err) {
-      showToast(err?.response?.data?.message || 'Allocation failed', 'error')
+      showToast(err?.message || 'Allocation failed', 'error')
     } finally {
       setFcfsAllocating(false)
     }
@@ -643,7 +638,15 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               {['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => {
                 const entry = allocationSummary.find(s => s.stage === stage)
-                const count = entry ? entry.unassignedCount : 0
+                const unassignedCount = entry ? entry.unassignedCount : 0
+                
+                // Calculate total applications in this stage (assigned + unassigned)
+                const totalCount = applications.filter(app => {
+                  const status = String(app.status || app.applicationStatus || '').toUpperCase()
+                  if (['APPROVED', 'REJECTED', 'DISBURSED'].includes(status)) return false
+                  return String(app.currentStage || '').toUpperCase() === stage
+                }).length
+
                 const active = allocationStageTab === stage
                 return (
                   <button
@@ -657,16 +660,22 @@ export default function AdminDashboard() {
                       background: 'var(--panel-strong)',
                       borderRadius: '14px',
                       padding: '1.2rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center'
                     }}
                   >
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
                       {stage.replace('_', ' ')}
                     </div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)', marginTop: '0.3rem' }}>
-                      {count}
+                      {totalCount}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                      application{count === 1 ? '' : 's'} awaiting allocation
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text)' }}>
+                      total application{totalCount === 1 ? '' : 's'} in stage
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: unassignedCount > 0 ? '#f59e0b' : 'var(--muted)', marginTop: '0.4rem', fontWeight: 600 }}>
+                      • {unassignedCount} awaiting allocation
                     </div>
                   </button>
                 )

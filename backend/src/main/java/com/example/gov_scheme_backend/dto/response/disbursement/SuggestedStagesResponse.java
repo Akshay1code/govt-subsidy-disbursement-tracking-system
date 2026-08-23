@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,7 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class SuggestedStagesResponse {
     private Long planId;
-    private Double totalAmount;
+    private BigDecimal totalAmount;
     private Integer totalStages;
     private List<StageDto> suggestedStages;
 }

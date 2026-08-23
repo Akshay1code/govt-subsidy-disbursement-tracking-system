@@ -26,7 +26,7 @@ public class VerificationWorkflow {
     private Application application;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private WorkflowStage currentStage;
 
     @ManyToOne(fetch = FetchType.LAZY)

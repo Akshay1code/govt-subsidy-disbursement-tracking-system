@@ -3,5 +3,7 @@ package com.example.gov_scheme_backend.enums;
 public enum ReviewStage {
     FIELD,
     REGIONAL,
-    DISTRICT
+    DISTRICT,
+    FINANCE,
+    COMPLETED
 }
