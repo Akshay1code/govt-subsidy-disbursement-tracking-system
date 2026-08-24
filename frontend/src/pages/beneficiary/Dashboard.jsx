@@ -1,4 +1,4 @@
-﻿import '../../styles/Dashboard.css';
+import '../../styles/Dashboard.css';
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -237,12 +237,14 @@ export default function Dashboard() {
   const hasApplications = appliedSchemes.length > 0
   const fundedApplication = applications.find(app => {
     const appId = app.id || app.applicationId
-    return beneficiaryRecord?.applicationId && appId === beneficiaryRecord.applicationId
+    const isBeneficiaryMatch = beneficiaryRecord?.applicationId && appId === beneficiaryRecord.applicationId
+    const isApprovedWithAmount = Number(app.amount || 0) > 0 && ['APPROVED', 'DISBURSED'].includes(String(app.status || '').toUpperCase())
+    return isBeneficiaryMatch || isApprovedWithAmount
   })
   const fundedSchemeCode = fundedApplication ? getApplicationSchemeCode(fundedApplication) : ''
-  const hasFundsAllocation = Number(beneficiaryRecord?.sanctionedAmount || 0) > 0
+  const hasFundsAllocation = Number(beneficiaryRecord?.sanctionedAmount || 0) > 0 || Number(fundedApplication?.amount || 0) > 0
+  const currentAllocated = Number(fundedApplication?.amount || beneficiaryRecord?.sanctionedAmount || 0)
   const currentDisbursed = Number(beneficiaryRecord?.disbursedAmount || 0)
-  const currentAllocated = Number(beneficiaryRecord?.sanctionedAmount || 0)
   const currentRemaining = Math.max(0, currentAllocated - currentDisbursed)
 
   const getStatusLabel = (status) => {
@@ -656,7 +658,7 @@ export default function Dashboard() {
                   <div className="funds-summary-card">
                     <div className="funds-summary-card__label">Current Allocated</div>
                     <div className="funds-summary-card__amount">₹{currentAllocated.toLocaleString('en-IN')}</div>
-                    <div className="funds-summary-card__caption">From beneficiary record</div>
+                    <div className="funds-summary-card__caption">From approved subsidy plan</div>
                   </div>
                   <div className="funds-summary-card">
                     <div className="funds-summary-card__label">Disbursed So Far</div>

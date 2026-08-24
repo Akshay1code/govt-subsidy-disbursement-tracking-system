@@ -1,42 +1,122 @@
+/* ==========================================================================
+   GS GOV SUBSIDY - BENEFICIARY FUNDS & DISBURSEMENT TRACKER
+   Responsive Layout: Desktop (> 980px), Tablet (641px - 980px), Mobile (<= 640px)
+   ========================================================================== */
+
 .funds-layout {
+  min-height: 100vh;
+  max-width: 100%;
+  overflow-x: clip;
+  box-sizing: border-box;
   background:
     radial-gradient(circle at top right, rgba(255, 199, 106, 0.14), transparent 26%),
     radial-gradient(circle at left center, rgba(142, 214, 106, 0.10), transparent 24%),
     var(--bg);
 }
 
-.funds-main {
-  gap: 1.25rem;
+.funds-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem;
 }
+
+.funds-topbar__brand {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.funds-topbar__brand-text strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.funds-topbar__brand-text span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+
+.funds-topbar__user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.funds-user-badge {
+  white-space: nowrap;
+}
+
+.funds-back-btn {
+  white-space: nowrap;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.funds-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Hero Section
+   ========================================================================== */
 
 .funds-hero h1 {
   margin: 0;
   font-family: inherit;
-  font-size: clamp(2rem, 3vw, 2.6rem);
+  font-size: clamp(1.6rem, 3.2vw, 2.5rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text);
+  line-height: 1.2;
 }
 
 .funds-hero p {
   margin: 0.45rem 0 0;
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: clamp(0.88rem, 1.5vw, 1rem);
+  line-height: 1.55;
+  max-width: 780px;
 }
+
+/* ==========================================================================
+   Financial Summary Cards Grid
+   ========================================================================== */
 
 .funds-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+  max-width: 100%;
 }
 
 .funds-summary-card {
-  padding: 1.4rem 1.45rem;
+  padding: 1.35rem 1.4rem;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .funds-summary-card--accent {
@@ -48,18 +128,20 @@
   align-items: center;
   gap: 0.45rem;
   color: #5b6575;
-  font-size: 0.77rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
 .funds-summary-card__amount {
-  margin-top: 0.75rem;
-  font-size: clamp(1.95rem, 3vw, 2.65rem);
+  margin-top: 0.65rem;
+  font-size: clamp(1.65rem, 2.6vw, 2.5rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   color: #0f172a;
+  line-height: 1.15;
+  word-break: break-word;
 }
 
 .funds-summary-card__amount--success {
@@ -73,14 +155,20 @@
 .funds-summary-card__caption {
   margin-top: 0.35rem;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
+
+/* ==========================================================================
+   Main Content Layout (Timeline + Sidebar)
+   ========================================================================== */
 
 .funds-content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.95fr);
+  gap: 1.25rem;
   align-items: start;
+  max-width: 100%;
 }
 
 .funds-card {
@@ -88,25 +176,32 @@
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .funds-card__header {
-  padding-bottom: 0.8rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   margin-bottom: 1rem;
 }
 
 .funds-card__header h2 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   letter-spacing: -0.02em;
   color: #18212f;
+  font-weight: 800;
 }
+
+/* ==========================================================================
+   Milestone Timeline
+   ========================================================================== */
 
 .funds-timeline {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .funds-timeline-item {
@@ -117,21 +212,28 @@
   border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.06);
   background: rgba(250, 250, 249, 0.9);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .funds-timeline-item.is-completed {
-  border-color: rgba(26, 127, 55, 0.18);
+  border-color: rgba(26, 127, 55, 0.22);
   background: rgba(243, 250, 245, 0.98);
 }
 
 .funds-timeline-item.is-in-progress {
-  border-color: rgba(217, 130, 43, 0.18);
+  border-color: rgba(217, 130, 43, 0.22);
   background: rgba(255, 248, 234, 0.98);
 }
 
 .funds-timeline-item.is-pending {
-  border-color: rgba(148, 163, 184, 0.16);
+  border-color: rgba(148, 163, 184, 0.18);
   background: rgba(248, 250, 252, 0.96);
+}
+
+.funds-timeline-item.is-overdue {
+  border-color: rgba(220, 53, 69, 0.22);
+  background: rgba(255, 245, 245, 0.98);
 }
 
 .funds-timeline-item__icon {
@@ -142,6 +244,7 @@
   border-radius: 50%;
   color: #fff;
   margin-top: 0.15rem;
+  flex-shrink: 0;
 }
 
 .funds-timeline-item.is-completed .funds-timeline-item__icon {
@@ -157,82 +260,228 @@
   color: #64748b;
 }
 
+.funds-timeline-item.is-overdue .funds-timeline-item__icon {
+  background: #dc3545;
+}
+
+.funds-timeline-item__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
 .funds-timeline-item__top {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.funds-timeline-item__top h3 {
+.funds-timeline-item__heading {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.funds-timeline-item__heading h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 800;
   color: #111827;
+  line-height: 1.35;
 }
 
-.funds-timeline-item__top p {
-  margin: 0.35rem 0 0;
+.funds-timeline-item__heading p {
+  margin: 0.3rem 0 0;
   color: var(--muted);
   line-height: 1.5;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
 }
 
 .funds-status-badge {
-  padding: 0.3rem 0.7rem;
+  padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
+  align-self: flex-start;
 }
 
 .funds-status-badge.is-completed {
-  background: rgba(26, 127, 55, 0.12);
+  background: rgba(26, 127, 55, 0.14);
   color: #1a7f37;
 }
 
 .funds-status-badge.is-in-progress {
-  background: rgba(217, 130, 43, 0.12);
+  background: rgba(217, 130, 43, 0.14);
   color: #9a6612;
 }
 
 .funds-status-badge.is-pending {
-  background: rgba(148, 163, 184, 0.14);
+  background: rgba(148, 163, 184, 0.16);
   color: #64748b;
+}
+
+.funds-status-badge.is-overdue {
+  background: rgba(220, 53, 69, 0.14);
+  color: #dc3545;
 }
 
 .funds-timeline-item__meta {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.8rem;
-  align-items: baseline;
+  gap: 0.75rem;
+  align-items: flex-end;
   font-size: 0.82rem;
   color: var(--muted);
+  border-top: 1px dashed rgba(15, 23, 42, 0.06);
+  padding-top: 0.55rem;
 }
 
-.funds-timeline-item__meta strong {
-  font-size: 1rem;
+.funds-timeline-item__date {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
-.funds-timeline-item__meta strong.is-completed {
+.funds-timeline-item__amount-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.funds-timeline-item__amount {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.funds-timeline-item__amount.is-completed {
   color: #1a7f37;
 }
 
-.funds-timeline-item__meta strong.is-in-progress,
-.funds-timeline-item__meta strong.is-pending {
+.funds-timeline-item__amount.is-in-progress,
+.funds-timeline-item__amount.is-pending {
   color: #111827;
 }
 
+.funds-timeline-item__amount.is-overdue {
+  color: #dc3545;
+}
+
+.funds-timeline-item__amount-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   Sidebar: Disbursement Progress Widget
+   ========================================================================== */
+
 .funds-sidebar {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
+  min-width: 0;
 }
+
+.funds-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.funds-progress-stage-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.funds-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+  padding: 0.2rem 0;
+  min-width: 0;
+}
+
+.funds-progress-item.is-inactive {
+  opacity: 0.45;
+}
+
+.funds-progress-icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.funds-progress-icon--success {
+  color: #2ecc71;
+}
+
+.funds-progress-icon--muted {
+  color: var(--muted);
+}
+
+.funds-progress-icon--danger {
+  color: #ff6b76;
+}
+
+.funds-progress-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.funds-progress-label--bold {
+  font-weight: 700;
+}
+
+.funds-progress-badge {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.funds-progress-badge--success {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.1);
+}
+
+.funds-progress-badge--danger {
+  color: #ff6b76;
+  background: rgba(255, 107, 118, 0.1);
+}
+
+.funds-progress-badge--warning {
+  color: #f39c12;
+  background: rgba(243, 156, 18, 0.1);
+}
+
+.funds-progress-amount {
+  margin-left: auto;
+  font-weight: 700;
+  color: #2ecc71;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Sidebar: Recent Transactions (Desktop Table vs Mobile Cards)
+   ========================================================================== */
 
 .funds-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 .funds-table {
@@ -242,32 +491,93 @@
 
 .funds-table thead th {
   text-align: left;
-  padding: 0.75rem 0;
+  padding: 0.65rem 0;
   color: #8b7355;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .funds-table tbody td {
-  padding: 0.85rem 0;
+  padding: 0.75rem 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   color: #0f172a;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
 }
 
 .funds-table__mono {
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
   color: #64748b;
+  font-size: 0.82rem;
+}
+
+/* Mobile Transaction Cards (Hidden by default on Desktop/Tablet) */
+.funds-tx-mobile-list {
+  display: none;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.funds-tx-card {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.funds-tx-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.funds-tx-card__label {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.funds-tx-card__amount {
+  font-weight: 800;
+  color: #1a7f37;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.funds-tx-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.funds-tx-card__ref {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: rgba(15, 23, 42, 0.05);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
 }
 
 .funds-history-btn {
   width: 100%;
   margin-top: 0.9rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
+/* Full History List */
 .funds-full-history {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -275,59 +585,114 @@
 }
 
 .funds-full-history h3 {
-  margin: 0 0 0.8rem;
-  font-size: 1rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #18212f;
 }
 
-.funds-history-row {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr auto;
-  gap: 0.75rem;
-  padding: 0.55rem 0;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+.funds-full-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
 }
+
+.funds-history-row-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.funds-history-row-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.funds-history-row-card__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.funds-history-row-card__amount {
+  font-size: 0.92rem;
+  color: #1a7f37;
+  font-weight: 800;
+}
+
+.funds-history-row-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   Sidebar: Need Assistance Card
+   ========================================================================== */
 
 .funds-assist-card {
-  padding: 1.1rem 1.1rem 1.15rem;
+  padding: 1.1rem 1.15rem;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(226, 236, 255, 0.98) 0%, rgba(212, 226, 255, 0.94) 100%);
   border: 1px solid rgba(96, 130, 182, 0.16);
-  box-shadow: 0 12px 28px rgba(96, 130, 182, 0.12);
+  box-shadow: 0 10px 24px rgba(96, 130, 182, 0.10);
 }
 
 .funds-assist-card__title {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.6rem;
   color: #1e3a8a;
 }
 
 .funds-assist-card__title h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .funds-assist-card p {
-  margin: 0.75rem 0 1rem;
+  margin: 0.65rem 0 0.85rem;
   color: #2c4c94;
-  line-height: 1.55;
-  font-size: 0.94rem;
+  line-height: 1.5;
+  font-size: 0.88rem;
 }
 
-.funds-assist-card a {
-  color: #1e40af;
+.funds-assist-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  background: #1e40af;
+  color: #ffffff;
   font-weight: 700;
-  text-decoration: underline;
-  font-size: 0.92rem;
+  text-decoration: none;
+  font-size: 0.88rem;
+  transition: background 0.18s ease;
 }
 
+.funds-assist-btn:hover {
+  background: #1d3557;
+  color: #ffffff;
+}
+
+/* Empty States */
 .funds-empty-card,
 .funds-empty-inline {
   border-radius: 18px;
   padding: 1.35rem;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
 
 .funds-empty-card h2 {
@@ -337,28 +702,518 @@
 .funds-empty-inline {
   color: var(--muted);
   box-shadow: none;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2rem 1rem;
 }
+
+/* ==========================================================================
+   Responsive Breakpoints: Tablet (641px - 980px)
+   ========================================================================== */
 
 @media (max-width: 980px) {
-  .funds-summary-grid,
   .funds-content-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
-}
 
-@media (max-width: 640px) {
-  .funds-hero h1 {
-    font-size: 1.8rem;
+  .funds-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+
+  .funds-summary-card {
+    padding: 1.1rem 1rem;
   }
 
   .funds-summary-card__amount {
-    font-size: 1.9rem;
+    font-size: clamp(1.4rem, 2.8vw, 1.85rem);
+  }
+}
+
+/* ==========================================================================
+   Responsive Breakpoints: Mobile (<= 640px)
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .funds-layout {
+    padding: 0.75rem;
   }
 
-  .funds-timeline-item__top,
-  .funds-timeline-item__meta,
-  .funds-history-row {
+  .funds-topbar {
+    padding: 0.65rem 0.85rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .funds-topbar__user-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .funds-hero h1 {
+    font-size: 1.55rem;
+  }
+
+  .funds-hero p {
+    font-size: 0.88rem;
+  }
+
+  /* Summary Cards stack vertically on mobile */
+  .funds-summary-grid {
     grid-template-columns: 1fr;
-    display: grid;
+    gap: 0.75rem;
+  }
+
+  .funds-summary-card {
+    padding: 1rem 1.1rem;
+  }
+
+  .funds-summary-card__amount {
+    font-size: 1.85rem;
+    margin-top: 0.45rem;
+  }
+
+  /* Timeline item responsive adjustment */
+  .funds-timeline-item {
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+
+  .funds-timeline-item__top {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .funds-status-badge {
+    align-self: flex-start;
+  }
+
+  .funds-timeline-item__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .funds-timeline-item__amount-wrap {
+    align-items: flex-start;
+  }
+
+  /* Switch table to touch-friendly card list on mobile */
+  .funds-table-desktop {
+    display: none;
+  }
+
+  .funds-tx-mobile-list {
+    display: flex;
+  }
+
+  .funds-history-btn {
+    min-height: 48px;
+    font-size: 0.92rem;
+  }
+
+  .funds-assist-btn {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
+/* ==========================================================================
+   Responsive Breakpoints: Small Mobile (<= 380px)
+   ========================================================================== */
+
+@media (max-width: 380px) {
+  .funds-layout {
+    padding: 0.5rem;
+  }
+
+  .funds-summary-card__amount {
+    font-size: 1.6rem;
+  }
+
+  .funds-timeline-item {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .funds-timeline-item__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   PROOF SUBMISSION STATES — Timeline & Progress Sidebar
+   ========================================================================== */
+
+/* Timeline item variants for proof states */
+.funds-timeline-item.is-proof-submitted {
+  border-left: 3px solid #d97706;
+}
+
+.funds-timeline-item.is-proof-rejected {
+  border-left: 3px solid #dc2626;
+}
+
+/* Status badge variants */
+.funds-status-badge.is-proof-submitted {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.funds-status-badge.is-proof-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* Timeline icon color for proof states */
+.funds-timeline-item.is-proof-submitted .funds-timeline-item__icon {
+  color: #d97706;
+}
+
+.funds-timeline-item.is-proof-rejected .funds-timeline-item__icon {
+  color: #dc2626;
+}
+
+/* Amount color for proof states */
+.funds-timeline-item__amount.is-proof-submitted,
+.funds-timeline-item__amount.is-proof-rejected {
+  color: #374151;
+}
+
+/* Rejection feedback inline note */
+.funds-proof-rejection-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #7f1d1d;
+  line-height: 1.45;
+}
+
+.funds-proof-rejection-icon {
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+  color: #dc2626;
+}
+
+/* Proof submitted / under review inline note */
+.funds-proof-submitted-note {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.75rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #78350f;
+}
+
+.funds-proof-submitted-icon {
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+/* Proof action button section */
+.funds-proof-action {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.funds-proof-action-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, transform 0.1s;
+  width: fit-content;
+}
+
+.funds-proof-action-btn--submit {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.funds-proof-action-btn--submit:hover {
+  background: #1e40af;
+  transform: translateY(-1px);
+}
+
+.funds-proof-action-btn--resubmit {
+  background: #d97706;
+  color: #fff;
+}
+
+.funds-proof-action-btn--resubmit:hover {
+  background: #b45309;
+  transform: translateY(-1px);
+}
+
+.funds-proof-action-hint {
+  font-size: 0.75rem;
+  color: var(--muted, #6b7280);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Progress sidebar — proof states */
+.funds-progress-item--review {
+  opacity: 1;
+}
+
+.funds-progress-icon--review {
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.funds-progress-badge--review {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.18rem 0.5rem;
+  border-radius: 9999px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   PROOF UPLOAD MODAL
+   ========================================================================== */
+
+.funds-proof-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+
+.funds-proof-modal {
+  background: var(--card, #fff);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  width: 100%;
+  max-width: 520px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.funds-proof-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.funds-proof-modal__header h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text, #111827);
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.funds-proof-modal__close {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--muted, #6b7280);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.funds-proof-modal__close:hover:not(:disabled) {
+  background: var(--hover, #f3f4f6);
+}
+
+.funds-proof-modal__subtitle {
+  font-size: 0.85rem;
+  color: var(--muted, #6b7280);
+  margin: 0;
+}
+
+.funds-proof-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.funds-proof-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.funds-proof-modal__label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text, #111827);
+}
+
+.funds-proof-modal__required {
+  color: #dc2626;
+  margin-left: 0.15rem;
+}
+
+/* File upload drop area */
+.funds-proof-file-drop {
+  border: 2px dashed var(--border, #d1d5db);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  background: var(--hover, #f9fafb);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.funds-proof-file-drop:hover {
+  border-color: #6366f1;
+  background: #f0f1ff;
+}
+
+.funds-proof-file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.funds-proof-file-placeholder,
+.funds-proof-file-selected {
+  margin: 0;
+  font-size: 0.83rem;
+  display: flex;
+  align-items: center;
+  color: var(--muted, #6b7280);
+  pointer-events: none;
+}
+
+.funds-proof-file-selected {
+  color: #1a7f37;
+  font-weight: 600;
+}
+
+.funds-proof-modal__textarea {
+  width: 100%;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--text, #111827);
+  background: var(--card, #fff);
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+
+.funds-proof-modal__textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+}
+
+.funds-proof-modal__char-count {
+  font-size: 0.73rem;
+  color: var(--muted, #9ca3af);
+  text-align: right;
+}
+
+.funds-proof-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.85rem;
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  color: #7f1d1d;
+}
+
+.funds-proof-modal__success {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #14532d;
+  font-weight: 600;
+}
+
+.funds-proof-modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.funds-proof-submit-btn {
+  min-width: 130px;
+}
+
+@media (max-width: 640px) {
+  .funds-proof-modal {
+    padding: 1.25rem;
+    border-radius: 12px;
+    max-width: 100%;
+  }
+
+  .funds-proof-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .funds-proof-modal__actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .funds-proof-action-btn {
+    width: 100%;
+    justify-content: center;
   }
 }

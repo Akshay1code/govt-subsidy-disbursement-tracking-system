@@ -1,12 +1,16 @@
 package com.example.gov_scheme_backend.services.impl;
 
+import com.example.gov_scheme_backend.dto.request.application.ApplicationAllocationRequestDTO;
 import com.example.gov_scheme_backend.dto.request.application.BatchAllocationRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.BatchAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.OfficerWorkloadDTO;
 import com.example.gov_scheme_backend.dto.response.application.AllocationStageSummaryResponse;
 import com.example.gov_scheme_backend.dto.response.application.OfficerCapacityResponse;
 import com.example.gov_scheme_backend.entities.AuditLog;
 import com.example.gov_scheme_backend.entities.Application;
+import com.example.gov_scheme_backend.exceptions.BadRequestException;
+import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.entities.VerificationWorkflow;
 import com.example.gov_scheme_backend.entities.Notification;
@@ -156,6 +160,95 @@ public class AllocationServiceImpl implements AllocationService {
         }
 
         return new BatchAllocationResponseDTO(request.getCount(), actuallyAllocated, msg);
+    }
+
+    @Override
+    @Transactional
+    public ApplicationAllocationResponseDTO allocateApplicationToOfficer(
+            ApplicationAllocationRequestDTO request,
+            Users currentUser) {
+
+        if (request == null || request.getApplicationId() == null) {
+            throw new BadRequestException("Application ID is required");
+        }
+        if (request.getOfficerId() == null || request.getOfficerId().isBlank()) {
+            throw new BadRequestException("Officer ID is required");
+        }
+
+        Application application = applicationRepository.findById(request.getApplicationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with id: " + request.getApplicationId()));
+
+        VerificationWorkflow workflow = workflowRepository.findByApplicationId(request.getApplicationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Verification workflow not found for application id: " + request.getApplicationId()));
+
+        Users officer = null;
+        try {
+            Long officerDbId = Long.parseLong(request.getOfficerId().trim());
+            officer = userRepo.findById(officerDbId).orElse(null);
+        } catch (NumberFormatException ignored) {
+        }
+
+        if (officer == null) {
+            officer = userRepo.findByuniqueID(request.getOfficerId().trim())
+                    .or(() -> userRepo.findByUsername(request.getOfficerId().trim()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Officer not found with id: " + request.getOfficerId()));
+        }
+
+        Role expectedRole;
+        try {
+            expectedRole = getRoleForStage(workflow.getCurrentStage());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Applications at stage " + workflow.getCurrentStage() + " cannot be allocated");
+        }
+
+        if (expectedRole == null || officer.getRole() != expectedRole) {
+            throw new BadRequestException("Officer role " + officer.getRole() + " does not match workflow stage " + workflow.getCurrentStage());
+        }
+
+        boolean isSameOfficer = workflow.getAssignedOfficer() != null
+                && workflow.getAssignedOfficer().getId() != null
+                && workflow.getAssignedOfficer().getId().equals(officer.getId());
+
+        if (!isSameOfficer) {
+            long activeAssignments = workflowRepository.countActiveAssignmentsByOfficer(officer.getId());
+            int capacity = officer.getAllocationCapacity() != null ? officer.getAllocationCapacity() : 10;
+            if (activeAssignments >= capacity) {
+                throw new BadRequestException("Officer " + officer.getFullName() + " has reached maximum capacity (" + capacity + ")");
+            }
+        }
+
+        workflow.setAssignedOfficer(officer);
+        workflowRepository.save(workflow);
+
+        application.setAllocatedOfficer(officer);
+        applicationRepository.save(application);
+
+        String appCode = application.getApplicationCode() != null ? application.getApplicationCode() : String.valueOf(application.getId());
+        notificationService.createAndPublishNotification(
+                officer,
+                "A new application (" + appCode + ") has been allocated to you.",
+                NotificationType.APPLICATION_ASSIGNED,
+                null,
+                application.getId()
+        );
+
+        AuditLog log = AuditLog.builder()
+                .auditId("AUD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .user(currentUser)
+                .action(AuditAction.ALLOCATE)
+                .description("Application #" + application.getId() + " allocated to Officer #" + officer.getId())
+                .build();
+        auditLogRepository.save(log);
+
+        return new ApplicationAllocationResponseDTO(
+                true,
+                "Application allocated successfully",
+                application.getId(),
+                officer.getUniqueID() != null ? officer.getUniqueID() : String.valueOf(officer.getId()),
+                officer.getFullName(),
+                workflow.getCurrentStage() != null ? workflow.getCurrentStage().name() : null,
+                application.getStatus() != null ? application.getStatus().name() : null
+        );
     }
 
     @Override
