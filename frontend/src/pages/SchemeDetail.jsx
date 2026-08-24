@@ -49,6 +49,18 @@ function humanizeEnum(value) {
     .replace(/\b\w/g, char => char.toUpperCase())
 }
 
+function humanizeCondition(op, expectedValue) {
+  switch (op) {
+    case 'EQUALS': return `Exactly ${expectedValue}`
+    case 'NOT_EQUALS': return `Cannot be ${expectedValue}`
+    case 'GREATER_THAN': return `More than ${expectedValue}`
+    case 'GREATER_THAN_EQUAL': return `At least ${expectedValue}`
+    case 'LESS_THAN': return `Less than ${expectedValue}`
+    case 'LESS_THAN_EQUAL': return `Up to ${expectedValue}`
+    default: return `${op} ${expectedValue}`
+  }
+}
+
 function getDocumentDefinitions(scheme) {
   const configuredDocuments = Array.isArray(scheme?.documents) ? scheme.documents : []
 
@@ -204,6 +216,7 @@ export default function SchemeDetail() {
       })),
   }
   const eligibilityScore = eligibilityResult?.score ?? 0
+  const eligibilityTotalPossible = eligibilityResult?.totalPossibleScore ?? 0
   const eligibilityThreshold = Number(scheme.minimumEligibleScore || 0)
   const eligibilityGap = eligibilityScore - eligibilityThreshold
   const eligibilityState = !eligibilityResult
@@ -211,14 +224,13 @@ export default function SchemeDetail() {
     : eligibilityResult.status
       ? 'pass'
       : 'fail'
-  const scoreRingProgress = eligibilityThreshold > 0
-    ? Math.max(0, Math.min(100, Math.round((eligibilityScore / eligibilityThreshold) * 100)))
-    : 0
-  const canProceedToDocs = Boolean(
-    eligibilityResult &&
-    eligibilityResult.status &&
-    eligibilityScore >= eligibilityThreshold
-  )
+  const scoreRingProgress = eligibilityTotalPossible > 0
+      ? Math.max(0, Math.min(100, Math.round((eligibilityScore / eligibilityTotalPossible) * 100)))
+      : eligibilityThreshold > 0
+        ? Math.max(0, Math.min(100, Math.round((eligibilityScore / eligibilityThreshold) * 100)))
+        : 0
+  // canProceedToDocs relies purely on the backend-set status flag
+  const canProceedToDocs = Boolean(eligibilityResult && eligibilityResult.status)
   const hasInitiatedScoring = Boolean(eligibilityResult || eligibilityError || isCheckingScore)
 
   // Handle Form Change
@@ -235,15 +247,13 @@ export default function SchemeDetail() {
 
     setIsCheckingScore(true)
     setEligibilityError('')
+    setEligibilityResult(null)
     setViewState('apply')
 
     try {
       const response = await runEligibilityEngine(eligibilityPayload)
       setEligibilityResult(response)
       await refreshApplications()
-      if (response?.status === false) {
-        setEligibilityError(response?.message || 'Eligibility engine marked the application as not eligible.')
-      }
     } catch (error) {
       console.error('Failed to check score:', error.message)
       setEligibilityError(error.message || 'Eligibility engine request failed.')
@@ -575,81 +585,88 @@ export default function SchemeDetail() {
                   </div>
 
                   {(eligibilityResult || eligibilityError) && (
+
                     <motion.div
-                      className="eligibility-console-card"
+                      className="eligibility-results-container"
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.28 }}
+                      style={{ marginTop: '3rem' }}
                     >
-                      <div className="eligibility-console__header">
-                        <div>
-                          <p className="console-eyebrow">Eligibility Engine</p>
-                          <h3>Live scoring result</h3>
-                          <p className="eligibility-console__copy">
-                            The engine evaluates your submitted profile against the scheme rules and streams back a score.
-                          </p>
-                        </div>
-                        <span className="console-endpoint">ENGINE://RUNNING</span>
+                      <div className="eligibility-results-header">
+                        <h2>Eligibility Evaluation Results</h2>
+                        <p>Review the breakdown of your recent assessment.</p>
                       </div>
 
                       {eligibilityResult ? (
-                        <>
-                          <div className="eligibility-score-hero">
-                            <div
-                              className="eligibility-score-ring"
-                              style={{
-                                '--score-progress': `${scoreRingProgress}%`,
-                                '--score-accent': eligibilityResult.status ? '#8ed66a' : '#ff6b76',
-                              }}
-                              aria-label={`Eligibility score ${Number(eligibilityScore || 0).toFixed(1)}`}
-                            >
-                              <div className="eligibility-score-ring__inner">
-                                <div className="eligibility-score-value">
-                                  {Number(eligibilityScore || 0).toFixed(1)}
-                                </div>
-                                <div className="eligibility-score-label">Score</div>
+                        <div className="eligibility-results-grid">
+                          <div className="eligibility-results-left">
+                            <div className={`eligibility-status-card ${eligibilityResult.status ? 'status-eligible' : 'status-ineligible'}`}>
+                              <div className="status-icon">
+                                {eligibilityResult.status ? '✓' : '✕'}
                               </div>
+                              <h3>{eligibilityResult.status ? 'Eligible' : 'Not Eligible'}</h3>
+                              <p>
+                                {eligibilityResult.status 
+                                  ? 'Based on the provided information, you meet the requirements for this scheme.'
+                                  : 'Based on the provided information, you do not meet the minimum requirements at this time.'}
+                              </p>
                             </div>
 
-                            <div className="eligibility-score-meta">
-                              <span className={`eligibility-state-badge is-${eligibilityState}`}>
-                                {eligibilityState === 'idle'
-                                  ? 'Pending'
-                                  : eligibilityState === 'pass'
-                                    ? 'Eligible'
-                                    : 'Not eligible'}
-                              </span>
-                              <div className="eligibility-threshold">
-                                Threshold: <strong>{Number(eligibilityThreshold || 0).toFixed(1)}</strong>
+                            <div className="eligibility-score-summary-card">
+                              <span className="score-summary-label">SCORE SUMMARY</span>
+                              <div className="score-summary-values">
+                                <div className="score-computed">
+                                  <span className="score-label">Computed Total</span>
+                                  <span className="score-value">{Number(eligibilityScore || 0).toFixed(1)}</span>
+                                </div>
+                                <div className="score-required">
+                                  <span className="score-label">Required</span>
+                                  <span className="score-value">{Number(eligibilityThreshold || 0).toFixed(1)}</span>
+                                </div>
                               </div>
-                              <div className="eligibility-gap">
-                                Gap: <strong>{eligibilityGap >= 0 ? `+${eligibilityGap.toFixed(1)}` : eligibilityGap.toFixed(1)}</strong>
-                              </div>
-                              <div className="eligibility-result-banner">
-                                <strong>{eligibilityResult.message}</strong>
-                                <span>
-                                  {canProceedToDocs
-                                    ? 'Documents can now be submitted.'
-                                    : 'The engine did not clear the threshold.'}
-                                </span>
+                              <div className="score-progress-bar">
+                                <div 
+                                  className="score-progress-fill" 
+                                  style={{ width: `${Math.min(100, (eligibilityScore / (eligibilityThreshold || 1)) * 100)}%` }}
+                                ></div>
                               </div>
                             </div>
                           </div>
-                          <div className="eligibility-field-stack">
-                            <div className="eligibility-rule-row">
-                              <span className="eligibility-rule-card__name">Computed score</span>
-                              <strong>{Number(eligibilityScore || 0).toFixed(1)}</strong>
-                            </div>
-                            <div className="eligibility-rule-row">
-                              <span className="eligibility-rule-card__name">Minimum required</span>
-                              <strong>{eligibilityThreshold.toFixed ? eligibilityThreshold.toFixed(1) : eligibilityThreshold}</strong>
-                            </div>
-                            <div className="eligibility-rule-row">
-                              <span className="eligibility-rule-card__name">Decision</span>
-                              <strong>{eligibilityResult.status ? 'PASS' : 'FAIL'}</strong>
+
+                          <div className="eligibility-results-right">
+                            <span className="breakdown-label">EVALUATION BREAKDOWN</span>
+                            <div className="breakdown-cards-list">
+                                {eligibilityResult.fieldBreakdown?.map((field, idx) => (
+                                  <div key={idx} className="breakdown-field-card">
+                                    <div className="breakdown-field-header">
+                                      <h4>{humanizeEnum(field.fieldName)}</h4>
+                                      <span className={`breakdown-tag ${field.ruleMet ? 'tag-passed' : 'tag-failed'}`}>
+                                        <span className="tag-dot"></span>
+                                        {field.scoreDescription
+                                          ? field.scoreDescription
+                                          : `${field.ruleMet ? 'Passed' : 'Failed'} (${field.pointsAwarded}/${field.pointsPossible} pts)`}
+                                      </span>
+                                    </div>
+                                    <div className="breakdown-field-body">
+                                      <div className="breakdown-req-block">
+                                        <span className="block-label">Requirement</span>
+                                        <span className="block-value">
+                                          {field.requirementDescription
+                                            ? field.requirementDescription
+                                            : humanizeCondition(field.operator, field.expectedValue)}
+                                        </span>
+                                      </div>
+                                      <div className={`breakdown-input-block ${field.ruleMet ? 'input-passed' : 'input-failed'}`}>
+                                        <span className="block-label">Your Input</span>
+                                        <span className="block-value">{field.userValue}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                             </div>
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <div className="eligibility-error-box">
                           {eligibilityError}
@@ -677,7 +694,7 @@ export default function SchemeDetail() {
                 </div>
 
                 <p className="eligibility-console__copy">
-                  Your score has cleared the threshold. Upload the supporting files required for this scheme.
+                  You have been found eligible for this scheme. Please upload the supporting documents required to complete your application.
                 </p>
 
                 <div className="docs-grid">
