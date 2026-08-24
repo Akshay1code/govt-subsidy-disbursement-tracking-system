@@ -98,8 +98,9 @@ public class SecurityConfig {
         org.springframework.web.cors.CorsConfiguration configuration =
                 new org.springframework.web.cors.CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-                java.util.Arrays.asList("http://localhost:5173"));
+        // Allow all origins (using patterns to support credentials)
+        configuration.setAllowedOriginPatterns(
+                java.util.Arrays.asList("*"));
 
         configuration.setAllowedMethods(
                 java.util.Arrays.asList(

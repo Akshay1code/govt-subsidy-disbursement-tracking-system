@@ -211,20 +211,6 @@ export async function updateScheme(schemeCode, schemeData) {
   return response.data
 }
 
-export async function addSchemeRules(schemeId, rules) {
-  console.warn(`[FLAG] Backend endpoint for adding rules is missing. Tried to save rules for scheme ${schemeId}:`, rules)
-  return { status: true, message: 'Rules processed (mocked)' }
-}
-
-export async function addSchemeDocuments(schemeId, documents) {
-  console.warn(`[FLAG] Backend endpoint for adding documents is missing. Tried to save documents for scheme ${schemeId}:`, documents)
-  return { status: true, message: 'Documents processed (mocked)' }
-}
-
-export async function addSchemeFields(schemeId, fields) {
-  console.warn(`[FLAG] Backend endpoint for adding required fields is missing. Tried to save fields for scheme ${schemeId}:`, fields)
-  return { status: true, message: 'Fields processed (mocked)' }
-}
 
 export function checkEligibility(scheme, userProfile) {
   if (!userProfile) return { eligible: false, reasons: ['Not logged in'] }

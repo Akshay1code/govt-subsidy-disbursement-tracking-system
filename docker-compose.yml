@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # ── MySQL Database ──
+  db:
+    image: mysql:8.0
+    container_name: gov_scheme_db
+    environment:
+      MYSQL_DATABASE: gov_scheme_db
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot Backend ──
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gov_scheme_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_URL=jdbc:mysql://db:3306/gov_scheme_db?useSSL=false&allowPublicKeyRetrieval=true
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      # Replace this in your real Render environment!
+      - JWT_SECRET=YOUR_SUPER_SECRET_JWT_KEY_FOR_PRODUCTION_MUST_BE_LONG_ENOUGH
+      - ALLOWED_ORIGINS=*
+      # Cloudinary fallback to demo if not provided
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-demo}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-demo}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-demo}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db_data:

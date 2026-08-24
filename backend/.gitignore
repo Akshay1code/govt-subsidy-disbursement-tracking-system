@@ -1,10 +1,32 @@
-HELP.md
+# ─── Backend .gitignore (Spring Boot / Maven) ─────────────────────────────────
+
+# ── Maven build output ────────────────────────────────────────────────────────
 target/
-.mvn/wrapper/maven-wrapper.jar
+build/
 !**/src/main/**/target/
 !**/src/test/**/target/
-**/src/main/resources/application.properties
-### STS ###
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Maven wrapper JAR (the .cmd and shell scripts should be committed)
+.mvn/wrapper/maven-wrapper.jar
+
+# ── Spring Boot secrets / environment config ──────────────────────────────────
+# application.properties contains DB credentials, JWT secrets, etc.
+src/main/resources/application.properties
+src/main/resources/application-dev.properties
+src/main/resources/application-local.properties
+# Keep the production template committed (it should use env variable placeholders)
+!src/main/resources/application-prod.properties
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / STS
 .apt_generated
 .classpath
 .factorypath
@@ -13,24 +35,27 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
+# VS Code
 .vscode/
 
-##
-src/main/resources/application.properties
+# ── Logs & test artifacts ─────────────────────────────────────────────────────
+*.log
+build-test.log
+logs/
+hs_err_pid*.log
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Secrets / credentials ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
