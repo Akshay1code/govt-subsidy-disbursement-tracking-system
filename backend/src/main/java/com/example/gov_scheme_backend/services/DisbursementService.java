@@ -24,7 +24,10 @@ public interface DisbursementService {
     List<OverdueMilestoneResponse> getOverdueMilestonesReport();
     List<Notification> getUserNotifications(String username);
 
-    // NEW
+    // Staged Proof Lifecycle
+    DisbursementMilestoneResponse submitProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request);
+    DisbursementMilestoneResponse rejectProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofRejectRequest request);
+
     SuggestedStagesResponse suggestStages(Long planId);
     MilestoneContextResponse getMilestoneContext(Long milestoneId);
 }

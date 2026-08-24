@@ -18,6 +18,10 @@ public interface DisbursementMilestoneRepo
             DisbursementPlan plan
     );
 
+    List<DisbursementMilestone> findByPlanInOrderByStageNumberAsc(
+            java.util.Collection<DisbursementPlan> plans
+    );
+
     Optional<DisbursementMilestone> findByPlanAndStageNumber(
             DisbursementPlan plan,
             Integer stageNumber
@@ -28,13 +32,13 @@ public interface DisbursementMilestoneRepo
     );
 
     List<DisbursementMilestone> findByCompletionStatusAndDueDateBetween(
-            MilestoneStatus status, 
-            java.time.LocalDate startDate, 
+            MilestoneStatus status,
+            java.time.LocalDate startDate,
             java.time.LocalDate endDate
     );
 
     List<DisbursementMilestone> findByCompletionStatusAndDueDateBefore(
-            MilestoneStatus status, 
+            MilestoneStatus status,
             java.time.LocalDate date
     );
 
@@ -62,4 +66,4 @@ public interface DisbursementMilestoneRepo
         ORDER BY 1
     """)
     List<Object[]> countReleasedMilestonesByMonth();
-}
+}
