@@ -28,6 +28,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final UserRepo usersRepo;
     private final ApplicationRepo applicationRepo;
     private final com.example.gov_scheme_backend.repositories.AuditLogRepo auditLogRepo;
+    private final com.example.gov_scheme_backend.repositories.DisbursementPlanRepo disbursementPlanRepo;
+    private final com.example.gov_scheme_backend.repositories.DisbursementMilestoneRepo disbursementMilestoneRepo;
 
     /** Creates a beneficiary record linked to a user and their approved application. */
     @Override
@@ -86,9 +88,55 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new ResourceNotFoundException("Authenticated beneficiary user not found");
         }
 
-        Beneficiary beneficiary = beneficiaryRepo.findByUser_Username(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Beneficiary record not found for current user"));
-        return mapToResponse(beneficiary);
+        Beneficiary beneficiary = beneficiaryRepo.findByUser_Username(username).orElse(null);
+        if (beneficiary != null) {
+            return mapToResponse(beneficiary);
+        }
+
+        // If no standalone Beneficiary row exists in table, dynamically resolve from the user's application and disbursement plan
+        Users user = usersRepo.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        List<Application> userApps = applicationRepo.findByUser_IdOrderByCreatedAtDesc(user.getId());
+        if (userApps.isEmpty()) {
+            throw new ResourceNotFoundException("Beneficiary record not found for current user");
+        }
+
+        Application targetApp = userApps.stream()
+                .filter(a -> a.getStatus() == com.example.gov_scheme_backend.enums.ApplicationStatus.APPROVED
+                          || a.getStatus() == com.example.gov_scheme_backend.enums.ApplicationStatus.DISBURSED)
+                .findFirst()
+                .orElse(userApps.get(0));
+
+        Double sanctionedAmount = null;
+        Double disbursedAmount = 0.0;
+        com.example.gov_scheme_backend.entities.DisbursementPlan plan =
+                disbursementPlanRepo.findByApplicationId(targetApp.getId()).orElse(null);
+
+        if (plan != null) {
+            if (plan.getTotalAmount() != null) {
+                sanctionedAmount = plan.getTotalAmount().doubleValue();
+            }
+            List<com.example.gov_scheme_backend.entities.DisbursementMilestone> milestones =
+                    disbursementMilestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+            disbursedAmount = milestones.stream()
+                    .filter(m -> m.getCompletionStatus() == com.example.gov_scheme_backend.enums.MilestoneStatus.RELEASED)
+                    .map(m -> m.getAmountReleased() != null ? m.getAmountReleased().doubleValue() : (m.getAmountToRelease() != null ? m.getAmountToRelease().doubleValue() : 0.0))
+                    .reduce(0.0, Double::sum);
+        }
+
+        return BeneficiaryResponseDTO.builder()
+                .id(targetApp.getId())
+                .uniqueID(user.getUniqueID())
+                .applicationId(targetApp.getId())
+                .sanctionedAmount(sanctionedAmount)
+                .disbursedAmount(disbursedAmount)
+                .currentStatus(com.example.gov_scheme_backend.enums.BeneficiaryStatus.ACTIVE)
+                .approvedDate(targetApp.getUpdatedAt() != null ? targetApp.getUpdatedAt().toLocalDate() : (targetApp.getCreatedAt() != null ? targetApp.getCreatedAt().toLocalDate() : java.time.LocalDate.now()))
+                .disbursedDate(disbursedAmount > 0 ? java.time.LocalDate.now() : null)
+                .remarks(targetApp.getRemarks())
+                .isFlagged(false)
+                .build();
     }
 
     @Override
@@ -262,12 +310,31 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     }
 
     private BeneficiaryResponseDTO mapToResponse(Beneficiary beneficiary) {
+        Double sanctioned = beneficiary.getSanctionedAmount();
+        Double disbursed = beneficiary.getDisbursedAmount();
+
+        if (beneficiary.getApplication() != null) {
+            com.example.gov_scheme_backend.entities.DisbursementPlan plan =
+                    disbursementPlanRepo.findByApplicationId(beneficiary.getApplication().getId()).orElse(null);
+            if (plan != null) {
+                if (plan.getTotalAmount() != null) {
+                    sanctioned = plan.getTotalAmount().doubleValue();
+                }
+                List<com.example.gov_scheme_backend.entities.DisbursementMilestone> milestones =
+                        disbursementMilestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+                disbursed = milestones.stream()
+                        .filter(m -> m.getCompletionStatus() == com.example.gov_scheme_backend.enums.MilestoneStatus.RELEASED)
+                        .map(m -> m.getAmountReleased() != null ? m.getAmountReleased().doubleValue() : (m.getAmountToRelease() != null ? m.getAmountToRelease().doubleValue() : 0.0))
+                        .reduce(0.0, Double::sum);
+            }
+        }
+
         return BeneficiaryResponseDTO.builder()
                 .id(beneficiary.getId())
-                .uniqueID(beneficiary.getUser().getUniqueID())
-                .applicationId(beneficiary.getApplication().getId())
-                .sanctionedAmount(beneficiary.getSanctionedAmount())
-                .disbursedAmount(beneficiary.getDisbursedAmount())
+                .uniqueID(beneficiary.getUser() != null ? beneficiary.getUser().getUniqueID() : null)
+                .applicationId(beneficiary.getApplication() != null ? beneficiary.getApplication().getId() : null)
+                .sanctionedAmount(sanctioned)
+                .disbursedAmount(disbursed)
                 .currentStatus(beneficiary.getCurrentStatus())
                 .approvedDate(beneficiary.getApprovedDate())
                 .disbursedDate(beneficiary.getDisbursedDate())

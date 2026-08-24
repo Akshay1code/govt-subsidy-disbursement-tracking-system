@@ -6,6 +6,8 @@ import com.example.gov_scheme_backend.dto.response.application.OfficerWorkloadDT
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.enums.WorkflowStage;
 
+import com.example.gov_scheme_backend.dto.request.application.ApplicationAllocationRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.AllocationStageSummaryResponse;
 import com.example.gov_scheme_backend.dto.response.application.OfficerCapacityResponse;
 import java.util.List;
@@ -13,6 +15,7 @@ import java.util.List;
 public interface AllocationService {
     List<OfficerWorkloadDTO> getAvailableOfficers(WorkflowStage stage);
     BatchAllocationResponseDTO batchAllocate(BatchAllocationRequestDTO request, Users currentUser);
+    ApplicationAllocationResponseDTO allocateApplicationToOfficer(ApplicationAllocationRequestDTO request, Users currentUser);
     
     List<AllocationStageSummaryResponse> getAllocationStageSummary();
     List<OfficerCapacityResponse> getOfficerCapacities(WorkflowStage stage);

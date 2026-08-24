@@ -11,6 +11,7 @@ import {
   getDisbursementPlan, 
   configureDisbursementPlan, 
   completeMilestone,
+  rejectProof,
   releaseMilestone,
   resolveMilestone,
   getOverdueMilestones,
@@ -36,6 +37,29 @@ const STATUS_BADGE = {
   FINANCE_OFFICER: 'badge-status--applied',
   APPROVED: 'badge-status--eligible',
   REJECTED: 'badge-status--ineligible',
+}
+
+function getApplicationId(app) {
+  return app?.id || app?.applicationId
+}
+
+function isOfficerAssignedToApp(officer, app) {
+  if (!officer || !app) return false
+  const officerDbId = officer.id
+  const officerUnique = officer.uniqueID || officer.uniqueId
+  const assignedDb = app.assignedOfficerDbId
+  const assignedUnique = app.assignedOfficerId
+  if (assignedDb != null && officerDbId != null && String(assignedDb) === String(officerDbId)) return true
+  if (assignedUnique != null && officerUnique != null && String(assignedUnique) === String(officerUnique)) return true
+  return false
+}
+
+function getMilestoneStatus(milestone) {
+  return String(milestone?.completionStatus || '').toUpperCase()
+}
+
+function getProofPendingMilestones(plan) {
+  return (plan?.milestones || []).filter((m) => getMilestoneStatus(m) === 'PROOF_SUBMITTED')
 }
 
 export default function OfficerDashboard() {
@@ -74,6 +98,9 @@ export default function OfficerDashboard() {
   const [resolvingMilestoneId, setResolvingMilestoneId] = useState(null)
   const [resolvedReasonInput, setResolvedReasonInput] = useState('')
   const [isResolving, setIsResolving] = useState(false)
+  const [proofRejectMilestone, setProofRejectMilestone] = useState(null)
+  const [proofRejectReason, setProofRejectReason] = useState('')
+  const [proofActionBusyId, setProofActionBusyId] = useState(null)
   // Auth guard + fetch officer profile on mount
   useEffect(() => {
     async function init() {
@@ -152,11 +179,24 @@ export default function OfficerDashboard() {
     setSelectedApp(app)
     setRejectMode(false)
     setRejectReason('')
+    setProofRejectMilestone(null)
+    setProofRejectReason('')
+    setDisbursementPlan(null)
     // Reset inspection state
     setChecklist({ address: false, business: false, assets: false })
     setFieldNotes('')
     setUploadedMediaIds([])
     setInspectionContext(null)
+
+    const appId = getApplicationId(app)
+    if (appId) {
+      try {
+        const plan = await getDisbursementPlan(appId)
+        setDisbursementPlan(plan)
+      } catch {
+        setDisbursementPlan(null)
+      }
+    }
 
     // Field Officer: pre-fill their own editable inspection form.
     // District/Regional/Finance Officer: fetch the same data read-only, to review
@@ -194,6 +234,8 @@ export default function OfficerDashboard() {
     setRejectReason('')
     setInspectionContext(null)
     setUploadedMediaIds([])
+    setProofRejectMilestone(null)
+    setProofRejectReason('')
   }
 
   // Media upload handler for inspection evidence
@@ -340,6 +382,125 @@ export default function OfficerDashboard() {
     } catch (err) {
       showToast(err.message || 'Failed to complete milestone.', 'error')
     }
+  }
+
+  const refreshSelectedPlan = async () => {
+    const appId = getApplicationId(selectedApp) || disbursementPlan?.applicationId
+    if (!appId) return
+    const plan = await getDisbursementPlan(appId)
+    setDisbursementPlan(plan)
+  }
+
+  const canReviewProof = isOfficerAssignedToApp(officer, selectedApp)
+
+  const handleApproveProof = async (milestoneId) => {
+    if (!canReviewProof) {
+      showToast('You can only review proof for applications assigned to you.', 'error')
+      return
+    }
+    setProofActionBusyId(milestoneId)
+    try {
+      await completeMilestone(milestoneId)
+      showToast('Proof approved. Milestone marked as COMPLETED.')
+      await refreshSelectedPlan()
+    } catch (err) {
+      showToast(err.message || 'Failed to approve proof.', 'error')
+    } finally {
+      setProofActionBusyId(null)
+    }
+  }
+
+  const handleConfirmRejectProof = async () => {
+    if (!proofRejectMilestone) return
+    if (!canReviewProof) {
+      showToast('You can only review proof for applications assigned to you.', 'error')
+      return
+    }
+    if (!proofRejectReason.trim()) {
+      showToast('Please provide a reason for requesting resubmission.', 'error')
+      return
+    }
+    const milestoneId = proofRejectMilestone.milestoneId
+    setProofActionBusyId(milestoneId)
+    try {
+      await rejectProof(milestoneId, proofRejectReason.trim())
+      showToast('Proof rejected. The beneficiary can resubmit.')
+      setProofRejectMilestone(null)
+      setProofRejectReason('')
+      await refreshSelectedPlan()
+    } catch (err) {
+      showToast(err.message || 'Failed to reject proof.', 'error')
+    } finally {
+      setProofActionBusyId(null)
+    }
+  }
+
+  const renderProofReviewSection = () => {
+    const pendingProofs = getProofPendingMilestones(disbursementPlan)
+    if (!pendingProofs.length) return null
+
+    return (
+      <div className="proof-review-section">
+        <h4 className="proof-review-section__title">Stage Proof Awaiting Review</h4>
+        {pendingProofs.map((m) => {
+          const busy = proofActionBusyId === m.milestoneId
+          return (
+            <div className="proof-review-card" key={m.milestoneId}>
+              <div className="proof-review-card__header">
+                <strong>Stage {m.stageNumber}: {m.milestoneName}</strong>
+                <span className="badge-status status-proof_submitted">PROOF SUBMITTED</span>
+              </div>
+              <div className="proof-review-card__meta">
+                {m.fileName && <div><strong>Document:</strong> {m.fileName}</div>}
+                {m.proofDocumentUrl ? (
+                  <a
+                    href={m.proofDocumentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="proof-review-card__link"
+                  >
+                    View uploaded proof
+                  </a>
+                ) : (
+                  <div className="proof-review-card__muted">Proof document URL is not available.</div>
+                )}
+                {m.proofNotes ? (
+                  <div className="proof-review-card__notes">
+                    <strong>Beneficiary notes:</strong>
+                    <p>{m.proofNotes}</p>
+                  </div>
+                ) : null}
+              </div>
+              {canReviewProof ? (
+                <div className="proof-review-card__actions">
+                  <button
+                    className="button button--primary"
+                    style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem' }}
+                    onClick={() => handleApproveProof(m.milestoneId)}
+                    disabled={busy}
+                  >
+                    {busy ? 'Working…' : 'Approve Proof'}
+                  </button>
+                  <button
+                    className="button button--ghost"
+                    style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', color: '#ef4444', borderColor: '#fca5a5' }}
+                    onClick={() => {
+                      setProofRejectMilestone(m)
+                      setProofRejectReason('')
+                    }}
+                    disabled={busy}
+                  >
+                    Reject / Request Resubmission
+                  </button>
+                </div>
+              ) : (
+                <p className="proof-review-card__muted">Read-only: this application is not assigned to you for proof review.</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   const handleReleaseMilestone = async (milestoneId) => {
@@ -960,6 +1121,8 @@ export default function OfficerDashboard() {
                       style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: '#fafaf9', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.88rem', outline: 'none', color: 'var(--text)' }}
                     />
                   </div>
+
+                  {renderProofReviewSection()}
 
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>

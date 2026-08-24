@@ -17,6 +17,8 @@ public interface VerificationWorkflowRepository extends JpaRepository<Verificati
 
     Optional<VerificationWorkflow> findByApplicationId(Long applicationId);
 
+    List<VerificationWorkflow> findByApplicationIdIn(java.util.Collection<Long> applicationIds);
+
     List<VerificationWorkflow> findByCurrentStage(WorkflowStage currentStage);
 
     List<VerificationWorkflow> findByAssignedOfficer(Users assignedOfficer);
