@@ -23,6 +23,20 @@ public class DisbursementController {
         return ResponseEntity.ok(disbursementService.configurePlan(planId, request));
     }
 
+    @PostMapping("/milestone/{milestoneId}/submit-proof")
+    public ResponseEntity<DisbursementMilestoneResponse> submitProof(
+            @PathVariable Long milestoneId,
+            @RequestBody com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request) {
+        return ResponseEntity.ok(disbursementService.submitProof(milestoneId, request));
+    }
+
+    @PostMapping("/milestone/{milestoneId}/reject-proof")
+    public ResponseEntity<DisbursementMilestoneResponse> rejectProof(
+            @PathVariable Long milestoneId,
+            @RequestBody com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofRejectRequest request) {
+        return ResponseEntity.ok(disbursementService.rejectProof(milestoneId, request));
+    }
+
     @PostMapping("/milestone/{milestoneId}/complete")
     public ResponseEntity<DisbursementMilestoneResponse> completeMilestone(
             @PathVariable Long milestoneId) {

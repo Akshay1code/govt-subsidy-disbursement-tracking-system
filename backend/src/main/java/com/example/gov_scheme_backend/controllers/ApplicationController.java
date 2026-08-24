@@ -11,6 +11,7 @@ import com.example.gov_scheme_backend.enums.Role;
 import com.example.gov_scheme_backend.enums.WorkflowStage;
 import com.example.gov_scheme_backend.security.JwtService;
 import com.example.gov_scheme_backend.services.ApplicationService;
+import com.example.gov_scheme_backend.services.AllocationService;
 import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.entities.VerificationWorkflow;
@@ -34,6 +35,8 @@ public class ApplicationController {
 
     @Autowired
      ApplicationService applicationService;
+    @Autowired
+    private AllocationService allocationService;
     @Autowired
     JwtService jwtService;
 
@@ -82,6 +85,34 @@ public class ApplicationController {
         Long userId = claims.get("userId", Long.class);
         applicationService.cancelApplication(userId, applicationId);
         return ResponseEntity.ok(new ApiResponse(true, "Application process cancelled successfully"));
+    }
+
+    @PutMapping("/allocation")
+    public ResponseEntity<?> allocateApplication(
+            @RequestBody ApplicationAllocationRequestDTO request,
+            HttpServletRequest req) {
+        String token = jwtService.extractTokenFromCookie(req);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "You are Unauthorised"));
+        }
+
+        Claims claims = jwtService.extractAllClaims(token);
+        String role = String.valueOf(claims.get("role")).toUpperCase();
+        if (!Role.ADMIN.name().equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse(false, "Only admins can allocate applications"));
+        }
+
+        String username = claims.getSubject();
+        Users adminUser = userRepo.findByUsername(username).orElse(null);
+        if (adminUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "Admin user not found"));
+        }
+
+        ApplicationAllocationResponseDTO response = allocationService.allocateApplicationToOfficer(request, adminUser);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -164,6 +195,12 @@ public class ApplicationController {
     @Autowired
     private com.example.gov_scheme_backend.repositories.UserRepo userRepo;
 
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.DisbursementPlanRepo disbursementPlanRepo;
+
+    @Autowired
+    private com.example.gov_scheme_backend.repositories.DisbursementMilestoneRepo disbursementMilestoneRepo;
+
     @GetMapping
     public ResponseEntity<?> getAllApplications(HttpServletRequest req) {
         String token = jwtService.extractTokenFromCookie(req);
@@ -204,16 +241,65 @@ public class ApplicationController {
             apps = applicationRepo.findAllByOrderByCreatedAtDesc();
         }
 
+        List<Long> appIds = apps.stream().map(Application::getId).filter(java.util.Objects::nonNull).toList();
+
+        java.util.Map<Long, VerificationWorkflow> workflowMap = new java.util.HashMap<>();
+        if (!appIds.isEmpty()) {
+            try {
+                for (VerificationWorkflow vw : workflowRepository.findByApplicationIdIn(appIds)) {
+                    if (vw.getApplication() != null && vw.getApplication().getId() != null) {
+                        workflowMap.put(vw.getApplication().getId(), vw);
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
+        List<com.example.gov_scheme_backend.entities.DisbursementPlan> plans = java.util.Collections.emptyList();
+        java.util.Map<Long, com.example.gov_scheme_backend.entities.DisbursementPlan> planMap = new java.util.HashMap<>();
+        if (!appIds.isEmpty()) {
+            try {
+                plans = disbursementPlanRepo.findByApplicationIdIn(appIds);
+                for (com.example.gov_scheme_backend.entities.DisbursementPlan plan : plans) {
+                    if (plan.getApplicationId() != null) {
+                        planMap.put(plan.getApplicationId(), plan);
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
+        java.util.Map<Long, java.util.List<com.example.gov_scheme_backend.entities.DisbursementMilestone>> planMilestonesMap = new java.util.HashMap<>();
+        if (!plans.isEmpty()) {
+            try {
+                java.util.List<com.example.gov_scheme_backend.entities.DisbursementMilestone> allMilestones =
+                        disbursementMilestoneRepo.findByPlanInOrderByStageNumberAsc(plans);
+                for (com.example.gov_scheme_backend.entities.DisbursementMilestone m : allMilestones) {
+                    if (m.getPlan() != null && m.getPlan().getPlanId() != null) {
+                        planMilestonesMap.computeIfAbsent(m.getPlan().getPlanId(), k -> new java.util.ArrayList<>()).add(m);
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
         List<java.util.Map<String, Object>> response = new java.util.ArrayList<>();
         for (Application app : apps) {
-            VerificationWorkflow workflow = workflowRepository.findByApplicationId(app.getId()).orElse(null);
-
-            if (viewerContext != null
-                    && isOfficerRole(viewerContext.role())
-                    && !isAssignedToCurrentOfficer(viewerContext.userId(), app)) {
-                continue;
+            VerificationWorkflow workflow = workflowMap.get(app.getId());
+            if (workflow == null) {
+                // Fallback in case batch lookup missed or on single-item fetch
+                workflow = workflowRepository.findByApplicationId(app.getId()).orElse(null);
             }
+            if (viewerContext != null && isOfficerRole(viewerContext.role())) {
+                boolean assignedToCurrentOfficer =
+                        isAssignedToCurrentOfficer(viewerContext.userId(), app);
+                boolean financeApprovedApplication =
+                        "FINANCE_OFFICER".equalsIgnoreCase(viewerContext.role())
+                        && workflow != null
+                        && workflow.getCurrentStage() == WorkflowStage.COMPLETED
+                        && app.getStatus() == ApplicationStatus.APPROVED;
 
+                if (!assignedToCurrentOfficer && !financeApprovedApplication) {
+                    continue;
+                }
+            }
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", app.getId());
             map.put("applicationId", app.getId());
@@ -221,7 +307,9 @@ public class ApplicationController {
             map.put("applicant", app.getUser() != null ? app.getUser().getFullName() : "Unknown");
             map.put("applicantName", app.getUser() != null ? app.getUser().getFullName() : "Unknown");
             map.put("schemeName", app.getScheme() != null ? app.getScheme().getSchemeName() : "Unknown");
-            map.put("schemeId", app.getScheme() != null ? app.getScheme().getSchemeCode() : "");
+            String code = app.getScheme() != null ? app.getScheme().getSchemeCode() : "";
+            map.put("schemeId", code);
+            map.put("schemeCode", code);
             String applicationStatus = app.getStatus() != null ? app.getStatus().toString() : "DRAFT";
             map.put("status", applicationStatus);
             map.put("applicationStatus", applicationStatus);
@@ -296,6 +384,75 @@ public class ApplicationController {
             map.put("phone", phone);
             map.put("district", district);
             map.put("state", state);
+
+            // Include full disbursement and milestone tracking details
+            com.example.gov_scheme_backend.entities.DisbursementPlan plan = planMap.get(app.getId());
+            if (plan == null) {
+                try {
+                    plan = disbursementPlanRepo.findByApplicationId(app.getId()).orElse(null);
+                } catch (Exception ignored) { }
+            }
+
+            java.math.BigDecimal planAmount = plan != null && plan.getTotalAmount() != null ? plan.getTotalAmount() : java.math.BigDecimal.ZERO;
+            map.put("amount", planAmount);
+            map.put("hasDisbursementPlan", plan != null);
+            map.put("planId", plan != null ? plan.getPlanId() : null);
+            map.put("totalStages", plan != null ? plan.getTotalStages() : null);
+
+            java.util.List<com.example.gov_scheme_backend.entities.DisbursementMilestone> milestones =
+                    plan != null ? planMilestonesMap.getOrDefault(plan.getPlanId(), java.util.Collections.emptyList()) : java.util.Collections.emptyList();
+
+            if (plan != null && milestones.isEmpty()) {
+                try {
+                    milestones = disbursementMilestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+                } catch (Exception ignored) { }
+            }
+
+            map.put("isPlanConfigured", !milestones.isEmpty());
+
+            java.math.BigDecimal disbursedAmount = java.math.BigDecimal.ZERO;
+            int releasedCount = 0;
+            int totalMilestones = milestones.size();
+
+            java.util.List<java.util.Map<String, Object>> milestoneMaps = new java.util.ArrayList<>();
+            for (com.example.gov_scheme_backend.entities.DisbursementMilestone m : milestones) {
+                if (m.getCompletionStatus() == com.example.gov_scheme_backend.enums.MilestoneStatus.RELEASED) {
+                    releasedCount++;
+                    if (m.getAmountReleased() != null) {
+                        disbursedAmount = disbursedAmount.add(m.getAmountReleased());
+                    } else if (m.getAmountToRelease() != null) {
+                        disbursedAmount = disbursedAmount.add(m.getAmountToRelease());
+                    }
+                }
+                java.util.Map<String, Object> mMap = new java.util.HashMap<>();
+                mMap.put("milestoneId", m.getMilestoneId());
+                mMap.put("stageNumber", m.getStageNumber());
+                mMap.put("milestoneName", m.getMilestoneName());
+                mMap.put("amountToRelease", m.getAmountToRelease());
+                mMap.put("amountReleased", m.getAmountReleased());
+                mMap.put("completionStatus", m.getCompletionStatus() != null ? m.getCompletionStatus().name() : "PENDING");
+                mMap.put("dueDate", m.getDueDate());
+                mMap.put("releaseDate", m.getReleaseDate());
+                milestoneMaps.add(mMap);
+            }
+
+            map.put("disbursedAmount", disbursedAmount);
+            map.put("milestones", milestoneMaps);
+
+            String disbursementStatus = null;
+            if (plan != null) {
+                if (milestones.isEmpty()) {
+                    disbursementStatus = "Approved / Ready for Plan";
+                } else if (releasedCount == totalMilestones && totalMilestones > 0) {
+                    disbursementStatus = "Fully Disbursed";
+                } else if (releasedCount > 0) {
+                    disbursementStatus = "Stage " + releasedCount + " Released / Stage " + (releasedCount + 1) + " Pending";
+                } else {
+                    disbursementStatus = "Plan Configured / Stage 1 Pending";
+                }
+            }
+            map.put("disbursementStatus", disbursementStatus);
+
             response.add(map);
         }
         return ResponseEntity.ok(response);
