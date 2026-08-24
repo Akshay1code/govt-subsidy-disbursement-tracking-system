@@ -25,4 +25,7 @@ public class DisbursementMilestoneResponse {
     private LocalDate releaseDate;
     private String resolvedReason;
     private LocalDate resolvedDate;
+    private String proofDocumentUrl;
+    private String fileName;
+    private String proofNotes;
 }

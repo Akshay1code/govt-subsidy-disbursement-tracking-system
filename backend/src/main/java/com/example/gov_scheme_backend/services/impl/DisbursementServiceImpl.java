@@ -64,6 +64,9 @@ public class DisbursementServiceImpl implements DisbursementService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired(required = false)
+    private VerificationWorkflowRepository workflowRepository;
+
     @Override
     @Transactional
     public DisbursementPlanResponse configurePlan(Long planId, StageConfigurationRequest request) {
@@ -168,6 +171,146 @@ public class DisbursementServiceImpl implements DisbursementService {
 
     @Override
     @Transactional
+    public DisbursementMilestoneResponse submitProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request) {
+        DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
+
+        if (milestone.getCompletionStatus() == MilestoneStatus.RELEASED) {
+            throw new BadRequestException("Milestone has already been released");
+        }
+
+        if (milestone.getCompletionStatus() == MilestoneStatus.COMPLETED) {
+            throw new BadRequestException("Milestone proof has already been approved and is ready for release");
+        }
+
+        DisbursementPlan plan = milestone.getPlan();
+        List<DisbursementMilestone> allMilestones = milestoneRepo.findByPlanOrderByStageNumberAsc(plan);
+        for (DisbursementMilestone m : allMilestones) {
+            if (m.getStageNumber() < milestone.getStageNumber() && m.getCompletionStatus() != MilestoneStatus.RELEASED) {
+                throw new BadRequestException("Cannot submit proof for Stage " + milestone.getStageNumber()
+                        + " until Stage " + m.getStageNumber() + " is released.");
+            }
+        }
+
+        Application application = applicationRepo.findById(plan.getApplicationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found for disbursement plan"));
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Users performer = null;
+        if (auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
+            performer = userRepo.findByUsername(auth.getName()).orElse(null);
+        }
+
+        if (request != null && request.getProofDocumentUrl() != null && !request.getProofDocumentUrl().isBlank()) {
+            ApplicationDocument proofDoc = new ApplicationDocument();
+            proofDoc.setApplication(application);
+            proofDoc.setDocumentType(com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF);
+            String docName = (request.getFileName() != null && !request.getFileName().isBlank())
+                    ? request.getFileName()
+                    : "Stage " + milestone.getStageNumber() + " Proof - " + milestone.getMilestoneName();
+            proofDoc.setFileName(docName);
+            proofDoc.setFilePath("");
+            proofDoc.setVerified(false);
+            proofDoc.setDocumentUrl(request.getProofDocumentUrl());
+
+            if (application.getDocuments() == null) {
+                application.setDocuments(new ArrayList<>());
+            }
+            application.getDocuments().add(proofDoc);
+            applicationRepo.save(application);
+        }
+
+        milestone.setCompletionStatus(MilestoneStatus.PROOF_SUBMITTED);
+        DisbursementMilestone saved = milestoneRepo.save(milestone);
+
+        String notesDesc = (request != null && request.getNotes() != null && !request.getNotes().isBlank()) ? " | Notes: " + request.getNotes() : "";
+        String docDesc = (request != null && request.getProofDocumentUrl() != null && !request.getProofDocumentUrl().isBlank()) ? " | Document: " + request.getProofDocumentUrl() : "";
+        AuditLog audit = AuditLog.builder()
+                .auditId(UUID.randomUUID().toString())
+                .user(performer != null ? performer : application.getUser())
+                .action(AuditAction.UPDATE)
+                .description("Stage " + milestone.getStageNumber() + " (" + milestone.getMilestoneName()
+                        + ") proof submitted for application " + application.getApplicationCode() + notesDesc + docDesc)
+                .build();
+        auditLogRepo.save(audit);
+
+        Users reviewingOfficer = application.getAllocatedOfficer();
+        if (reviewingOfficer == null) {
+            reviewingOfficer = userRepo.findByRole(Role.FIELD_OFFICER).stream().findFirst().orElse(null);
+        }
+        if (reviewingOfficer != null) {
+            notificationService.createAndPublishNotification(
+                    reviewingOfficer,
+                    "Beneficiary " + (application.getUser() != null ? application.getUser().getFullName() : "")
+                            + " submitted stage proof for Milestone '" + milestone.getMilestoneName()
+                            + "' (Stage " + milestone.getStageNumber() + ") of application " + application.getApplicationCode() + ".",
+                    NotificationType.APPLICATION_ASSIGNED,
+                    milestone.getMilestoneId(),
+                    application.getId()
+            );
+        }
+
+        return mapToMilestoneResponse(saved, application, request != null ? request.getNotes() : null);
+    }
+
+    @Override
+    @Transactional
+    public DisbursementMilestoneResponse rejectProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofRejectRequest request) {
+        DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
+
+        if (milestone.getCompletionStatus() == MilestoneStatus.RELEASED) {
+            throw new BadRequestException("Milestone is already released and cannot be rejected");
+        }
+
+        String reason = (request != null && request.getReason() != null && !request.getReason().isBlank())
+                ? request.getReason()
+                : "Proof verification failed. Please provide compliant documentation.";
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Users performer = null;
+        if (auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
+            performer = userRepo.findByUsername(auth.getName()).orElse(null);
+            if (performer != null) {
+                Role role = performer.getRole();
+                boolean isOfficer = role == Role.FIELD_OFFICER || role == Role.DISTRICT_OFFICER || role == Role.REGIONAL_OFFICER || role == Role.FINANCE_OFFICER || role == Role.ADMIN;
+                if (!isOfficer) {
+                    throw new BadRequestException("Only an authorized officer can reject stage proofs");
+                }
+            }
+        }
+
+        milestone.setCompletionStatus(MilestoneStatus.PROOF_REJECTED);
+        DisbursementMilestone saved = milestoneRepo.save(milestone);
+
+        Application application = applicationRepo.findById(milestone.getPlan().getApplicationId()).orElse(null);
+        if (application != null) {
+            AuditLog audit = AuditLog.builder()
+                    .auditId(UUID.randomUUID().toString())
+                    .user(performer)
+                    .action(AuditAction.REJECT)
+                    .description("Stage " + milestone.getStageNumber() + " (" + milestone.getMilestoneName()
+                            + ") proof rejected for application " + application.getApplicationCode() + ". Reason: " + reason)
+                    .build();
+            auditLogRepo.save(audit);
+
+            if (application.getUser() != null) {
+                notificationService.createAndPublishNotification(
+                        application.getUser(),
+                        "Stage " + milestone.getStageNumber() + " (" + milestone.getMilestoneName()
+                                + ") proof requires revision: " + reason + ". Please resubmit compliant evidence.",
+                        NotificationType.APPLICATION_RE_VERIFY,
+                        milestone.getMilestoneId(),
+                        application.getId()
+                );
+            }
+        }
+
+        return mapToMilestoneResponse(saved, application, null);
+    }
+
+    @Override
+    @Transactional
     public DisbursementMilestoneResponse completeMilestone(Long milestoneId) {
         DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
@@ -176,13 +319,53 @@ public class DisbursementServiceImpl implements DisbursementService {
             throw new BadRequestException("Milestone is already released");
         }
 
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Users performer = null;
+        if (auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
+            performer = userRepo.findByUsername(auth.getName()).orElse(null);
+            if (performer != null) {
+                Role role = performer.getRole();
+                boolean isOfficer = role == Role.FIELD_OFFICER || role == Role.DISTRICT_OFFICER || role == Role.REGIONAL_OFFICER || role == Role.FINANCE_OFFICER || role == Role.ADMIN;
+                if (!isOfficer) {
+                    throw new BadRequestException("Only an authorized officer can approve and complete milestone proofs");
+                }
+            }
+        }
+
         milestone.setCompletionStatus(MilestoneStatus.COMPLETED);
         milestone.setCompletedDate(LocalDate.now());
         DisbursementMilestone saved = milestoneRepo.save(milestone);
 
+        Application application = null;
+        if (milestone.getPlan() != null && milestone.getPlan().getApplicationId() != null) {
+            application = applicationRepo.findById(milestone.getPlan().getApplicationId()).orElse(null);
+        }
+
+        if (application != null) {
+            // Mark any stage compliance document as verified
+            if (application.getDocuments() != null) {
+                for (ApplicationDocument doc : application.getDocuments()) {
+                    if (doc.getDocumentType() == com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF
+                            && doc.getFileName() != null && doc.getFileName().contains("Stage " + milestone.getStageNumber())) {
+                        doc.setVerified(true);
+                    }
+                }
+                applicationRepo.save(application);
+            }
+
+            AuditLog audit = AuditLog.builder()
+                    .auditId(UUID.randomUUID().toString())
+                    .user(performer)
+                    .action(AuditAction.APPROVE)
+                    .description("Approved stage compliance proof for milestone: " + milestone.getMilestoneName()
+                            + " (Stage " + milestone.getStageNumber() + ") for Application ID: " + application.getId())
+                    .build();
+            auditLogRepo.save(audit);
+        }
+
         notifyFinanceOfficerMilestoneReady(saved);
 
-        return mapToMilestoneResponse(saved);
+        return mapToMilestoneResponse(saved, application, null);
     }
 
     @Override
@@ -195,8 +378,8 @@ public class DisbursementServiceImpl implements DisbursementService {
             throw new BadRequestException("Milestone is already released");
         }
 
-        if (milestone.getCompletionStatus() == MilestoneStatus.PENDING) {
-            throw new BadRequestException("Milestone status is PENDING and must be COMPLETED before release");
+        if (milestone.getCompletionStatus() == MilestoneStatus.PENDING || milestone.getCompletionStatus() == MilestoneStatus.PROOF_SUBMITTED || milestone.getCompletionStatus() == MilestoneStatus.PROOF_REJECTED) {
+            throw new BadRequestException("Milestone status is " + milestone.getCompletionStatus() + " and must be COMPLETED before release");
         }
 
         if (milestone.getCompletionStatus() == MilestoneStatus.OVERDUE) {
@@ -212,13 +395,7 @@ public class DisbursementServiceImpl implements DisbursementService {
                     throw new BadRequestException("Stage " + milestone.getStageNumber()
                             + " release is blocked because Stage " + m.getStageNumber() + " is OVERDUE.");
                 }
-                if (m.getCompletionStatus() == MilestoneStatus.PENDING) {
-                    throw new BadRequestException("Stage " + milestone.getStageNumber()
-                            + " cannot be released unless Stage " + m.getStageNumber() + " milestone is COMPLETE.");
-                }
-                // Strict sequential release: a prior stage that is COMPLETED but not yet
-                // RELEASED must be released first, so funds always flow in stage order.
-                if (m.getCompletionStatus() == MilestoneStatus.COMPLETED) {
+                if (m.getCompletionStatus() != MilestoneStatus.RELEASED) {
                     throw new BadRequestException("Stage " + milestone.getStageNumber()
                             + " cannot be released until Stage " + m.getStageNumber() + " has been released.");
                 }
@@ -277,7 +454,38 @@ public class DisbursementServiceImpl implements DisbursementService {
             );
         }
 
-        return mapToMilestoneResponse(milestone);
+        // 5. Check if all milestones are released -> transition application to DISBURSED
+        boolean allReleased = allMilestones.stream()
+                .allMatch(m -> m.getMilestoneId().equals(milestone.getMilestoneId())
+                        || m.getCompletionStatus() == MilestoneStatus.RELEASED);
+
+        if (allReleased) {
+            application.setStatus(ApplicationStatus.DISBURSED);
+            applicationRepo.save(application);
+
+            if (workflowRepository != null) {
+                try {
+                    VerificationWorkflow workflow = workflowRepository.findByApplicationId(application.getId()).orElse(null);
+                    if (workflow != null) {
+                        workflow.setCurrentStage(com.example.gov_scheme_backend.enums.WorkflowStage.COMPLETED);
+                        workflowRepository.save(workflow);
+                    }
+                } catch (Exception ignored) { }
+            }
+
+            if (application.getUser() != null) {
+                notificationService.createAndPublishNotification(
+                        application.getUser(),
+                        "All disbursement milestones have been successfully released for your application "
+                                + application.getApplicationCode() + ". Your application status is now DISBURSED.",
+                        NotificationType.DISBURSEMENT_RELEASED,
+                        milestone.getMilestoneId(),
+                        application.getId()
+                );
+            }
+        }
+
+        return mapToMilestoneResponse(milestone, application, null);
     }
 
     @Override
@@ -705,6 +913,31 @@ public class DisbursementServiceImpl implements DisbursementService {
     }
 
     private DisbursementMilestoneResponse mapToMilestoneResponse(DisbursementMilestone milestone) {
+        return mapToMilestoneResponse(milestone, null, null);
+    }
+
+    private DisbursementMilestoneResponse mapToMilestoneResponse(DisbursementMilestone milestone, Application app, String notes) {
+        String proofUrl = null;
+        String fileName = null;
+
+        if (app == null && milestone.getPlan() != null && milestone.getPlan().getApplicationId() != null) {
+            try {
+                app = applicationRepo.findById(milestone.getPlan().getApplicationId()).orElse(null);
+            } catch (Exception ignored) { }
+        }
+
+        if (app != null && app.getDocuments() != null) {
+            for (ApplicationDocument doc : app.getDocuments()) {
+                if (doc.getDocumentType() == com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF) {
+                    if (doc.getFileName() != null && doc.getFileName().contains("Stage " + milestone.getStageNumber())) {
+                        proofUrl = doc.getDocumentUrl();
+                        fileName = doc.getFileName();
+                        break;
+                    }
+                }
+            }
+        }
+
         return DisbursementMilestoneResponse.builder()
                 .milestoneId(milestone.getMilestoneId())
                 .stageNumber(milestone.getStageNumber())
@@ -717,6 +950,9 @@ public class DisbursementServiceImpl implements DisbursementService {
                 .releaseDate(milestone.getReleaseDate())
                 .resolvedReason(milestone.getResolvedReason())
                 .resolvedDate(milestone.getResolvedDate())
+                .proofDocumentUrl(proofUrl)
+                .fileName(fileName)
+                .proofNotes(notes)
                 .build();
     }
 }

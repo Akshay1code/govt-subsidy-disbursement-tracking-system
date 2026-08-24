@@ -1,14 +1,21 @@
 package com.example.gov_scheme_backend.services;
 
+import com.example.gov_scheme_backend.dto.request.application.ApplicationAllocationRequestDTO;
 import com.example.gov_scheme_backend.dto.request.application.BatchAllocationRequestDTO;
+import com.example.gov_scheme_backend.dto.response.application.ApplicationAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.BatchAllocationResponseDTO;
 import com.example.gov_scheme_backend.dto.response.application.OfficerWorkloadDTO;
 import com.example.gov_scheme_backend.entities.Application;
 import com.example.gov_scheme_backend.entities.AuditLog;
 import com.example.gov_scheme_backend.entities.Users;
 import com.example.gov_scheme_backend.entities.VerificationWorkflow;
+import com.example.gov_scheme_backend.enums.AuditAction;
+import com.example.gov_scheme_backend.enums.NotificationType;
 import com.example.gov_scheme_backend.enums.Role;
 import com.example.gov_scheme_backend.enums.WorkflowStage;
+import com.example.gov_scheme_backend.exceptions.BadRequestException;
+import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
+import com.example.gov_scheme_backend.repositories.ApplicationRepo;
 import com.example.gov_scheme_backend.repositories.AuditLogRepo;
 import com.example.gov_scheme_backend.repositories.UserRepo;
 import com.example.gov_scheme_backend.repositories.VerificationWorkflowRepository;
@@ -16,6 +23,7 @@ import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.services.impl.AllocationServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,7 +34,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,6 +59,8 @@ class AllocationServiceImplTest {
     private UserRepo userRepo;
     @Mock
     private VerificationWorkflowRepository workflowRepository;
+    @Mock
+    private ApplicationRepo applicationRepository;
     @Mock
     private AuditLogRepo auditLogRepository;
     // AllocationServiceImpl now publishes an APPLICATION_ASSIGNED notification on
@@ -188,4 +200,187 @@ class AllocationServiceImplTest {
         assertEquals(3L, dtoB.getAllocatedCount());
         assertEquals(7, dtoB.getRemainingCapacity());
     }
+
+    @Test
+    void allocateApplicationToOfficer_correctRoleOfficer_successfullyAssigned() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Users officer = officer(1L, Role.FIELD_OFFICER, 10, "Officer Field");
+        officer.setUniqueID("FO_1001");
+
+        Application app = application(101L);
+        app.setApplicationCode("APP-101");
+        VerificationWorkflow wf = unassignedWorkflow(app, WorkflowStage.FIELD_OFFICER);
+
+        when(applicationRepository.findById(101L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(101L)).thenReturn(Optional.of(wf));
+        when(userRepo.findById(1L)).thenReturn(Optional.of(officer));
+        when(workflowRepository.countActiveAssignmentsByOfficer(1L)).thenReturn(2L);
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(101L);
+        req.setOfficerId("1");
+
+        ApplicationAllocationResponseDTO res = allocationService.allocateApplicationToOfficer(req, admin);
+
+        assertTrue(res.isStatus());
+        assertEquals(101L, res.getApplicationId());
+        assertEquals("FO_1001", res.getOfficerId());
+        assertEquals("Officer Field", res.getOfficerName());
+        assertEquals(WorkflowStage.FIELD_OFFICER.name(), res.getCurrentStage());
+
+        assertSame(officer, wf.getAssignedOfficer());
+        assertSame(officer, app.getAllocatedOfficer());
+        verify(workflowRepository).save(wf);
+        verify(applicationRepository).save(app);
+        verify(notificationService).createAndPublishNotification(
+                eq(officer),
+                any(String.class),
+                eq(NotificationType.APPLICATION_ASSIGNED),
+                eq(null),
+                eq(101L)
+        );
+
+        ArgumentCaptor<AuditLog> logCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(logCaptor.capture());
+        AuditLog savedLog = logCaptor.getValue();
+        assertNotNull(savedLog);
+        assertEquals(AuditAction.ALLOCATE, savedLog.getAction());
+        assertEquals(admin, savedLog.getUser());
+        assertTrue(savedLog.getDescription().contains("101"));
+        assertTrue(savedLog.getDescription().contains("1"));
+    }
+
+    @Test
+    void allocateApplicationToOfficer_wrongRoleOfficer_throwsBadRequestException() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Users districtOfficer = officer(2L, Role.DISTRICT_OFFICER, 10, "District Officer");
+
+        Application app = application(102L);
+        VerificationWorkflow wf = unassignedWorkflow(app, WorkflowStage.FIELD_OFFICER);
+
+        when(applicationRepository.findById(102L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(102L)).thenReturn(Optional.of(wf));
+        when(userRepo.findById(2L)).thenReturn(Optional.of(districtOfficer));
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(102L);
+        req.setOfficerId("2");
+
+        assertThrows(BadRequestException.class, () ->
+                allocationService.allocateApplicationToOfficer(req, admin));
+
+        verify(workflowRepository, never()).save(any());
+        verify(applicationRepository, never()).save(any());
+        verify(notificationService, never()).createAndPublishNotification(any(), any(), any(), any(), any());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void allocateApplicationToOfficer_fullCapacityOfficer_throwsBadRequestException() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Users officer = officer(1L, Role.FIELD_OFFICER, 3, "Officer Field");
+
+        Application app = application(103L);
+        VerificationWorkflow wf = unassignedWorkflow(app, WorkflowStage.FIELD_OFFICER);
+
+        when(applicationRepository.findById(103L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(103L)).thenReturn(Optional.of(wf));
+        when(userRepo.findById(1L)).thenReturn(Optional.of(officer));
+        when(workflowRepository.countActiveAssignmentsByOfficer(1L)).thenReturn(3L); // at max capacity
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(103L);
+        req.setOfficerId("1");
+
+        assertThrows(BadRequestException.class, () ->
+                allocationService.allocateApplicationToOfficer(req, admin));
+
+        verify(workflowRepository, never()).save(any());
+        verify(applicationRepository, never()).save(any());
+    }
+
+    @Test
+    void allocateApplicationToOfficer_reassigningToSameOfficer_allowedEvenIfFullCapacity() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Users officer = officer(1L, Role.FIELD_OFFICER, 3, "Officer Field");
+
+        Application app = application(104L);
+        app.setAllocatedOfficer(officer);
+        VerificationWorkflow wf = unassignedWorkflow(app, WorkflowStage.FIELD_OFFICER);
+        wf.setAssignedOfficer(officer); // already assigned to officer 1
+
+        when(applicationRepository.findById(104L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(104L)).thenReturn(Optional.of(wf));
+        when(userRepo.findById(1L)).thenReturn(Optional.of(officer));
+        // countActiveAssignmentsByOfficer is not even called or bypassed because isSameOfficer is true
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(104L);
+        req.setOfficerId("1");
+
+        ApplicationAllocationResponseDTO res = allocationService.allocateApplicationToOfficer(req, admin);
+
+        assertTrue(res.isStatus());
+        verify(workflowRepository).save(wf);
+        verify(applicationRepository).save(app);
+        verify(notificationService).createAndPublishNotification(eq(officer), any(), eq(NotificationType.APPLICATION_ASSIGNED), eq(null), eq(104L));
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void allocateApplicationToOfficer_missingWorkflow_throwsResourceNotFoundException() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Application app = application(105L);
+
+        when(applicationRepository.findById(105L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(105L)).thenReturn(Optional.empty());
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(105L);
+        req.setOfficerId("1");
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                allocationService.allocateApplicationToOfficer(req, admin));
+    }
+
+    @Test
+    void allocateApplicationToOfficer_missingApplication_throwsResourceNotFoundException() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+
+        when(applicationRepository.findById(106L)).thenReturn(Optional.empty());
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(106L);
+        req.setOfficerId("1");
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                allocationService.allocateApplicationToOfficer(req, admin));
+    }
+
+    @Test
+    void allocateApplicationToOfficer_resolvesOfficerByUniqueID() {
+        Users admin = officer(99L, Role.ADMIN, 0, "Admin");
+        Users officer = officer(1L, Role.FIELD_OFFICER, 10, "Officer Field");
+        officer.setUniqueID("OFF_FIELD_99");
+
+        Application app = application(107L);
+        VerificationWorkflow wf = unassignedWorkflow(app, WorkflowStage.FIELD_OFFICER);
+
+        when(applicationRepository.findById(107L)).thenReturn(Optional.of(app));
+        when(workflowRepository.findByApplicationId(107L)).thenReturn(Optional.of(wf));
+        when(userRepo.findByuniqueID("OFF_FIELD_99")).thenReturn(Optional.of(officer));
+        when(workflowRepository.countActiveAssignmentsByOfficer(1L)).thenReturn(0L);
+
+        ApplicationAllocationRequestDTO req = new ApplicationAllocationRequestDTO();
+        req.setApplicationId(107L);
+        req.setOfficerId("OFF_FIELD_99");
+
+        ApplicationAllocationResponseDTO res = allocationService.allocateApplicationToOfficer(req, admin);
+
+        assertTrue(res.isStatus());
+        assertEquals("OFF_FIELD_99", res.getOfficerId());
+        verify(workflowRepository).save(wf);
+        verify(applicationRepository).save(app);
+    }
 }
+
