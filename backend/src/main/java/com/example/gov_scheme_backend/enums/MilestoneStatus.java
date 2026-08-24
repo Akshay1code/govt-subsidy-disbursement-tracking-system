@@ -11,6 +11,8 @@ package com.example.gov_scheme_backend.enums;
 public enum MilestoneStatus {
 
     PENDING,
+    PROOF_SUBMITTED,
+    PROOF_REJECTED,
     COMPLETED,
     RELEASED,
     OVERDUE

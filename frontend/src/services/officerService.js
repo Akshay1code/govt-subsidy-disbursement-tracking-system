@@ -33,6 +33,14 @@ export async function completeMilestone(milestoneId) {
 }
 
 /**
+ * Rejects submitted milestone proof and requests beneficiary resubmission.
+ */
+export async function rejectProof(milestoneId, reason) {
+  const response = await api.post(`/api/v1/disbursement/milestone/${milestoneId}/reject-proof`, { reason })
+  return response.data?.data || response.data
+}
+
+/**
  * Releases funds for a completed milestone.
  */
 export async function releaseMilestone(milestoneId) {
