@@ -10,5 +10,7 @@ import lombok.NoArgsConstructor;
 public class EligibilityEngineScoreDTO {
     private boolean status;
     private double score;
+    private double totalPossibleScore;
     private String message;
+    private java.util.List<EligibilityFieldResultDTO> fieldBreakdown;
 }

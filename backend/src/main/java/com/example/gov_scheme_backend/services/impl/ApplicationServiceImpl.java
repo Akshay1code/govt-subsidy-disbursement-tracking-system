@@ -175,7 +175,9 @@ public class ApplicationServiceImpl implements ApplicationService {
             return new EligibilityEngineScoreDTO(
                     false,
                     0.0,
-                    "Missing value for field: " + missingField
+                    0.0,
+                    "Missing value for field: " + missingField,
+                    new java.util.ArrayList<>()
             );
         }
 
@@ -183,15 +185,29 @@ public class ApplicationServiceImpl implements ApplicationService {
          * Run eligibility engine after all required fields
          * have been supplied.
          */
-        double score = check.validateFields(saved.getId());
+        EligibilityEngineScoreDTO result = check.validateFields(saved.getId());
 
-        if (score < scheme.getMinimumEligibleScore()) {
+        boolean passed;
+        if (result.getTotalPossibleScore() <= 0) {
+            // No rules have point values configured — treat as a checklist:
+            // eligible only if every evaluated rule was individually met.
+            passed = result.getFieldBreakdown() != null
+                    && !result.getFieldBreakdown().isEmpty()
+                    && result.getFieldBreakdown().stream().allMatch(
+                            com.example.gov_scheme_backend.dto.response.application.EligibilityFieldResultDTO::isRuleMet);
+        } else {
+            double minScore = scheme.getMinimumEligibleScore() != null ? scheme.getMinimumEligibleScore() : 0.0;
+            // If the configured threshold exceeds what the rules can possibly award,
+            // cap it at totalPossibleScore — otherwise a user who passes every rule
+            // would still be marked ineligible due to a misconfigured threshold.
+            double effectiveThreshold = Math.min(minScore, result.getTotalPossibleScore());
+            passed = result.getScore() >= effectiveThreshold;
+        }
 
-            return new EligibilityEngineScoreDTO(
-                    false,
-                    score,
-                    "You are not eligible"
-            );
+        if (!passed) {
+            result.setStatus(false);
+            result.setMessage("You are not eligible");
+            return result;
         }
 
         /*
@@ -203,11 +219,9 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         applicationRepo.save(app);
 
-        return new EligibilityEngineScoreDTO(
-                true,
-                score,
-                "You are eligible"
-        );
+        result.setStatus(true);
+        result.setMessage("You are eligible");
+        return result;
     }
 
     @Override

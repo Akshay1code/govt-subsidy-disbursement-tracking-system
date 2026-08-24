@@ -1826,3 +1826,246 @@
   letter-spacing: 0.02em;
 }
 
+
+
+/* --- Eligibility Evaluation Results Custom Styles --- */
+.eligibility-results-container {
+  margin-top: 3rem;
+}
+.eligibility-results-header {
+  margin-bottom: 2rem;
+}
+.eligibility-results-header h2 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.5rem;
+}
+.eligibility-results-header p {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0;
+}
+.eligibility-results-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.eligibility-status-card {
+  padding: 2.5rem 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.eligibility-status-card.status-ineligible {
+  background: #fde8e8;
+  border: 1px solid #fbd5d5;
+}
+.eligibility-status-card.status-eligible {
+  background: #e6f4ea;
+  border: 1px solid #ceead6;
+}
+.status-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-size: 24px;
+  font-weight: bold;
+}
+.status-ineligible .status-icon {
+  background: #c81e1e;
+  color: white;
+}
+.status-eligible .status-icon {
+  background: #1e8e3e;
+  color: white;
+}
+.eligibility-status-card h3 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.75rem;
+  margin: 0 0 0.75rem;
+  font-weight: 700;
+}
+.status-ineligible h3 {
+  color: #9b1c1c;
+}
+.status-eligible h3 {
+  color: #137333;
+}
+.eligibility-status-card p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.status-ineligible p {
+  color: #9b1c1c;
+}
+.status-eligible p {
+  color: #137333;
+}
+.eligibility-score-summary-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f1f5f9;
+}
+.score-summary-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+}
+.score-summary-values {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+.score-computed {
+  display: flex;
+  flex-direction: column;
+}
+.score-required {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+.score-label {
+  font-size: 0.75rem;
+  color: #0f172a;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+.score-value {
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+.score-computed .score-value {
+  font-size: 3.5rem;
+}
+.score-required .score-value {
+  font-size: 1.5rem;
+  color: #64748b;
+}
+.score-progress-bar {
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.score-progress-fill {
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 99px;
+}
+.breakdown-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+.breakdown-cards-list {
+  display: grid;
+  gap: 1.25rem;
+}
+.breakdown-field-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f1f5f9;
+}
+.breakdown-field-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.breakdown-field-header h4 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+.breakdown-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.tag-failed {
+  background: #fde8e8;
+  color: #9b1c1c;
+}
+.tag-passed {
+  background: #e6f4ea;
+  color: #137333;
+}
+.tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.tag-failed .tag-dot {
+  background: #c81e1e;
+}
+.tag-passed .tag-dot {
+  background: #1e8e3e;
+}
+.breakdown-field-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.breakdown-req-block, .breakdown-input-block {
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+}
+.breakdown-req-block {
+  background: #f8fafc;
+}
+.input-failed {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+}
+.input-passed {
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+}
+.block-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #475569;
+  margin-bottom: 0.35rem;
+}
+.block-value {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.input-failed .block-value {
+  color: #9b1c1c;
+}
+.input-passed .block-value {
+  color: #137333;
+}
