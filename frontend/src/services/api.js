@@ -2,7 +2,7 @@ import axios from 'axios'
 import { clearPortalSessionCaches } from './sessionCleanup'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://govt-subsidy-disbursement-tracking-system.onrender.com',
+  baseURL: 'https://govt-subsidy-disbursement-tracking-system.onrender.com',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
