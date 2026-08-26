@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { register as apiRegister, registerOfficer as apiRegisterOfficer } from '../../services/authService'
 import logo from '../../assets/icons/logo.png'
-import { FaUser, FaLandmark } from 'react-icons/fa'
+import { FaUser, FaLandmark, FaUserPlus, FaFileSignature, FaChartPie, FaRegCheckCircle } from 'react-icons/fa'
+
 const OFFICER_ROLES = [
   { value: 'FIELD_OFFICER',    label: 'Field Officer' },
   { value: 'DISTRICT_OFFICER', label: 'District Officer' },
@@ -21,7 +22,7 @@ const EMPTY_FORM = {
   username: '',
   password: '',
   confirmPassword: '',
-  role: 'FIELD_OFFICER',   // officer-only
+  role: 'FIELD_OFFICER',
 }
 
 function validate(form, mode) {
@@ -43,117 +44,13 @@ function validate(form, mode) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Sub-form: Beneficiary                                          */
-/* ─────────────────────────────────────────────────────────────── */
-function BeneficiaryForm({ form, onChange, error, loading }) {
-  return (
-    <>
-      <div className="login-page__copy" style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.55rem', margin: 0 }}>Register as Beneficiary</h2>
-        <p style={{ margin: '0.3rem 0 0', color: 'var(--muted)', fontSize: '0.88rem' }}>
-          Citizens, farmers &amp; eligible individuals — create your subsidy portal account.
-        </p>
-      </div>
-
-      <div className="form-group-row">
-        <Field id="fullName"   label="Full Name"             name="fullName"   placeholder="Enter full name"       value={form.fullName}   onChange={onChange} />
-        <Field id="mobileNo"   label="Mobile Number (10 Digits)" name="mobileNo" placeholder="10-digit mobile"   value={form.mobileNo}   onChange={onChange} type="tel" maxLength={10} />
-      </div>
-
-      <Field id="region" label="Region / Address" name="region" placeholder="Residential region / address" value={form.region} onChange={onChange} />
-
-      <div className="form-group-row">
-        <Field id="district" label="District" name="district" placeholder="e.g. Pune"         value={form.district} onChange={onChange} />
-        <Field id="state"    label="State"    name="state"    placeholder="e.g. Maharashtra"  value={form.state}    onChange={onChange} />
-      </div>
-
-      <Field id="username" label="Choose Username" name="username" placeholder="e.g. rahul_sharma" value={form.username} onChange={onChange} autoComplete="off" />
-
-      <div className="form-group-row">
-        <Field id="password"        label="Password (Letters & Numbers)" name="password"        type="password" placeholder="e.g. pass123"      value={form.password}        onChange={onChange} />
-        <Field id="confirmPassword" label="Confirm Password"             name="confirmPassword" type="password" placeholder="Repeat password"    value={form.confirmPassword} onChange={onChange} />
-      </div>
-
-      <ErrorMsg message={error} />
-
-      <motion.button type="submit" className="login-form__submit" disabled={loading} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} style={{ marginTop: '1rem' }}>
-        {loading ? <span className="login-form__spinner" /> : 'Register Account'}
-      </motion.button>
-    </>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Sub-form: Officer                                              */
-/* ─────────────────────────────────────────────────────────────── */
-function OfficerForm({ form, onChange, error, loading }) {
-  return (
-    <>
-      <div className="login-page__copy" style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.55rem', margin: 0 }}>Register as Officer</h2>
-        <p style={{ margin: '0.3rem 0 0', color: 'var(--muted)', fontSize: '0.88rem' }}>
-          Government officials — sign up and await admin approval before accessing the Officer Portal.
-        </p>
-      </div>
-
-      {/* Role selector */}
-      <div className="login-form__field" style={{ marginBottom: '0.5rem' }}>
-        <label htmlFor="role">Officer Role</label>
-        <div className="login-form__input-wrap">
-          <select
-            id="role"
-            name="role"
-            value={form.role}
-            onChange={onChange}
-            style={{ width: '100%', background: 'transparent', color: 'var(--text)', border: 'none', outline: 'none', fontSize: '0.95rem' }}
-          >
-            {OFFICER_ROLES.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="form-group-row">
-        <Field id="fullName" label="Full Name"             name="fullName" placeholder="Enter full name"   value={form.fullName} onChange={onChange} />
-        <Field id="mobileNo" label="Mobile Number (10 Digits)" name="mobileNo" placeholder="10-digit mobile" value={form.mobileNo} onChange={onChange} type="tel" maxLength={10} />
-      </div>
-
-      <Field id="region" label="Region / Address" name="region" placeholder="Posting region / address" value={form.region} onChange={onChange} />
-
-      <div className="form-group-row">
-        <Field id="district" label="District / Jurisdiction" name="district" placeholder="e.g. North Delhi"   value={form.district} onChange={onChange} />
-        <Field id="state"    label="State"                   name="state"    placeholder="e.g. Delhi"         value={form.state}    onChange={onChange} />
-      </div>
-
-      <Field id="username" label="Choose Username" name="username" placeholder="e.g. officer_anil" value={form.username} onChange={onChange} autoComplete="off" />
-
-      <div className="form-group-row">
-        <Field id="password"        label="Password (Letters & Numbers)" name="password"        type="password" placeholder="e.g. pass123"   value={form.password}        onChange={onChange} />
-        <Field id="confirmPassword" label="Confirm Password"             name="confirmPassword" type="password" placeholder="Repeat password" value={form.confirmPassword} onChange={onChange} />
-      </div>
-
-      <ErrorMsg message={error} />
-
-      <motion.button type="submit" className="login-form__submit" disabled={loading} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} style={{ marginTop: '1rem' }}>
-        {loading ? <span className="login-form__spinner" /> : 'Submit for Approval'}
-      </motion.button>
-
-      <p style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '0.75rem', lineHeight: 1.5 }}>
-        ⓘ Officer accounts require Admin approval before login access is granted.
-      </p>
-    </>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────── */
 /*  Shared helpers                                                 */
 /* ─────────────────────────────────────────────────────────────── */
 function Field({ id, label, name, placeholder, value, onChange, type = 'text', maxLength, autoComplete }) {
   return (
-    <div className="login-form__field">
+    <div className="form-field">
       <label htmlFor={id}>{label}</label>
-      <div className="login-form__input-wrap">
+      <div className="input-wrapper">
         <input
           id={id}
           name={name}
@@ -163,6 +60,7 @@ function Field({ id, label, name, placeholder, value, onChange, type = 'text', m
           onChange={onChange}
           maxLength={maxLength}
           autoComplete={autoComplete}
+          style={{ padding: 0 }}
         />
       </div>
     </div>
@@ -174,16 +72,115 @@ function ErrorMsg({ message }) {
     <AnimatePresence>
       {message && (
         <motion.p
-          className="login-form__error"
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          style={{ color: '#dc3545', fontSize: '0.85rem', margin: '0.5rem 0' }}
+          className="form-error"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          style={{ marginTop: '0.5rem' }}
         >
           {message}
         </motion.p>
       )}
     </AnimatePresence>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Sub-form: Beneficiary                                          */
+/* ─────────────────────────────────────────────────────────────── */
+function BeneficiaryForm({ form, onChange, error, loading }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div className="login-header" style={{ marginBottom: '0.5rem' }}>
+        <h2>Register as Beneficiary</h2>
+        <p>Citizens, farmers &amp; eligible individuals — create your subsidy portal account.</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="fullName"   label="Full Name"             name="fullName"   placeholder="Enter full name"       value={form.fullName}   onChange={onChange} />
+        <Field id="mobileNo"   label="Mobile Number" name="mobileNo" placeholder="10-digit mobile"   value={form.mobileNo}   onChange={onChange} type="tel" maxLength={10} />
+      </div>
+
+      <Field id="region" label="Region / Address" name="region" placeholder="Residential region / address" value={form.region} onChange={onChange} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="district" label="District" name="district" placeholder="e.g. Pune"         value={form.district} onChange={onChange} />
+        <Field id="state"    label="State"    name="state"    placeholder="e.g. Maharashtra"  value={form.state}    onChange={onChange} />
+      </div>
+
+      <Field id="username" label="Choose Username" name="username" placeholder="e.g. rahul_sharma" value={form.username} onChange={onChange} autoComplete="off" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="password"        label="Password" name="password"        type="password" placeholder="e.g. Pass@123"      value={form.password}        onChange={onChange} />
+        <Field id="confirmPassword" label="Confirm Password"             name="confirmPassword" type="password" placeholder="Repeat password"    value={form.confirmPassword} onChange={onChange} />
+      </div>
+
+      <ErrorMsg message={error} />
+
+      <motion.button type="submit" className="submit-btn" disabled={loading} whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+        {loading ? <span className="spinner" /> : 'Register Account'}
+      </motion.button>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Sub-form: Officer                                              */
+/* ─────────────────────────────────────────────────────────────── */
+function OfficerForm({ form, onChange, error, loading }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div className="login-header" style={{ marginBottom: '0.5rem' }}>
+        <h2>Register as Officer</h2>
+        <p>Government officials — sign up and await admin approval before accessing the Officer Portal.</p>
+      </div>
+
+      <div className="form-field">
+        <label htmlFor="role">Officer Role</label>
+        <div className="input-wrapper">
+          <select
+            id="role"
+            name="role"
+            value={form.role}
+            onChange={onChange}
+            style={{ width: '100%', background: 'transparent', color: 'var(--text-main)', border: 'none', outline: 'none', fontSize: '0.95rem', height: '100%', appearance: 'none', cursor: 'pointer' }}
+          >
+            {OFFICER_ROLES.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="fullName" label="Full Name"             name="fullName" placeholder="Enter full name"   value={form.fullName} onChange={onChange} />
+        <Field id="mobileNo" label="Mobile Number" name="mobileNo" placeholder="10-digit mobile" value={form.mobileNo} onChange={onChange} type="tel" maxLength={10} />
+      </div>
+
+      <Field id="region" label="Region / Address" name="region" placeholder="Posting region / address" value={form.region} onChange={onChange} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="district" label="District / Jurisdiction" name="district" placeholder="e.g. North Delhi"   value={form.district} onChange={onChange} />
+        <Field id="state"    label="State"                   name="state"    placeholder="e.g. Delhi"         value={form.state}    onChange={onChange} />
+      </div>
+
+      <Field id="username" label="Choose Username" name="username" placeholder="e.g. officer_anil" value={form.username} onChange={onChange} autoComplete="off" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <Field id="password"        label="Password" name="password"        type="password" placeholder="e.g. Pass@123"   value={form.password}        onChange={onChange} />
+        <Field id="confirmPassword" label="Confirm Password"             name="confirmPassword" type="password" placeholder="Repeat password" value={form.confirmPassword} onChange={onChange} />
+      </div>
+
+      <ErrorMsg message={error} />
+
+      <motion.button type="submit" className="submit-btn" disabled={loading} whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+        {loading ? <span className="spinner" /> : 'Submit for Approval'}
+      </motion.button>
+
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.5rem', lineHeight: 1.5 }}>
+        ⓘ Officer accounts require Admin approval before login access is granted.
+      </p>
+    </div>
   )
 }
 
@@ -195,7 +192,7 @@ export default function Register() {
   const navigate = useNavigate()
   const [mode, setMode] = useState(() => (
     location.pathname.startsWith('/officer') ? 'officer' : 'beneficiary'
-  )) // 'beneficiary' | 'officer'
+  ))
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -244,7 +241,7 @@ export default function Register() {
   }
 
   return (
-    <div className="login-page">
+    <div className="login-wrapper">
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -253,43 +250,98 @@ export default function Register() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
+            style={{
+              position: 'fixed',
+              top: '1rem',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: toast.type === 'success' ? '#047857' : '#b91c1c',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '8px',
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
           >
             {toast.message}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Left panel */}
+      {/* ── Left panel (Branding) ── */}
       <motion.div
-        className="login-page__left"
-        initial={{ opacity: 0, x: -28 }}
+        className="login-left"
+        initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.55, ease: 'easeOut' }}
-        style={{ overflowY: 'auto' }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
       >
-        {/* Brand */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <Link to="/" className="login-page__brand" style={{ margin: 0 }}>
-            <img src={logo} alt="GS Portal Logo" className="login-page__logo" />
-            <span>GS Gov Subsidy</span>
-          </Link>
+        <div className="login-left__content">
+          <div className="login-brand">
+            <img src={logo} alt="GS Portal Logo" className="login-brand__logo" />
+            <span className="login-brand__text">GS Gov Subsidy</span>
+          </div>
+          
+          <h1 className="login-left__title">
+            Empowering Citizens<br/>through Transparency
+          </h1>
+          <p className="login-left__subtitle">
+            Your central gateway for secure, efficient, and<br/>transparent government subsidy services.
+          </p>
+
+          <div className="login-left__features">
+            <div className="feature-card">
+              <div className="feature-card__icon"><FaUserPlus /></div>
+              <h4 className="feature-card__title">Register</h4>
+              <p className="feature-card__text">Create your portal account easily</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-card__icon"><FaFileSignature /></div>
+              <h4 className="feature-card__title">Apply</h4>
+              <p className="feature-card__text">Submit subsidy applications online</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-card__icon"><FaChartPie /></div>
+              <h4 className="feature-card__title">Track</h4>
+              <p className="feature-card__text">Monitor application status in real-time</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-card__icon"><FaRegCheckCircle /></div>
+              <h4 className="feature-card__title">Receive</h4>
+              <p className="feature-card__text">Secure and direct benefit transfers</p>
+            </div>
+          </div>
         </div>
 
-        <div className="login-page__form-area" style={{ marginTop: '0.5rem', marginBottom: '2rem' }}>
+        {/* Decorative Watermark */}
+        <div className="login-left__watermark">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+      </motion.div>
 
+      {/* ── Right panel (Form) ── */}
+      <motion.div
+        className="login-right"
+        style={{ overflowY: 'auto' }}
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
+      >
+        <div className="login-right__container" style={{ maxWidth: '480px', padding: '2rem 0' }}>
+          
           {/* ── Mode switcher tabs ── */}
           <div style={{
             display: 'flex',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
+            background: 'var(--bg-input)',
+            borderRadius: '10px',
             padding: '4px',
-            marginBottom: '1.75rem',
+            marginBottom: '2rem',
             gap: '4px',
           }}>
             {[
-              { key: 'beneficiary', label: <span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FaUser /> Register as Beneficiary</span> },
-              { key: 'officer',     label: <span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FaLandmark /> Register as Officer</span> },
+              { key: 'beneficiary', label: <span style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'}}><FaUser /> Register as Beneficiary</span> },
+              { key: 'officer',     label: <span style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'}}><FaLandmark /> Register as Officer</span> },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -297,16 +349,16 @@ export default function Register() {
                 onClick={() => switchMode(tab.key)}
                 style={{
                   flex: 1,
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '9px',
+                  padding: '0.65rem 0.5rem',
+                  borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
                   transition: 'all 0.2s ease',
-                  background: mode === tab.key ? 'var(--accent)' : 'transparent',
-                  color: mode === tab.key ? '#fff' : 'var(--muted)',
-                  boxShadow: mode === tab.key ? '0 2px 10px rgba(0,0,0,0.25)' : 'none',
+                  background: mode === tab.key ? '#ffffff' : 'transparent',
+                  color: mode === tab.key ? 'var(--text-main)' : 'var(--text-muted)',
+                  boxShadow: mode === tab.key ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                 }}
               >
                 {tab.label}
@@ -314,8 +366,7 @@ export default function Register() {
             ))}
           </div>
 
-          {/* ── Form ── */}
-          <form className="login-form" onSubmit={handleSubmit} noValidate style={{ display: 'block' }}>
+          <form className="login-form" onSubmit={handleSubmit} noValidate>
             <AnimatePresence mode="wait">
               <motion.div
                 key={mode}
@@ -323,7 +374,6 @@ export default function Register() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.22 }}
-                style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
               >
                 {mode === 'beneficiary'
                   ? <BeneficiaryForm form={form} onChange={handleChange} error={error} loading={loading} />
@@ -333,21 +383,10 @@ export default function Register() {
             </AnimatePresence>
           </form>
 
-          <p className="login-page__register" style={{ marginTop: '1.2rem' }}>
-            Already registered?{' '}
-            <Link to="/login" style={{ color: 'var(--accent-strong)', fontWeight: '700' }}>Login here</Link>
+          <p className="register-text">
+            Already registered? <Link to="/login">Login here</Link>
           </p>
         </div>
-      </motion.div>
-
-      {/* Right panel */}
-      <motion.div
-        className="login-page__right"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.1 }}
-      >
-        <div className="login-page__right-overlay" />
       </motion.div>
     </div>
   )

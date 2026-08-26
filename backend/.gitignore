@@ -16,9 +16,6 @@ build/
 src/main/resources/application.properties
 src/main/resources/application-dev.properties
 src/main/resources/application-local.properties
-# Keep the production template committed (it should use env variable placeholders)
-!src/main/resources/application-prod.properties
-
 # ── IDE ───────────────────────────────────────────────────────────────────────
 # IntelliJ IDEA
 .idea/
