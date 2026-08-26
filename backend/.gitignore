@@ -7,15 +7,12 @@ build/
 !**/src/test/**/target/
 !**/src/main/**/build/
 !**/src/test/**/build/
+.env
 
 # Maven wrapper JAR (the .cmd and shell scripts should be committed)
 .mvn/wrapper/maven-wrapper.jar
 
-# ── Spring Boot secrets / environment config ──────────────────────────────────
-# application.properties contains DB credentials, JWT secrets, etc.
-src/main/resources/application.properties
-src/main/resources/application-dev.properties
-src/main/resources/application-local.properties
+
 # ── IDE ───────────────────────────────────────────────────────────────────────
 # IntelliJ IDEA
 .idea/
