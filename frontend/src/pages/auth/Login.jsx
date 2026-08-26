@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { login as apiLogin } from '../../services/authService'
 import { clearPortalSessionCaches } from '../../services/sessionCleanup'
 import logo from '../../assets/icons/logo.png'
+import { FaUserPlus, FaFileSignature, FaChartPie, FaRegCheckCircle } from 'react-icons/fa'
 
 function EyeIcon({ open }) {
   return open ? (
@@ -22,7 +23,23 @@ function EyeIcon({ open }) {
   )
 }
 
-// No mock data — all authentication goes through the backend API
+function UserIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
+}
+
+function LockIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
 
 export default function Login() {
   const navigate = useNavigate()
@@ -30,8 +47,6 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  // Forgot Password State
   const [showForgotModal, setShowForgotModal] = useState(false)
 
   function handleChange(e) {
@@ -50,25 +65,17 @@ export default function Login() {
 
       if (result.status) {
         clearPortalSessionCaches()
-        // Fetch profile to determine role-based redirect
         try {
           const { default: api } = await import('../../services/api')
           const profileRes = await api.get('/gov/auth/profile/get')
           const user = profileRes.data?.data || profileRes.data
-
           const role = user?.role?.toUpperCase()
 
-          if (role === 'ADMIN') {
-            navigate('/admin/dashboard')
-          } else if (role === 'FINANCE_OFFICER') {
-            navigate('/finance')
-          } else if (role?.includes('OFFICER')) {
-            navigate('/officer/dashboard')
-          } else {
-            navigate('/dashboard', { state: { fromLogin: true } })
-          }
+          if (role === 'ADMIN') navigate('/admin/dashboard')
+          else if (role === 'FINANCE_OFFICER') navigate('/finance')
+          else if (role?.includes('OFFICER')) navigate('/officer/dashboard')
+          else navigate('/dashboard', { state: { fromLogin: true } })
         } catch {
-          // Fallback: go to beneficiary dashboard if profile fetch fails
           navigate('/dashboard', { state: { fromLogin: true } })
         }
       } else {
@@ -77,54 +84,111 @@ export default function Login() {
     } catch (err) {
       console.error('Login error:', err)
       const message = String(err?.message || '').toLowerCase()
-      if (message.includes('username not found')) {
-        setError('Username not found')
-      } else if (message.includes('password is incorrect') || message.includes('bad credentials')) {
-        setError('Password is incorrect')
-      } else if (message.includes('network error') || message.includes('failed to fetch') || message.includes('service unavailable') || message.includes('server is down')) {
-        setError('Server is down')
-      } else {
-        setError('Server is down')
-      }
+      if (message.includes('username not found')) setError('Username not found')
+      else if (message.includes('password is incorrect') || message.includes('bad credentials')) setError('Password is incorrect')
+      else setError('Server is down or unavailable')
     } finally {
       setLoading(false)
     }
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.4
+      }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
+  }
+
   return (
-    <div className="login-page">
-      {/* ── Left panel ── */}
+    <div className="login-wrapper">
+      {/* ── Left panel (Branding) ── */}
       <motion.div
-        className="login-page__left"
-        initial={{ opacity: 0, x: -28 }}
+        className="login-left"
+        initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.55, ease: 'easeOut' }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
       >
-        {/* Brand & Theme */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <Link to="/" className="login-page__brand" style={{ margin: 0 }}>
-            <img src={logo} alt="GS Portal Logo" className="login-page__logo" />
-            <span>GS Gov Subsidy</span>
-          </Link>
+        <div className="login-left__content">
+          <div className="login-brand">
+            <img src={logo} alt="GS Portal Logo" className="login-brand__logo" />
+            <span className="login-brand__text">GS Gov Subsidy</span>
+          </div>
+          
+          <h1 className="login-left__title">
+            Empowering Citizens<br/>through Transparency
+          </h1>
+          <p className="login-left__subtitle">
+            Your central gateway for secure, efficient, and<br/>transparent government subsidy services.
+          </p>
+
+          <motion.div 
+            className="login-left__features"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div variants={itemVariants} className="feature-card">
+              <div className="feature-card__icon"><FaUserPlus /></div>
+              <h4 className="feature-card__title">Register</h4>
+              <p className="feature-card__text">Create your portal account easily</p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="feature-card">
+              <div className="feature-card__icon"><FaFileSignature /></div>
+              <h4 className="feature-card__title">Apply</h4>
+              <p className="feature-card__text">Submit subsidy applications online</p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="feature-card">
+              <div className="feature-card__icon"><FaChartPie /></div>
+              <h4 className="feature-card__title">Track</h4>
+              <p className="feature-card__text">Monitor application status in real-time</p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="feature-card">
+              <div className="feature-card__icon"><FaRegCheckCircle /></div>
+              <h4 className="feature-card__title">Receive</h4>
+              <p className="feature-card__text">Secure and direct benefit transfers</p>
+            </motion.div>
+          </motion.div>
         </div>
 
-        <div className="login-page__form-area">
-          <div className="login-page__copy">
-            <h1>Portal Login</h1>
-            <p>Login as a citizen, officer, or administrator to access the government subsidy portal.</p>
+        {/* Decorative Watermark */}
+        <motion.div 
+          className="login-left__watermark"
+          animate={{ y: [0, -15, 0] }}
+          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </motion.div>
+      </motion.div>
+
+      {/* ── Right panel (Form) ── */}
+      <motion.div
+        className="login-right"
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
+      >
+        <div className="login-right__container">
+          <div className="login-header">
+            <h2>Secure Portal Access</h2>
+            <p>Sign in to access your secure government dashboard for subsidy management and applications.</p>
           </div>
 
-
-
           <form className="login-form" onSubmit={handleSubmit} noValidate>
-            {/* Username/ID */}
-            <div className="login-form__field">
-              <label htmlFor="identifier">Username</label>
-              <div className="login-form__input-wrap">
-                <svg className="login-form__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+            <div className="form-field">
+              <label htmlFor="identifier">EMAIL OR USERNAME</label>
+              <div className="input-wrapper">
+                <span className="input-icon"><UserIcon /></span>
                 <input
                   id="identifier"
                   name="identifier"
@@ -137,14 +201,10 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Password */}
-            <div className="login-form__field">
-              <label htmlFor="password">Password</label>
-              <div className="login-form__input-wrap">
-                <svg className="login-form__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+            <div className="form-field">
+              <label htmlFor="password">PASSWORD</label>
+              <div className="input-wrapper">
+                <span className="input-icon"><LockIcon /></span>
                 <input
                   id="password"
                   name="password"
@@ -156,7 +216,7 @@ export default function Login() {
                 />
                 <button
                   type="button"
-                  className="login-form__pw-toggle"
+                  className="pw-toggle"
                   onClick={() => setShowPw(v => !v)}
                   aria-label={showPw ? 'Hide password' : 'Show password'}
                 >
@@ -165,15 +225,14 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="login-form__meta">
-              <label className="login-form__remember">
+            <div className="form-options">
+              <label className="checkbox-label">
                 <input type="checkbox" name="remember" />
                 <span>Remember me</span>
               </label>
               <button
                 type="button"
-                className="login-form__forgot"
-                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                className="link-btn"
                 onClick={() => setShowForgotModal(true)}
               >
                 Forgot password?
@@ -183,10 +242,10 @@ export default function Login() {
             <AnimatePresence>
               {error && (
                 <motion.p
-                  className="login-form__error"
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
+                  className="form-error"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
                 >
                   {error}
                 </motion.p>
@@ -195,73 +254,39 @@ export default function Login() {
 
             <motion.button
               type="submit"
-              className="login-form__submit"
+              className="submit-btn"
               disabled={loading}
-              whileHover={{ y: -2 }}
+              whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
             >
-              {loading ? (
-                <span className="login-form__spinner" />
-              ) : (
-                'Sign In'
-              )}
+              {loading ? <span className="spinner" /> : 'Sign In'}
             </motion.button>
           </form>
 
-          <p className="login-page__register">
-            New user?{' '}
-            <Link to="/register">Register on portal</Link>
+          <p className="register-text">
+            Don't have an account? <Link to="/register">Register here</Link>
           </p>
         </div>
-      </motion.div>
-
-      {/* ── Right panel ── */}
-      <motion.div
-        className="login-page__right"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.1 }}
-      >
-        <div className="login-page__right-overlay" />
-        <div className="login-page__right-overlay" />
       </motion.div>
 
       {/* ── Forgot Password Modal ── */}
       <AnimatePresence>
         {showForgotModal && (
-          <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="modal-overlay">
             <motion.div
               className="modal-content"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              style={{ background: 'var(--panel-strong)', borderRadius: '16px', border: '1px solid var(--border)', maxWidth: '440px', width: '100%', padding: '2rem', position: 'relative' }}
             >
-              <button
-                onClick={() => setShowForgotModal(false)}
-                style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 0, color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-
-              <h2 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem', color: 'var(--text)' }}>Reset Account Password</h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>
-                To reset your password, please contact your portal administrator with your registered username or email. They will initiate the reset process from the system backend.
-              </p>
-
-              <div style={{ padding: '1rem', borderRadius: '10px', background: 'rgba(130, 174, 202, 0.08)', border: '1px solid rgba(130, 174, 202, 0.2)', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>
-                📧 <strong style={{ color: 'var(--text)' }}>admin@govsubsidyportal.in</strong>
-                <br />
+              <button className="modal-close" onClick={() => setShowForgotModal(false)}>✕</button>
+              <h3>Reset Account Password</h3>
+              <p>To reset your password, please contact your portal administrator with your registered username or email.</p>
+              <div className="modal-info">
+                📧 <strong>admin@govsubsidyportal.in</strong><br />
                 Please include your full name and registered username in the email.
               </div>
-
-              <button
-                className="button button--primary"
-                style={{ width: '100%' }}
-                onClick={() => setShowForgotModal(false)}
-              >
-                Close
-              </button>
+              <button className="submit-btn" onClick={() => setShowForgotModal(false)}>Close</button>
             </motion.div>
           </div>
         )}
