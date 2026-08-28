@@ -14,7 +14,7 @@ import {
 } from 'react-icons/fa'
 import { getSchemes } from '../../services/schemeService'
 import { getApplications } from '../../services/applicationService'
-import { getCurrentBeneficiaryRecord, getDisbursementPlanByApplicationId } from '../../services/fundsService'
+import { getCurrentBeneficiaryRecord, getDisbursementPlanByApplicationId, submitProof } from '../../services/fundsService'
 import api from '../../services/api'
 import '../../styles/Dashboard.css'
 import '../../styles/FundsTracker.css'
@@ -171,22 +171,13 @@ export default function FundsTracker() {
     setProofError('')
     setProofSuccess('')
     try {
-      // Step 1: upload file to Cloudinary via existing media endpoint
       const formData = new FormData()
       formData.append('file', proofFile)
-      const uploadRes = await api.post('/api/media/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const uploadData = uploadRes.data?.data || uploadRes.data || {}
-      const proofDocumentUrl = uploadData.url || uploadData.secureUrl || uploadData.documentUrl || ''
-      const fileName = uploadData.fileName || proofFile.name
+      if (proofNotes.trim()) {
+        formData.append('notes', proofNotes.trim())
+      }
 
-      // Step 2: link proof to milestone
-      await api.post(`/api/v1/disbursement/milestone/${proofMilestoneId}/submit-proof`, {
-        proofDocumentUrl,
-        fileName,
-        notes: proofNotes.trim() || null,
-      })
+      await submitProof(proofMilestoneId, formData)
 
       setProofSuccess('Proof submitted successfully. The reviewing officer has been notified.')
 
@@ -194,7 +185,6 @@ export default function FundsTracker() {
       try {
         const appId = app?.id || app?.applicationId
         if (appId) {
-          const { getDisbursementPlanByApplicationId } = await import('../../services/fundsService')
           const refreshed = await getDisbursementPlanByApplicationId(appId)
           setPlan(refreshed)
         }

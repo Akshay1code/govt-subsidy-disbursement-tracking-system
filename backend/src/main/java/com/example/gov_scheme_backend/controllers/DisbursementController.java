@@ -23,11 +23,12 @@ public class DisbursementController {
         return ResponseEntity.ok(disbursementService.configurePlan(planId, request));
     }
 
-    @PostMapping("/milestone/{milestoneId}/submit-proof")
+    @PostMapping(value = "/milestone/{milestoneId}/submit-proof", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DisbursementMilestoneResponse> submitProof(
             @PathVariable Long milestoneId,
-            @RequestBody com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request) {
-        return ResponseEntity.ok(disbursementService.submitProof(milestoneId, request));
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "notes", required = false) String notes) {
+        return ResponseEntity.ok(disbursementService.submitProof(milestoneId, file, notes));
     }
 
     @PostMapping("/milestone/{milestoneId}/reject-proof")

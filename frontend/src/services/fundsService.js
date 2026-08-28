@@ -30,6 +30,26 @@ export async function completeMilestone(milestoneId) {
   return response.data?.data || response.data || null
 }
 
+export async function submitProof(milestoneId, fileOrFormData, notes) {
+  let data = fileOrFormData
+  if (fileOrFormData instanceof File || fileOrFormData instanceof Blob) {
+    data = new FormData()
+    data.append('file', fileOrFormData)
+    if (notes) {
+      data.append('notes', notes)
+    }
+  }
+  const response = await api.post(`/api/v1/disbursement/milestone/${milestoneId}/submit-proof`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data?.data || response.data || null
+}
+
+export async function rejectProof(milestoneId, reason) {
+  const response = await api.post(`/api/v1/disbursement/milestone/${milestoneId}/reject-proof`, { reason })
+  return response.data?.data || response.data || null
+}
+
 export async function getMilestoneContext(milestoneId) {
   const response = await api.get(`/api/v1/disbursement/milestone/${milestoneId}/context`)
   return response.data?.data || response.data || null

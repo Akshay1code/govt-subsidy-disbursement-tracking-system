@@ -13,6 +13,8 @@ import {
   suggestStages,
   configurePlan,
   releaseMilestone,
+  completeMilestone,
+  rejectProof,
   approveWithInstallments,
   getNotifications,
   markNotificationRead,
@@ -145,6 +147,9 @@ export default function FinanceDashboard() {
   const [inspectionContext, setInspectionContext] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [activeMilestone, setActiveMilestone] = useState(null)
+  const [proofReviewMilestone, setProofReviewMilestone] = useState(null)
+  const [proofRejectReason, setProofRejectReason] = useState('')
+  const [proofReviewError, setProofReviewError] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
   
   const [modalError, setModalError] = useState('')
@@ -389,6 +394,66 @@ export default function FinanceDashboard() {
       showToast('Milestone released successfully!', 'success')
     } catch (err) {
       alert(err.response?.data?.message || err.message)
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  async function refreshSelectedPlan() {
+    const appId = selectedApp?.id || selectedApp?.applicationId
+    if (!appId) return
+    const updatedPlan = await getDisbursementPlanByApplicationId(appId)
+    if (updatedPlan?.milestones) {
+      setStages(updatedPlan.milestones)
+    }
+    await refreshApplications()
+  }
+
+  async function openProofReview(milestoneId) {
+    setModalLoading(true)
+    setProofReviewError('')
+    try {
+      setProofReviewMilestone(await getMilestoneContext(milestoneId))
+      setProofRejectReason('')
+    } catch (err) {
+      showToast(err.response?.data?.message || err.message || 'Failed to load proof details.', 'error')
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  async function handleApproveProof() {
+    if (!proofReviewMilestone) return
+    setModalLoading(true)
+    setProofReviewError('')
+    try {
+      await completeMilestone(proofReviewMilestone.milestoneId)
+      setProofReviewMilestone(null)
+      await refreshSelectedPlan()
+      showToast('Proof approved. Milestone is ready for release.', 'success')
+    } catch (err) {
+      setProofReviewError(err.response?.data?.message || err.message || 'Failed to approve proof.')
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  async function handleRejectProof() {
+    if (!proofReviewMilestone) return
+    if (!proofRejectReason.trim()) {
+      setProofReviewError('A rejection reason is required.')
+      return
+    }
+    setModalLoading(true)
+    setProofReviewError('')
+    try {
+      await rejectProof(proofReviewMilestone.milestoneId, proofRejectReason.trim())
+      setProofReviewMilestone(null)
+      setProofRejectReason('')
+      await refreshSelectedPlan()
+      showToast('Proof rejected. The beneficiary can resubmit.', 'success')
+    } catch (err) {
+      setProofReviewError(err.response?.data?.message || err.message || 'Failed to reject proof.')
     } finally {
       setModalLoading(false)
     }
@@ -1071,6 +1136,8 @@ export default function FinanceDashboard() {
                         const st = String(stage.completionStatus || '').toUpperCase()
                         const isReleased = st === 'RELEASED'
                         const isPending = st === 'PENDING' || st === ''
+                        const isProofSubmitted = st === 'PROOF_SUBMITTED'
+                        const isCompleted = st === 'COMPLETED'
                         return (
                           <tr key={stage.milestoneId || stage.stageNumber}>
                             <td style={{ padding: '8px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>#{stage.stageNumber}</td>
@@ -1085,7 +1152,17 @@ export default function FinanceDashboard() {
                               </span>
                             </td>
                             <td style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
-                              {isPending && (
+                              {isProofSubmitted && (
+                                <button
+                                  className="officer-view-btn"
+                                  disabled={modalLoading}
+                                  onClick={() => openProofReview(stage.milestoneId)}
+                                  style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}
+                                >
+                                  {modalLoading ? '...' : 'Review Proof'}
+                                </button>
+                              )}
+                              {isCompleted && (
                                 <button
                                   className="officer-view-btn"
                                   disabled={modalLoading}
@@ -1123,6 +1200,70 @@ export default function FinanceDashboard() {
                   </button>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {proofReviewMilestone && (
+          <div className="modal-overlay" onClick={() => !modalLoading && setProofReviewMilestone(null)} style={{ background: 'rgba(0,0,0,0.7)', zIndex: 1900 }}>
+            <motion.div
+              className="modal-panel"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '600px', width: '90%', textAlign: 'left', background: 'var(--panel-strong)', border: '1px solid var(--border)' }}
+            >
+              <div className="tracking-card__header" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.8rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Review Milestone Proof</h3>
+                <span className="badge-status badge-status--applied">PROOF SUBMITTED</span>
+              </div>
+
+              <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--muted)' }}><strong>Beneficiary:</strong> {proofReviewMilestone.beneficiaryName}</p>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--muted)' }}><strong>Application:</strong> {proofReviewMilestone.applicationCode}</p>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--muted)' }}><strong>Scheme:</strong> {proofReviewMilestone.schemeName}</p>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--muted)' }}><strong>Stage:</strong> {proofReviewMilestone.stageNumber} - {proofReviewMilestone.milestoneName}</p>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--muted)' }}><strong>Amount:</strong> ₹{Number(proofReviewMilestone.amountToRelease || 0).toLocaleString()}</p>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <strong>Submitted proof</strong>
+                {(() => {
+                  const submittedProof = proofReviewMilestone.allMilestones?.find(
+                    (milestone) => String(milestone.milestoneId) === String(proofReviewMilestone.milestoneId)
+                  )
+                  return submittedProof?.proofDocumentUrl ? (
+                  <p style={{ margin: '0.4rem 0 0' }}>
+                    <a href={submittedProof.proofDocumentUrl} target="_blank" rel="noopener noreferrer">{submittedProof.fileName || 'View submitted document'}</a>
+                  </p>
+                  ) : (
+                  <p style={{ margin: '0.4rem 0 0', color: 'var(--muted)' }}>No proof document URL is available.</p>
+                  )
+                })()}
+              </div>
+
+              <label style={{ display: 'block', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                Rejection reason <span style={{ color: '#ff6b76' }}>*</span>
+                <textarea
+                  value={proofRejectReason}
+                  onChange={(e) => setProofRejectReason(e.target.value)}
+                  placeholder="Required only when rejecting proof"
+                  rows="3"
+                  disabled={modalLoading}
+                  style={{ width: '100%', marginTop: '0.4rem', boxSizing: 'border-box', padding: '0.6rem' }}
+                />
+              </label>
+
+              {proofReviewError && <div style={{ color: '#ff6b76', marginBottom: '1rem' }}>⚠️ {proofReviewError}</div>}
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="button button--ghost" onClick={() => setProofReviewMilestone(null)} disabled={modalLoading}>Cancel</button>
+                <button type="button" className="button button--ghost" onClick={handleRejectProof} disabled={modalLoading} style={{ color: '#ff6b76' }}>Reject Proof</button>
+                <button type="button" className="button button--primary" onClick={handleApproveProof} disabled={modalLoading}>Approve Proof</button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -25,7 +25,7 @@ public interface DisbursementService {
     List<Notification> getUserNotifications(String username);
 
     // Staged Proof Lifecycle
-    DisbursementMilestoneResponse submitProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request);
+    DisbursementMilestoneResponse submitProof(Long milestoneId, org.springframework.web.multipart.MultipartFile file, String notes);
     DisbursementMilestoneResponse rejectProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofRejectRequest request);
 
     SuggestedStagesResponse suggestStages(Long planId);

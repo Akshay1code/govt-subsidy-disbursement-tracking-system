@@ -13,6 +13,7 @@ import com.example.gov_scheme_backend.enums.Role;
 import com.example.gov_scheme_backend.exceptions.BadRequestException;
 import com.example.gov_scheme_backend.exceptions.ResourceNotFoundException;
 import com.example.gov_scheme_backend.repositories.*;
+import com.example.gov_scheme_backend.services.CloudinaryService;
 import com.example.gov_scheme_backend.services.DisbursementService;
 import com.example.gov_scheme_backend.services.NotificationService;
 import com.example.gov_scheme_backend.dto.response.disbursement.MilestoneContextResponse;
@@ -23,12 +24,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,6 +66,9 @@ public class DisbursementServiceImpl implements DisbursementService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     @Autowired(required = false)
     private VerificationWorkflowRepository workflowRepository;
@@ -171,7 +177,7 @@ public class DisbursementServiceImpl implements DisbursementService {
 
     @Override
     @Transactional
-    public DisbursementMilestoneResponse submitProof(Long milestoneId, com.example.gov_scheme_backend.dto.request.disbursement.MilestoneProofSubmitRequest request) {
+    public DisbursementMilestoneResponse submitProof(Long milestoneId, MultipartFile file, String notes) {
         DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
 
@@ -201,30 +207,33 @@ public class DisbursementServiceImpl implements DisbursementService {
             performer = userRepo.findByUsername(auth.getName()).orElse(null);
         }
 
-        if (request != null && request.getProofDocumentUrl() != null && !request.getProofDocumentUrl().isBlank()) {
-            ApplicationDocument proofDoc = new ApplicationDocument();
-            proofDoc.setApplication(application);
-            proofDoc.setDocumentType(com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF);
-            String docName = (request.getFileName() != null && !request.getFileName().isBlank())
-                    ? request.getFileName()
-                    : "Stage " + milestone.getStageNumber() + " Proof - " + milestone.getMilestoneName();
-            proofDoc.setFileName(docName);
-            proofDoc.setFilePath("");
-            proofDoc.setVerified(false);
-            proofDoc.setDocumentUrl(request.getProofDocumentUrl());
-
-            if (application.getDocuments() == null) {
-                application.setDocuments(new ArrayList<>());
-            }
-            application.getDocuments().add(proofDoc);
-            applicationRepo.save(application);
+        String secureUrl = cloudinaryService.uploadFile(file, "govt-scheme-docs");
+        if (secureUrl == null || secureUrl.isBlank()) {
+            throw new RuntimeException("Cloudinary returned an empty URL for milestone proof upload.");
         }
+
+        ApplicationDocument proofDoc = new ApplicationDocument();
+        proofDoc.setApplication(application);
+        proofDoc.setDocumentType(com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF);
+        String docName = (file != null && file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank())
+                ? file.getOriginalFilename()
+                : "Stage " + milestone.getStageNumber() + " Proof - " + milestone.getMilestoneName();
+        proofDoc.setFileName(docName);
+        proofDoc.setFilePath("");
+        proofDoc.setVerified(false);
+        proofDoc.setDocumentUrl(secureUrl);
+
+        if (application.getDocuments() == null) {
+            application.setDocuments(new ArrayList<>());
+        }
+        application.getDocuments().add(proofDoc);
+        applicationRepo.save(application);
 
         milestone.setCompletionStatus(MilestoneStatus.PROOF_SUBMITTED);
         DisbursementMilestone saved = milestoneRepo.save(milestone);
 
-        String notesDesc = (request != null && request.getNotes() != null && !request.getNotes().isBlank()) ? " | Notes: " + request.getNotes() : "";
-        String docDesc = (request != null && request.getProofDocumentUrl() != null && !request.getProofDocumentUrl().isBlank()) ? " | Document: " + request.getProofDocumentUrl() : "";
+        String notesDesc = (notes != null && !notes.isBlank()) ? " | Notes: " + notes : "";
+        String docDesc = " | Document: " + secureUrl;
         AuditLog audit = AuditLog.builder()
                 .auditId(UUID.randomUUID().toString())
                 .user(performer != null ? performer : application.getUser())
@@ -250,7 +259,7 @@ public class DisbursementServiceImpl implements DisbursementService {
             );
         }
 
-        return mapToMilestoneResponse(saved, application, request != null ? request.getNotes() : null);
+        return mapToMilestoneResponse(saved, application, notes);
     }
 
     @Override
@@ -259,8 +268,9 @@ public class DisbursementServiceImpl implements DisbursementService {
         DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
 
-        if (milestone.getCompletionStatus() == MilestoneStatus.RELEASED) {
-            throw new BadRequestException("Milestone is already released and cannot be rejected");
+        if (milestone.getCompletionStatus() != MilestoneStatus.PROOF_SUBMITTED) {
+            throw new BadRequestException("Milestone status is " + milestone.getCompletionStatus()
+                    + " and must be PROOF_SUBMITTED before rejection");
         }
 
         String reason = (request != null && request.getReason() != null && !request.getReason().isBlank())
@@ -268,16 +278,12 @@ public class DisbursementServiceImpl implements DisbursementService {
                 : "Proof verification failed. Please provide compliant documentation.";
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        Users performer = null;
-        if (auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
-            performer = userRepo.findByUsername(auth.getName()).orElse(null);
-            if (performer != null) {
-                Role role = performer.getRole();
-                boolean isOfficer = role == Role.FIELD_OFFICER || role == Role.DISTRICT_OFFICER || role == Role.REGIONAL_OFFICER || role == Role.FINANCE_OFFICER || role == Role.ADMIN;
-                if (!isOfficer) {
-                    throw new BadRequestException("Only an authorized officer can reject stage proofs");
-                }
-            }
+        Users performer = auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())
+                ? userRepo.findByUsername(auth.getName()).orElse(null)
+                : null;
+        if (performer == null || performer.getRole() != Role.FINANCE_OFFICER) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only Finance Officer can perform this action");
         }
 
         milestone.setCompletionStatus(MilestoneStatus.PROOF_REJECTED);
@@ -315,21 +321,18 @@ public class DisbursementServiceImpl implements DisbursementService {
         DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
 
-        if (milestone.getCompletionStatus() == MilestoneStatus.RELEASED) {
-            throw new BadRequestException("Milestone is already released");
+        if (milestone.getCompletionStatus() != MilestoneStatus.PROOF_SUBMITTED) {
+            throw new BadRequestException("Milestone status is " + milestone.getCompletionStatus()
+                    + " and must be PROOF_SUBMITTED before completion");
         }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        Users performer = null;
-        if (auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
-            performer = userRepo.findByUsername(auth.getName()).orElse(null);
-            if (performer != null) {
-                Role role = performer.getRole();
-                boolean isOfficer = role == Role.FIELD_OFFICER || role == Role.DISTRICT_OFFICER || role == Role.REGIONAL_OFFICER || role == Role.FINANCE_OFFICER || role == Role.ADMIN;
-                if (!isOfficer) {
-                    throw new BadRequestException("Only an authorized officer can approve and complete milestone proofs");
-                }
-            }
+        Users performer = auth != null && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())
+                ? userRepo.findByUsername(auth.getName()).orElse(null)
+                : null;
+        if (performer == null || performer.getRole() != Role.FINANCE_OFFICER) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only Finance Officer can perform this action");
         }
 
         milestone.setCompletionStatus(MilestoneStatus.COMPLETED);
@@ -371,6 +374,16 @@ public class DisbursementServiceImpl implements DisbursementService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DisbursementMilestoneResponse releaseMilestone(Long milestoneId) {
+        Authentication releaseAuthentication = SecurityContextHolder.getContext().getAuthentication();
+        String releaseUsername = releaseAuthentication != null ? releaseAuthentication.getName() : null;
+        Users releasingOfficer = releaseUsername != null
+                ? userRepo.findByUsername(releaseUsername).orElse(null)
+                : null;
+        if (releasingOfficer == null || releasingOfficer.getRole() != Role.FINANCE_OFFICER) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only Finance Officer can perform this action");
+        }
+
         DisbursementMilestone milestone = milestoneRepo.findById(milestoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with ID: " + milestoneId));
 
@@ -934,6 +947,24 @@ public class DisbursementServiceImpl implements DisbursementService {
                         fileName = doc.getFileName();
                         break;
                     }
+                }
+            }
+
+            // Existing proof uploads retain the beneficiary's original filename, which
+            // may not include the stage number. A plan allows only one proof to be
+            // awaiting review at a time, so use the most recently uploaded compliance
+            // proof for the currently submitted milestone as a safe fallback.
+            if (proofUrl == null && milestone.getCompletionStatus() == MilestoneStatus.PROOF_SUBMITTED) {
+                ApplicationDocument latestProof = app.getDocuments().stream()
+                        .filter(doc -> doc.getDocumentType() == com.example.gov_scheme_backend.enums.DocumentType.STAGE_COMPLIANCE_PROOF)
+                        .filter(doc -> doc.getDocumentUrl() != null && !doc.getDocumentUrl().isBlank())
+                        .max(Comparator.comparing(
+                                ApplicationDocument::getUploadedAt,
+                                Comparator.nullsFirst(Comparator.naturalOrder())))
+                        .orElse(null);
+                if (latestProof != null) {
+                    proofUrl = latestProof.getDocumentUrl();
+                    fileName = latestProof.getFileName();
                 }
             }
         }
