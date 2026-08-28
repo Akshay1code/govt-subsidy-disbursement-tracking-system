@@ -1,9 +1,9 @@
 import '../../styles/Dashboard.css';
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getSchemes, addScheme, updateScheme } from '../../services/schemeService'
-import DashboardTopbar from '../../components/DashboardTopbar'
+import AdminLayout from '../../components/AdminLayout'
 import { updateApprovalStatus, getOfficerRequests, getAllocationSummary } from '../../services/adminService'
 import { getApplications, allocateApplication, getAvailableOfficersWorkload, batchAllocateApplications } from '../../services/applicationService'
 import { getProfilesByRole } from '../../services/adminService'
@@ -14,8 +14,17 @@ import { FaUserShield, FaTools, FaClipboardList, FaComments, FaHourglassHalf, Fa
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const contentRef = useRef(null)
   const [profile, setProfile] = useState(null)
+
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab)
+      // clear state so it doesn't get stuck on refresh
+      window.history.replaceState({}, '')
+    }
+  }, [location.state])
 
   // Auth guard: backend cookie + profile role check
   useEffect(() => {
@@ -136,7 +145,7 @@ export default function AdminDashboard() {
   const [queries, setQueries] = useState([])
 
   // View state (declared early so useEffects below can reference it)
-  const [activeTab, setActiveTab] = useState('allocation') // 'allocation' | 'officers' | 'schemes' | 'action-logs' | 'officer-requests' | 'queries' | 'profile'
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'allocation') // 'allocation' | 'officers' | 'schemes' | 'action-logs' | 'officer-requests' | 'queries' | 'profile'
 
   // Officer Requests from backend (GET /gov/auth/officer/get-request)
   const [officerRequests, setOfficerRequests] = useState([])
@@ -536,7 +545,13 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="dashboard-layout">
+    <AdminLayout
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      userName={profile?.fullName || 'System Administrator'}
+      userRole={profile?.role || 'ADMIN'}
+      onLogout={handleLogout}
+    >
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
@@ -552,743 +567,678 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
-      {/* ── Admin Top Navigation Bar ── */}
-      <DashboardTopbar
-        brandTitle="GS GOV SUBSIDY"
-        brandSubtitle="ADMIN DASHBOARD"
-        userName={profile?.fullName || 'System Administrator'}
-        userRole={profile?.role || 'ADMIN'}
-        onLogout={handleLogout}
-        homeLink="/"
-        homeLabel="Back to Home"
-        showHomeLink
-      />
+      <div ref={contentRef} style={{ animation: 'fadeIn 0.3s ease' }}>
+        <div className="pane-header" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: '0 0 0.5rem 0' }}>{tabContentMeta[activeTab]?.title || 'Admin Dashboard'}</h2>
+          <p style={{ color: 'var(--text-soft)', margin: 0 }}>{tabContentMeta[activeTab]?.subtitle || 'Manage the subsidy platform from one consistent portal.'}</p>
+        </div>
 
-      {/* ── Main Content Container ── */}
-      <main ref={contentRef} className="dashboard-main">
+        {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
 
-        {/* Tab Navigation */}
-        <motion.div
-          initial={{ opacity: 0, y: -10, scale: 0.99 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="dashboard-tabs"
-        >
-          <button
-            className={`dashboard-tab ${activeTab === 'allocation' ? 'active' : ''}`}
-            onClick={() => handleTabChange('allocation')}
+        {activeTab === 'allocation' && (
+          <motion.div
+            key="allocation"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
           >
-            <FaFileInvoice /> Application Allocation ({allocationApps.length})
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'officers' ? 'active' : ''}`}
-            onClick={() => handleTabChange('officers')}
-          >
-            <FaUserShield /> Officer Work Tracker ({officers.length})
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'schemes' ? 'active' : ''}`}
-            onClick={() => handleTabChange('schemes')}
-          >
-            <FaTools /> Manage Schemes ({schemes.length})
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'action-logs' ? 'active' : ''}`}
-            onClick={() => handleTabChange('action-logs')}
-          >
-            <FaUserShield /> Officer Actions History
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'officer-requests' ? 'active' : ''}`}
-            onClick={() => handleTabChange('officer-requests')}
-          >
-            <FaClipboardList /> Officer Requests ({officerRequests.length})
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'queries' ? 'active' : ''}`}
-            onClick={() => handleTabChange('queries')}
-          >
-            <FaComments /> Citizen Queries ({queries.length})
-          </button>
-          <button
-            className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => handleTabChange('profile')}
-          >
-            <FaUserCircle /> Profile
-          </button>
-        </motion.div>
+            {/* Stage summary cards — counts only, no application detail */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              {['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => {
+                const entry = allocationSummary.find(s => s.stage === stage)
+                const unassignedCount = entry ? entry.unassignedCount : 0
 
-        <div className="tab-pane">
-          <div className="pane-header">
-            <h2>{tabContentMeta[activeTab]?.title || 'Admin Dashboard'}</h2>
-            <p>{tabContentMeta[activeTab]?.subtitle || 'Manage the subsidy platform from one consistent portal.'}</p>
-          </div>
-          {/* ── TAB 1: ANALYTICS & INSIGHTS ── */}
+                // Calculate total applications in this stage (assigned + unassigned)
+                const totalCount = applications.filter(app => {
+                  const status = String(app.status || app.applicationStatus || '').toUpperCase()
+                  if (['APPROVED', 'REJECTED', 'DISBURSED'].includes(status)) return false
+                  return String(app.currentStage || '').toUpperCase() === stage
+                }).length
 
-          {activeTab === 'allocation' && (
-            <motion.div
-              key="allocation"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              {/* Stage summary cards — counts only, no application detail */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                {['FIELD_OFFICER', 'DISTRICT_OFFICER', 'REGIONAL_OFFICER', 'FINANCE_OFFICER'].map(stage => {
-                  const entry = allocationSummary.find(s => s.stage === stage)
-                  const unassignedCount = entry ? entry.unassignedCount : 0
+                const active = allocationStageTab === stage
+                return (
+                  <button
+                    key={stage}
+                    onClick={() => setAllocationStageTab(stage)}
+                    className="officer-stat-card"
+                    style={{
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      border: active ? '2px solid var(--accent)' : '1px solid var(--border)',
+                      background: 'var(--panel-strong)',
+                      borderRadius: '14px',
+                      padding: '1.2rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      {stage.replace('_', ' ')}
+                    </div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)', marginTop: '0.3rem' }}>
+                      {totalCount}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text)' }}>
+                      total application{totalCount === 1 ? '' : 's'} in stage
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: unassignedCount > 0 ? '#f59e0b' : 'var(--muted)', marginTop: '0.4rem', fontWeight: 600 }}>
+                      • {unassignedCount} awaiting allocation
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
 
-                  // Calculate total applications in this stage (assigned + unassigned)
-                  const totalCount = applications.filter(app => {
-                    const status = String(app.status || app.applicationStatus || '').toUpperCase()
-                    if (['APPROVED', 'REJECTED', 'DISBURSED'].includes(status)) return false
-                    return String(app.currentStage || '').toUpperCase() === stage
-                  }).length
-
-                  const active = allocationStageTab === stage
-                  return (
-                    <button
-                      key={stage}
-                      onClick={() => setAllocationStageTab(stage)}
-                      className="officer-stat-card"
-                      style={{
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        border: active ? '2px solid var(--accent)' : '1px solid var(--border)',
-                        background: 'var(--panel-strong)',
-                        borderRadius: '14px',
-                        padding: '1.2rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                        {stage.replace('_', ' ')}
-                      </div>
-                      <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text)', marginTop: '0.3rem' }}>
-                        {totalCount}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text)' }}>
-                        total application{totalCount === 1 ? '' : 's'} in stage
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: unassignedCount > 0 ? '#f59e0b' : 'var(--muted)', marginTop: '0.4rem', fontWeight: 600 }}>
-                        • {unassignedCount} awaiting allocation
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Batch allocation control — one count for the whole stage. The
+            {/* Batch allocation control — one count for the whole stage. The
                 backend picks the oldest unassigned applications (FCFS) and
                 spreads them across the least-loaded officers. The admin does
                 not choose the officer. */}
-              {(() => {
-                const totalRemaining = officerWorkloads.reduce((sum, o) => sum + (o.remainingCapacity || 0), 0)
-                const queueEntry = allocationSummary.find(s => s.stage === allocationStageTab)
-                const queueCount = queueEntry ? queueEntry.unassignedCount : 0
-                const suggestedMax = Math.min(queueCount, totalRemaining)
-                return (
-                  <div style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '14px', padding: '1.3rem', marginBottom: '1.6rem' }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.35rem' }}>
-                      Allocate applications — {allocationStageTab.replace(/_/g, ' ')}
+            {(() => {
+              const totalRemaining = officerWorkloads.reduce((sum, o) => sum + (o.remainingCapacity || 0), 0)
+              const queueEntry = allocationSummary.find(s => s.stage === allocationStageTab)
+              const queueCount = queueEntry ? queueEntry.unassignedCount : 0
+              const suggestedMax = Math.min(queueCount, totalRemaining)
+              return (
+                <div style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '14px', padding: '1.3rem', marginBottom: '1.6rem' }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.35rem' }}>
+                    Allocate applications — {allocationStageTab.replace(/_/g, ' ')}
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 0.9rem 0' }}>
+                    Enter how many applications to assign. The system takes the oldest unassigned applications first and distributes them to the least-loaded officers automatically.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)' }}>{queueCount}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>awaiting allocation</div>
                     </div>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 0.9rem 0' }}>
-                      Enter how many applications to assign. The system takes the oldest unassigned applications first and distributes them to the least-loaded officers automatically.
-                    </p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)' }}>{queueCount}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>awaiting allocation</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: totalRemaining > 0 ? '#22c55e' : '#ef4444' }}>{totalRemaining}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>officer capacity free</div>
-                      </div>
+                    <div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: totalRemaining > 0 ? '#22c55e' : '#ef4444' }}>{totalRemaining}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>officer capacity free</div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        type="number"
-                        min="1"
-                        value={fcfsCount}
-                        onChange={(e) => setFcfsCount(e.target.value)}
-                        placeholder="Count"
-                        style={{ width: '120px', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.9rem', background: 'var(--panel)', color: 'var(--text)' }}
-                        disabled={fcfsAllocating}
-                      />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      value={fcfsCount}
+                      onChange={(e) => setFcfsCount(e.target.value)}
+                      placeholder="Count"
+                      style={{ width: '120px', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.9rem', background: 'var(--panel)', color: 'var(--text)' }}
+                      disabled={fcfsAllocating}
+                    />
+                    <button
+                      className="button button--primary"
+                      onClick={handleBatchAllocate}
+                      disabled={fcfsAllocating || suggestedMax <= 0}
+                      style={{ padding: '0.55rem 1.3rem', fontSize: '0.9rem' }}
+                    >
+                      {fcfsAllocating ? 'Allocating…' : 'Allocate'}
+                    </button>
+                    {suggestedMax > 0 && (
                       <button
-                        className="button button--primary"
-                        onClick={handleBatchAllocate}
-                        disabled={fcfsAllocating || suggestedMax <= 0}
-                        style={{ padding: '0.55rem 1.3rem', fontSize: '0.9rem' }}
+                        type="button"
+                        onClick={() => setFcfsCount(suggestedMax)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}
                       >
-                        {fcfsAllocating ? 'Allocating…' : 'Allocate'}
+                        Fill {suggestedMax}
                       </button>
-                      {suggestedMax > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setFcfsCount(suggestedMax)}
-                          style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}
-                        >
-                          Fill {suggestedMax}
-                        </button>
-                      )}
-                    </div>
-                    {suggestedMax <= 0 && (
-                      <p style={{ fontSize: '0.78rem', color: '#ef4444', margin: '0.8rem 0 0 0' }}>
-                        {queueCount === 0 ? 'No applications are awaiting allocation at this stage.' : 'No officer has free capacity at this stage.'}
-                      </p>
                     )}
                   </div>
-                )
-              })()}
-
-              {/* Officer workload roster (read-only). The engine assigns officers;
-                this is a live view of who is carrying how much. */}
-              <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.8rem 0', color: 'var(--text)' }}>
-                {allocationStageTab.replace(/_/g, ' ')} officer workload
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                {workloadsLoading && (
-                  <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Loading workloads…</p>
-                )}
-                {!workloadsLoading && officerWorkloads.length === 0 && (
-                  <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No officers found for this stage.</p>
-                )}
-                {officerWorkloads.map(officer => {
-                  const pct = officer.capacity > 0 ? Math.min(100, Math.round((officer.allocatedCount / officer.capacity) * 100)) : 0
-                  return (
-                    <div
-                      key={officer.officerId}
-                      style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}
-                    >
-                      <div style={{ fontWeight: 700, color: 'var(--text)' }}>{officer.officerName}</div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
-                        <strong>{officer.allocatedCount}</strong> / {officer.capacity} assigned
-                        {' · '}
-                        <span style={{ color: officer.remainingCapacity > 0 ? '#22c55e' : '#ef4444' }}>
-                          {officer.remainingCapacity} slot{officer.remainingCapacity === 1 ? '' : 's'} free
-                        </span>
-                      </div>
-                      <div style={{ height: '6px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: pct >= 100 ? '#ef4444' : 'var(--accent)' }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── TAB 3: OFFICER WORK PROGRESS TRACKER ── */}
-          {activeTab === 'officers' && (
-            <motion.div
-              key="officers"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Work Progress & Performance Tracker</h2>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Monitor officer review queues, turnaround efficiency, approval ratios, and audit histories.</p>
+                  {suggestedMax <= 0 && (
+                    <p style={{ fontSize: '0.78rem', color: '#ef4444', margin: '0.8rem 0 0 0' }}>
+                      {queueCount === 0 ? 'No applications are awaiting allocation at this stage.' : 'No officer has free capacity at this stage.'}
+                    </p>
+                  )}
                 </div>
-                <Link to="/officer/register" className="button button--primary" style={{ fontSize: '0.85rem' }}>
-                  + Register New Officer
-                </Link>
-              </div>
+              )
+            })()}
 
-              {/* Officer Performance Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
-                {officers.map(officer => {
-                  // Applications assigned to this officer
-                  const officerKey = officer.officerId || officer.uniqueID || officer.id
-                  const officerApps = applications.filter(a => String(a.assignedOfficerId) === String(officerKey))
-                  const assignedCount = officerApps.length
-                  const pendingCount = officerApps.filter(a => a.status === 'Pending').length
-                  const approvedCount = officerApps.filter(a => a.status === 'Approved').length
-                  const rejectedCount = officerApps.filter(a => a.status === 'Rejected').length
-                  const reviewedCount = approvedCount + rejectedCount
-                  const approvalRate = reviewedCount > 0 ? ((approvedCount / reviewedCount) * 100).toFixed(0) : 100
-
-                  const loadStatus = pendingCount >= 3 ? { text: 'High Workload', color: '#ef4444' } : pendingCount >= 1 ? { text: 'Optimal Load', color: '#f59e0b' } : { text: 'Available', color: '#22c55e' }
-
-                  return (
-                    <div
-                      key={officer.officerId || officer.uniqueID || officer.id}
-                      className="officer-progress-card"
-                      style={{
-                        background: 'var(--panel-strong)',
-                        borderRadius: '14px',
-                        border: '1px solid var(--border)',
-                        padding: '1.4rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1rem'
-                      }}
-                    >
-                      {/* Card Header */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text)' }}>{officer.fullName}</h3>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 600 }}>{officer.designation}</span>
-                          <div style={{ fontSize: '0.76rem', color: '#82aeca', marginTop: '0.2rem' }}>{officer.department || 'Subsidy Dept'} • {officer.district || 'District Nodal'}</div>
-                        </div>
-                        <span style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', borderRadius: '12px', fontWeight: 700, background: `${loadStatus.color}20`, color: loadStatus.color, border: `1px solid ${loadStatus.color}40` }}>
-                          {loadStatus.text}
-                        </span>
-                      </div>
-
-                      {/* ID & Email Badge */}
-                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--muted)' }}>
-                        <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontFamily: 'monospace' }}>ID: {officerKey}</span>
-                        <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>{officer.email}</span>
-                      </div>
-
-                      {/* Progress & Stat Metrics */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)' }}>{assignedCount}</div>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Assigned</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b' }}>{pendingCount}</div>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Pending</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#22c55e' }}>{reviewedCount}</div>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Reviewed</span>
-                        </div>
-                      </div>
-
-                      {/* Approval Rate Meter */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.4rem', color: 'var(--muted)' }}>
-                          <span>Approval Rate</span>
-                          <strong style={{ color: 'var(--text)' }}>{approvalRate}% ({approvedCount} approved / {rejectedCount} rejected)</strong>
-                        </div>
-                        <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${approvalRate}%`, background: 'linear-gradient(90deg, #16a34a, #22c55e)', borderRadius: '999px' }} />
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button
-                          className="button button--ghost"
-                          style={{ flex: 1, fontSize: '0.78rem', padding: '0.45rem' }}
-                          onClick={() => setSelectedOfficer({ officer, apps: officerApps })}
-                        >
-                          Activity Audit Log
-                        </button>
-                      </div>
-
+            {/* Officer workload roster (read-only). The engine assigns officers;
+                this is a live view of who is carrying how much. */}
+            <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.8rem 0', color: 'var(--text)' }}>
+              {allocationStageTab.replace(/_/g, ' ')} officer workload
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+              {workloadsLoading && (
+                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Loading workloads…</p>
+              )}
+              {!workloadsLoading && officerWorkloads.length === 0 && (
+                <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No officers found for this stage.</p>
+              )}
+              {officerWorkloads.map(officer => {
+                const pct = officer.capacity > 0 ? Math.min(100, Math.round((officer.allocatedCount / officer.capacity) * 100)) : 0
+                return (
+                  <div
+                    key={officer.officerId}
+                    style={{ background: 'var(--panel-strong)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}
+                  >
+                    <div style={{ fontWeight: 700, color: 'var(--text)' }}>{officer.officerName}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
+                      <strong>{officer.allocatedCount}</strong> / {officer.capacity} assigned
+                      {' · '}
+                      <span style={{ color: officer.remainingCapacity > 0 ? '#22c55e' : '#ef4444' }}>
+                        {officer.remainingCapacity} slot{officer.remainingCapacity === 1 ? '' : 's'} free
+                      </span>
                     </div>
-                  )
-                })}
+                    <div style={{ height: '6px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: pct >= 100 ? '#ef4444' : 'var(--accent)' }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── TAB 3: OFFICER WORK PROGRESS TRACKER ── */}
+        {activeTab === 'officers' && (
+          <motion.div
+            key="officers"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Work Progress & Performance Tracker</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Monitor officer review queues, turnaround efficiency, approval ratios, and audit histories.</p>
               </div>
+              <Link to="/officer/register" className="button button--primary" style={{ fontSize: '0.85rem' }}>
+                + Register New Officer
+              </Link>
+            </div>
 
-            </motion.div>
-          )}
+            {/* Officer Performance Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
+              {officers.map(officer => {
+                // Applications assigned to this officer
+                const officerKey = officer.officerId || officer.uniqueID || officer.id
+                const officerApps = applications.filter(a => String(a.assignedOfficerId) === String(officerKey))
+                const assignedCount = officerApps.length
+                const pendingCount = officerApps.filter(a => a.status === 'Pending').length
+                const approvedCount = officerApps.filter(a => a.status === 'Approved').length
+                const rejectedCount = officerApps.filter(a => a.status === 'Rejected').length
+                const reviewedCount = approvedCount + rejectedCount
+                const approvalRate = reviewedCount > 0 ? ((approvedCount / reviewedCount) * 100).toFixed(0) : 100
 
-          {/* ── TAB 4: CITIZEN SUPPORT QUERIES ── */}
-          {activeTab === 'queries' && (
-            <motion.div
-              key="queries"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Citizen Support Queries & Assistance Tickets</h2>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Review messages submitted through the portal support desk and send officer responses.</p>
-              </div>
+                const loadStatus = pendingCount >= 3 ? { text: 'High Workload', color: '#ef4444' } : pendingCount >= 1 ? { text: 'Optimal Load', color: '#f59e0b' } : { text: 'Available', color: '#22c55e' }
 
-              <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Ticket ID</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitter Name</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Contact Info</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Subject</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted At</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Action</th>
+                return (
+                  <div
+                    key={officer.officerId || officer.uniqueID || officer.id}
+                    className="officer-progress-card"
+                    style={{
+                      background: 'var(--panel-strong)',
+                      borderRadius: '14px',
+                      border: '1px solid var(--border)',
+                      padding: '1.4rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}
+                  >
+                    {/* Card Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text)' }}>{officer.fullName}</h3>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 600 }}>{officer.designation}</span>
+                        <div style={{ fontSize: '0.76rem', color: '#82aeca', marginTop: '0.2rem' }}>{officer.department || 'Subsidy Dept'} • {officer.district || 'District Nodal'}</div>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', borderRadius: '12px', fontWeight: 700, background: `${loadStatus.color}20`, color: loadStatus.color, border: `1px solid ${loadStatus.color}40` }}>
+                        {loadStatus.text}
+                      </span>
+                    </div>
+
+                    {/* ID & Email Badge */}
+                    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--muted)' }}>
+                      <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontFamily: 'monospace' }}>ID: {officerKey}</span>
+                      <span style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>{officer.email}</span>
+                    </div>
+
+                    {/* Progress & Stat Metrics */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)' }}>{assignedCount}</div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Assigned</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b' }}>{pendingCount}</div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Pending</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#22c55e' }}>{reviewedCount}</div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>Reviewed</span>
+                      </div>
+                    </div>
+
+                    {/* Approval Rate Meter */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.4rem', color: 'var(--muted)' }}>
+                        <span>Approval Rate</span>
+                        <strong style={{ color: 'var(--text)' }}>{approvalRate}% ({approvedCount} approved / {rejectedCount} rejected)</strong>
+                      </div>
+                      <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${approvalRate}%`, background: 'linear-gradient(90deg, #16a34a, #22c55e)', borderRadius: '999px' }} />
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        className="button button--ghost"
+                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.45rem' }}
+                        onClick={() => setSelectedOfficer({ officer, apps: officerApps })}
+                      >
+                        Activity Audit Log
+                      </button>
+                    </div>
+
+                  </div>
+                )
+              })}
+            </div>
+
+          </motion.div>
+        )}
+
+        {/* ── TAB 4: CITIZEN SUPPORT QUERIES ── */}
+        {activeTab === 'queries' && (
+          <motion.div
+            key="queries"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Citizen Support Queries & Assistance Tickets</h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Review messages submitted through the portal support desk and send officer responses.</p>
+            </div>
+
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Ticket ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitter Name</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Contact Info</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Subject</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted At</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {queries.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                        No support queries submitted yet.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {queries.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                          No support queries submitted yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      queries.map(q => {
-                        const statusColor = q.status === 'Resolved' ? '#22c55e' : q.status === 'In Progress' ? '#82aeca' : '#f59e0b'
+                  ) : (
+                    queries.map(q => {
+                      const statusColor = q.status === 'Resolved' ? '#22c55e' : q.status === 'In Progress' ? '#82aeca' : '#f59e0b'
+                      return (
+                        <tr key={q.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, fontFamily: 'monospace', color: '#ffc76a' }}>{q.id}</td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{q.name}</td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem' }}>
+                            <div>{q.email}</div>
+                            <small style={{ color: 'var(--muted)' }}>{q.phone || 'N/A'}</small>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.88rem' }}>{q.subject}</td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{q.submittedAt}</td>
+                          <td style={{ padding: '0.9rem 1.2rem' }}>
+                            <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>
+                              {q.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
+                            <button
+                              className="button button--ghost"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                              onClick={() => { setSelectedQuery(q); setQueryReplyText(q.reply || '') }}
+                            >
+                              Review & Respond
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── TAB: OFFICER REGISTRATION REQUESTS ── */}
+        {activeTab === 'officer-requests' && (
+          <motion.div
+            key="officer-requests"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Registration Requests</h2>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>Review officer account requests. Approving creates a live system account.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <select
+                  value={requestsFilter}
+                  onChange={e => setRequestsFilter(e.target.value)}
+                  style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)', fontSize: '0.85rem' }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+                <button
+                  className="button button--ghost"
+                  style={{ fontSize: '0.82rem' }}
+                  onClick={fetchOfficerRequests}
+                  disabled={requestsLoading}
+                >
+                  {requestsLoading ? '⟳ Loading...' : '⟳ Refresh'}
+                </button>
+              </div>
+            </div>
+
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Full Name</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Role</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Mobile No</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Region / District</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>State</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestsLoading ? (
+                    <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading requests...</td></tr>
+                  ) : officerRequests.filter(r => requestsFilter === 'All' || r.status === requestsFilter).length === 0 ? (
+                    <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No requests found for this filter.</td></tr>
+                  ) : (
+                    officerRequests
+                      .filter(r => requestsFilter === 'All' || r.status === requestsFilter)
+                      .map((r, idx) => {
+                        const statusColor = r.status === 'APPROVED' ? '#22c55e' : r.status === 'REJECTED' ? '#ef4444' : '#f59e0b'
+                        const submittedDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'
                         return (
-                          <tr key={q.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, fontFamily: 'monospace', color: '#ffc76a' }}>{q.id}</td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{q.name}</td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem' }}>
-                              <div>{q.email}</div>
-                              <small style={{ color: 'var(--muted)' }}>{q.phone || 'N/A'}</small>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{r.fullName}</td>
+                            <td style={{ padding: '0.9rem 1.2rem' }}>
+                              <span style={{ padding: '0.2rem 0.55rem', borderRadius: '4px', background: 'rgba(130, 174, 202, 0.15)', fontSize: '0.8rem', color: '#82aeca', fontWeight: 600 }}>{r.role}</span>
                             </td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.88rem' }}>{q.subject}</td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{q.submittedAt}</td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem', fontFamily: 'monospace' }}>{r.mobileNo}</td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>
+                              <div>{r.region}</div>
+                              <small style={{ color: 'var(--muted)' }}>{r.district}</small>
+                            </td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>{r.state}</td>
+                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{submittedDate}</td>
                             <td style={{ padding: '0.9rem 1.2rem' }}>
                               <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>
-                                {q.status}
+                                {r.status}
                               </span>
                             </td>
                             <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
-                              <button
-                                className="button button--ghost"
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                                onClick={() => { setSelectedQuery(q); setQueryReplyText(q.reply || '') }}
-                              >
-                                Review & Respond
-                              </button>
+                              {r.status === 'PENDING' ? (
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    type="button"
+                                    className="button button--ghost"
+                                    style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' }}
+                                    onClick={() => handleRequestAction(r, 'APPROVED')}
+                                  >
+                                    <FaCheck style={{ fontSize: '0.85rem' }} /> Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="button button--ghost"
+                                    style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                                    onClick={() => handleRequestAction(r, 'REJECTED')}
+                                  >
+                                    <FaTimesCircle style={{ fontSize: '0.85rem' }} /> Reject
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>—</span>
+                              )}
                             </td>
                           </tr>
                         )
                       })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
-          {/* ── TAB: OFFICER REGISTRATION REQUESTS ── */}
-          {activeTab === 'officer-requests' && (
-            <motion.div
-              key="officer-requests"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Registration Requests</h2>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--muted)' }}>Review officer account requests. Approving creates a live system account.</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <select
-                    value={requestsFilter}
-                    onChange={e => setRequestsFilter(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)', fontSize: '0.85rem' }}
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                  <button
-                    className="button button--ghost"
-                    style={{ fontSize: '0.82rem' }}
-                    onClick={fetchOfficerRequests}
-                    disabled={requestsLoading}
-                  >
-                    {requestsLoading ? '⟳ Loading...' : '⟳ Refresh'}
-                  </button>
-                </div>
-              </div>
+        {/* ── TAB 5: MANAGE SCHEMES CRUD ── */}
+        {activeTab === 'profile' && (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <ProfilePanel
+              profile={profile}
+              role={profile?.role || 'ADMIN'}
+              editable={false}
+              deletable={false}
+              subtitle="Manage the administrator account details stored in the backend."
+            />
+          </motion.div>
+        )}
 
-              <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Full Name</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Role</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Mobile No</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Region / District</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>State</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Submitted</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+        {activeTab === 'schemes' && (
+          <motion.div
+            key="schemes"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Manage Government Subsidy Schemes</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Create new subsidy campaigns, update criteria parameters, or deprecate schemes.</p>
+              </div>
+              <button onClick={openCreateScheme} className="button button--primary" style={{ fontSize: '0.85rem' }}>
+                + Create New Scheme
+              </button>
+            </div>
+
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Code</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Name</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Category ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Allocated Funds</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Min Score</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schemes.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                        No schemes exist. Click "+ Create New Scheme" to get started.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {requestsLoading ? (
-                      <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading requests...</td></tr>
-                    ) : officerRequests.filter(r => requestsFilter === 'All' || r.status === requestsFilter).length === 0 ? (
-                      <tr><td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No requests found for this filter.</td></tr>
-                    ) : (
-                      officerRequests
-                        .filter(r => requestsFilter === 'All' || r.status === requestsFilter)
-                        .map((r, idx) => {
-                          const statusColor = r.status === 'APPROVED' ? '#22c55e' : r.status === 'REJECTED' ? '#ef4444' : '#f59e0b'
-                          const submittedDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'
-                          return (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                              <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{r.fullName}</td>
-                              <td style={{ padding: '0.9rem 1.2rem' }}>
-                                <span style={{ padding: '0.2rem 0.55rem', borderRadius: '4px', background: 'rgba(130, 174, 202, 0.15)', fontSize: '0.8rem', color: '#82aeca', fontWeight: 600 }}>{r.role}</span>
-                              </td>
-                              <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem', fontFamily: 'monospace' }}>{r.mobileNo}</td>
-                              <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>
-                                <div>{r.region}</div>
-                                <small style={{ color: 'var(--muted)' }}>{r.district}</small>
-                              </td>
-                              <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.87rem' }}>{r.state}</td>
-                              <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{submittedDate}</td>
-                              <td style={{ padding: '0.9rem 1.2rem' }}>
-                                <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>
-                                  {r.status}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
-                                {r.status === 'PENDING' ? (
-                                  <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                                    <button
-                                      type="button"
-                                      className="button button--ghost"
-                                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(34, 197, 94, 0.4)', color: '#22c55e' }}
-                                      onClick={() => handleRequestAction(r, 'APPROVED')}
-                                    >
-                                      <FaCheck style={{ fontSize: '0.85rem' }} /> Approve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="button button--ghost"
-                                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
-                                      onClick={() => handleRequestAction(r, 'REJECTED')}
-                                    >
-                                      <FaTimesCircle style={{ fontSize: '0.85rem' }} /> Reject
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>—</span>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── TAB 5: MANAGE SCHEMES CRUD ── */}
-          {activeTab === 'profile' && (
-            <motion.div
-              key="profile"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <ProfilePanel
-                profile={profile}
-                role={profile?.role || 'ADMIN'}
-                editable={false}
-                deletable={false}
-                subtitle="Manage the administrator account details stored in the backend."
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'schemes' && (
-            <motion.div
-              key="schemes"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Manage Government Subsidy Schemes</h2>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Create new subsidy campaigns, update criteria parameters, or deprecate schemes.</p>
-                </div>
-                <button onClick={openCreateScheme} className="button button--primary" style={{ fontSize: '0.85rem' }}>
-                  + Create New Scheme
-                </button>
-              </div>
-
-              <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Code</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Scheme Name</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Category ID</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Allocated Funds</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Min Score</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Status</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {schemes.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                          No schemes exist. Click "+ Create New Scheme" to get started.
+                  ) : (
+                    schemes.map(s => (
+                      <tr key={s.id || s.schemeCode} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#82aeca' }}>{s.schemeCode}</td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{s.schemeName || s.name || 'Unnamed Scheme'}</td>
+                        <td style={{ padding: '0.9rem 1.2rem' }}>
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
+                            {s.categoryId || s.category?.id || 'N/A'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, color: '#ffc76a' }}>₹{(s.allocatedFunds || 0).toLocaleString()}</td>
+                        <td style={{ padding: '0.9rem 1.2rem' }}>{s.minimumEligibleScore} pts</td>
+                        <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', color: s.active ? '#22c55e' : 'var(--muted)' }}>{s.active ? 'Active' : 'Inactive'}</td>
+                        <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button
+                              className="button button--ghost"
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                              onClick={() => openEditScheme(s)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="button button--ghost"
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                              onClick={() => handleDeleteScheme(s.id || s.schemeCode)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    ) : (
-                      schemes.map(s => (
-                        <tr key={s.id || s.schemeCode} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#82aeca' }}>{s.schemeCode}</td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontWeight: 600 }}>{s.schemeName || s.name || 'Unnamed Scheme'}</td>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── TAB 6: OFFICER ACTION HISTORY LOGS ── */}
+        {activeTab === 'action-logs' && (
+          <motion.div
+            key="action-logs"
+            initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ transformOrigin: 'top center' }}
+          >
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Action & Event History Log</h2>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Auditable trace of all verification activities, status decisions, and reassignments completed by regional officers.</p>
+            </div>
+
+            {/* Filters Row */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search log description, ticket ID, or log ID..."
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+                style={{ flex: 1, minWidth: '240px', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
+              />
+
+              <select
+                value={logActionFilter}
+                onChange={e => setLogActionFilter(e.target.value)}
+                style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
+              >
+                <option value="All">All Actions</option>
+                <option value="CREATE">CREATE</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+                <option value="APPROVE">APPROVE</option>
+                <option value="DISBURSE">DISBURSE</option>
+                <option value="LOGIN">LOGIN</option>
+                <option value="LOGOUT">LOGOUT</option>
+              </select>
+
+              <select
+                value={logOfficerFilter}
+                onChange={e => setLogOfficerFilter(e.target.value)}
+                style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
+              >
+                <option value="All">All Officers</option>
+                {officers.map(off => (
+                  <option key={off.officerId} value={off.officerId}>{off.fullName} ({off.officerId})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Log ID</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Timestamp</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Officer</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Action Type</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Description Details</th>
+                    <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Target ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                        No audit action logs found. Actions are logged when officers approve, reject, or verify applications.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogs.map(log => {
+                      let actionColor = '#82aeca'
+                      if (log.action.includes('APPROVE')) actionColor = '#22c55e'
+                      if (log.action.includes('UPDATE')) actionColor = '#f59e0b'
+                      if (log.action.includes('DELETE')) actionColor = '#ef4444'
+                      if (log.action.includes('CREATE')) actionColor = '#22c55e'
+                      if (log.action.includes('DISBURSE')) actionColor = '#10b981'
+
+                      return (
+                        <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--muted)' }}>{log.id}</td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{log.timestamp}</td>
                           <td style={{ padding: '0.9rem 1.2rem' }}>
-                            <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
-                              {s.categoryId || s.category?.id || 'N/A'}
+                            <div style={{ fontWeight: 600 }}>{log.officerName}</div>
+                            <small style={{ color: 'var(--muted)', fontFamily: 'monospace' }}>ID: {log.officerId}</small>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.2rem' }}>
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 700, background: `${actionColor}18`, color: actionColor, border: `1px solid ${actionColor}30`, whiteSpace: 'nowrap' }}>
+                              {log.action}
                             </span>
                           </td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontWeight: 700, color: '#ffc76a' }}>₹{(s.allocatedFunds || 0).toLocaleString()}</td>
-                          <td style={{ padding: '0.9rem 1.2rem' }}>{s.minimumEligibleScore} pts</td>
-                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem', color: s.active ? '#22c55e' : 'var(--muted)' }}>{s.active ? 'Active' : 'Inactive'}</td>
-                          <td style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              <button
-                                className="button button--ghost"
-                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
-                                onClick={() => openEditScheme(s)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="button button--ghost"
-                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
-                                onClick={() => handleDeleteScheme(s.id || s.schemeCode)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.88rem' }}>{log.details}</td>
+                          <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#ffc76a' }}>{log.targetId}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
 
-          {/* ── TAB 6: OFFICER ACTION HISTORY LOGS ── */}
-          {activeTab === 'action-logs' && (
-            <motion.div
-              key="action-logs"
-              initial={{ opacity: 0, y: 22, rotateX: -10, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -18, rotateX: 8, scale: 0.985 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              style={{ transformOrigin: 'top center' }}
-            >
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text)' }}>Officer Action & Event History Log</h2>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>Auditable trace of all verification activities, status decisions, and reassignments completed by regional officers.</p>
-              </div>
+      </div>
 
-              {/* Filters Row */}
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Search log description, ticket ID, or log ID..."
-                  value={logSearch}
-                  onChange={e => setLogSearch(e.target.value)}
-                  style={{ flex: 1, minWidth: '240px', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-                />
 
-                <select
-                  value={logActionFilter}
-                  onChange={e => setLogActionFilter(e.target.value)}
-                  style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-                >
-                  <option value="All">All Actions</option>
-                  <option value="CREATE">CREATE</option>
-                  <option value="UPDATE">UPDATE</option>
-                  <option value="DELETE">DELETE</option>
-                  <option value="APPROVE">APPROVE</option>
-                  <option value="DISBURSE">DISBURSE</option>
-                  <option value="LOGIN">LOGIN</option>
-                  <option value="LOGOUT">LOGOUT</option>
-                </select>
-
-                <select
-                  value={logOfficerFilter}
-                  onChange={e => setLogOfficerFilter(e.target.value)}
-                  style={{ padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel-strong)', color: 'var(--text)' }}
-                >
-                  <option value="All">All Officers</option>
-                  {officers.map(off => (
-                    <option key={off.officerId} value={off.officerId}>{off.fullName} ({off.officerId})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="table-card" style={{ background: 'var(--panel-strong)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Log ID</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Timestamp</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Officer</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Action Type</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Description Details</th>
-                      <th style={{ padding: '0.9rem 1.2rem', fontSize: '0.85rem' }}>Target ID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                          No audit action logs found. Actions are logged when officers approve, reject, or verify applications.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredLogs.map(log => {
-                        let actionColor = '#82aeca'
-                        if (log.action.includes('APPROVE')) actionColor = '#22c55e'
-                        if (log.action.includes('UPDATE')) actionColor = '#f59e0b'
-                        if (log.action.includes('DELETE')) actionColor = '#ef4444'
-                        if (log.action.includes('CREATE')) actionColor = '#22c55e'
-                        if (log.action.includes('DISBURSE')) actionColor = '#10b981'
-
-                        return (
-                          <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--muted)' }}>{log.id}</td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.82rem', color: 'var(--muted)' }}>{log.timestamp}</td>
-                            <td style={{ padding: '0.9rem 1.2rem' }}>
-                              <div style={{ fontWeight: 600 }}>{log.officerName}</div>
-                              <small style={{ color: 'var(--muted)', fontFamily: 'monospace' }}>ID: {log.officerId}</small>
-                            </td>
-                            <td style={{ padding: '0.9rem 1.2rem' }}>
-                              <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 700, background: `${actionColor}18`, color: actionColor, border: `1px solid ${actionColor}30`, whiteSpace: 'nowrap' }}>
-                                {log.action}
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontSize: '0.88rem' }}>{log.details}</td>
-                            <td style={{ padding: '0.9rem 1.2rem', fontFamily: 'monospace', fontWeight: 700, color: '#ffc76a' }}>{log.targetId}</td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
-
-        </div>
-
-      </main>
 
       {/* ── MODAL 1: APPLICATION DETAILS & ADMIN OVERRIDE ── */}
       <AnimatePresence>
@@ -1796,7 +1746,7 @@ export default function AdminDashboard() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </AdminLayout>
   )
 }
 

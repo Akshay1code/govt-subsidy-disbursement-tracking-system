@@ -126,7 +126,7 @@ export default function ProfilePanel({
       <div className="profile-container">
         <div className="profile-sidebar">
           <div className="profile-avatar-card">
-            <div className="avatar-circle">
+            <div className="avatar-circle" aria-hidden="true">
               {avatarLetter}
             </div>
             <h3>{profile?.fullName || 'Account Holder'}</h3>
@@ -137,7 +137,7 @@ export default function ProfilePanel({
           {deletable && onDelete && (
             <div className="profile-actions-panel">
               <button type="button" onClick={onDelete} className="btn-danger-outline">
-                <FaTrashAlt style={{ marginRight: '6px' }} />
+                <FaTrashAlt style={{ marginRight: '6px' }} aria-hidden="true" />
                 {deleteLabel}
               </button>
             </div>
@@ -149,7 +149,7 @@ export default function ProfilePanel({
             <h3>Profile Information</h3>
             {showEditor && !isEditing && (
               <button type="button" onClick={() => setIsEditing(true)} className="btn-edit-toggle">
-                <FaEdit style={{ marginRight: '6px' }} />
+                <FaEdit style={{ marginRight: '6px' }} aria-hidden="true" />
                 {editLabel}
               </button>
             )}
@@ -187,18 +187,18 @@ export default function ProfilePanel({
             {showEditor && isEditing && (
               <div className="form-actions">
                 <button type="button" className="button button--ghost" onClick={handleCancel} disabled={isSaving}>
-                  <FaTimes style={{ marginRight: '6px' }} />
+                  <FaTimes style={{ marginRight: '6px' }} aria-hidden="true" />
                   {cancelLabel}
                 </button>
                 <button type="submit" className="button button--primary" disabled={isSaving}>
-                  <FaSave style={{ marginRight: '6px' }} />
+                  <FaSave style={{ marginRight: '6px' }} aria-hidden="true" />
                   {isSaving ? 'Saving...' : saveLabel}
                 </button>
               </div>
             )}
 
             {error && (
-              <p style={{ margin: '1rem 0 0', color: '#ef4444', fontSize: '0.9rem', fontWeight: 600 }}>
+              <p style={{ margin: '1rem 0 0', color: '#B91C1C', fontSize: '0.9rem', fontWeight: 600 }}>
                 {error}
               </p>
             )}
